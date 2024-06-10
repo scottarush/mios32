@@ -1,4 +1,3 @@
-// $Id$
 /*
  * M3 SuperPedal
  *
@@ -214,111 +213,114 @@ void APP_DIN_NotifyToggle(u32 pin, u32 pin_value) {
 
    u32 timestamp = MIOS32_TIMESTAMP_Get();
 
-   u8 pressed = 0;
-   // pressed = 1 is more intuitive
+   // Use pressed = 1 as more intuitive, but it is opposite 
+   // for switches which are normally open (1) and pedals which are normal closed (0)
+   u8 switchPressed = 0;
    if (pin_value == 0)
-      pressed = 1;
+      switchPressed = 1;
+
+   u8 pedalPressed = pin_value;
       
  //  DEBUG_MSG("pin=%d value=%d",pin,pin_value);
 
    switch (pin) {
    case 15:
       // pedal #1
-      PEDALS_NotifyChange(1, pressed, timestamp);
+      PEDALS_NotifyChange(1, pedalPressed, timestamp);
       return;
    case 14:
       // pedal #2
-      PEDALS_NotifyChange(2, pressed, timestamp);
+      PEDALS_NotifyChange(2, pedalPressed, timestamp);
       return;
    case 13:
       // pedal #3
-      PEDALS_NotifyChange(3, pressed, timestamp);
+      PEDALS_NotifyChange(3, pedalPressed, timestamp);
       return;
    case 12:
       // pedal #4
-      PEDALS_NotifyChange(4, pressed, timestamp);
+      PEDALS_NotifyChange(4, pedalPressed, timestamp);
       return;
    case 11:
       // pedal #5
-      PEDALS_NotifyChange(5, pressed, timestamp);
+      PEDALS_NotifyChange(5, pedalPressed, timestamp);
       return;
    case 10:
       // pedal #6
-      PEDALS_NotifyChange(6, pressed, timestamp);
+      PEDALS_NotifyChange(6, pedalPressed, timestamp);
       return;
    case 9:
       // pedal #7
-      PEDALS_NotifyChange(7, pressed, timestamp);
+      PEDALS_NotifyChange(7, pedalPressed, timestamp);
       return;
    case 8:
       // pedal #8
-      PEDALS_NotifyChange(8, pressed, timestamp);
+      PEDALS_NotifyChange(8, pedalPressed, timestamp);
       return;
    case 0:
       // pedal #9
-      PEDALS_NotifyChange(9, pressed, timestamp);
+      PEDALS_NotifyChange(9, pedalPressed, timestamp);
       return;
    case 1:
       // pedal #10
-      PEDALS_NotifyChange(10, pressed, timestamp);
+      PEDALS_NotifyChange(10, pedalPressed, timestamp);
       return;
    case 2:
       // pedal #11
-      PEDALS_NotifyChange(11, pressed, timestamp);
+      PEDALS_NotifyChange(11, pedalPressed, timestamp);
       return;
    case 3:
       // pedal #12
-      PEDALS_NotifyChange(12, pressed, timestamp);
+      PEDALS_NotifyChange(12, pedalPressed, timestamp);
       return;
    case 4:
-      // make switch = num_pedals+1;
-      PEDALS_NotifyChange(13, pressed, timestamp);
+      // make switch
+      PEDALS_NotifyMakeChange(pedalPressed, timestamp);
       return;
    case 23:
-      HMI_NotifyToeToggle(1,pressed,timestamp);
+      HMI_NotifyToeToggle(1,switchPressed,timestamp);
       return;
    case 22:
-      HMI_NotifyToeToggle(2,pressed,timestamp);
+      HMI_NotifyToeToggle(2,switchPressed,timestamp);
       return;
    case 21:
-      HMI_NotifyToeToggle(3,pressed,timestamp);
+      HMI_NotifyToeToggle(3,switchPressed,timestamp);
       return;
    case 20:
-      HMI_NotifyToeToggle(4,pressed,timestamp);
+      HMI_NotifyToeToggle(4,switchPressed,timestamp);
       return;
    case 19:
-      HMI_NotifyToeToggle(5,pressed,timestamp);
+      HMI_NotifyToeToggle(5,switchPressed,timestamp);
       return;
    case 18:
-      HMI_NotifyToeToggle(6,pressed,timestamp);
+      HMI_NotifyToeToggle(6,switchPressed,timestamp);
       return;
    case 17:
-      HMI_NotifyToeToggle(7,pressed,timestamp);
+      HMI_NotifyToeToggle(7,switchPressed,timestamp);
       return;
    case 16:
-      HMI_NotifyToeToggle(8,pressed,timestamp);
+      HMI_NotifyToeToggle(8,switchPressed,timestamp);
       return;   
    case 31:
-      HMI_NotifyStompToggle(1,pressed,timestamp);
+      HMI_NotifyStompToggle(1,switchPressed,timestamp);
       return;
    case 29:
-      HMI_NotifyStompToggle(2,pressed,timestamp);
+      HMI_NotifyStompToggle(2,switchPressed,timestamp);
       return;
    case 26:
-      HMI_NotifyStompToggle(3,pressed,timestamp);
+      HMI_NotifyStompToggle(3,switchPressed,timestamp);
       return;
    case 25:
-      HMI_NotifyStompToggle(4,pressed,timestamp);
+      HMI_NotifyStompToggle(4,switchPressed,timestamp);
       return;
    case 7:
-      HMI_NotifyStompToggle(5,pressed,timestamp);
+      HMI_NotifyStompToggle(5,switchPressed,timestamp);
       return;  
    case 30:
-      HMI_NotifyBackToggle(pressed,timestamp);
+      HMI_NotifyBackToggle(switchPressed,timestamp);
       return;               
    default:
       // Invalid pin
-      DEBUG_MSG("Invalid pin=%d, pressed=%d", pin, pressed);
+      DEBUG_MSG("Invalid pin=%d, switchPressed=%d", pin, switchPressed);
       return;
    }
 

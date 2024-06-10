@@ -1,12 +1,10 @@
 /*
- * Header file of application
+ * M3 SuperPedal
  *
  * ==========================================================================
- *
- *  Copyright (C) <year> <your name> (<your email address>)
+ *  Copyright (C) 2024 Scott Rush (scottarush@yahoo.com)
  *  Licensed for personal non-commercial use only.
- *  All other rights reserved.
- * 
+ *  Uses open-source software from midibox.org subject to project licensing terms.
  * ==========================================================================
  */
 
