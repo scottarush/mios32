@@ -224,98 +224,98 @@ void APP_DIN_NotifyToggle(u32 pin, u32 pin_value) {
    DEBUG_MSG("pin=%d value=%d",pin,pin_value);
 
    switch (pin) {
-   case 31:
+   case 15:
       // pedal #1
       PEDALS_NotifyChange(1, pressed, timestamp);
       return;
-   case 30:
+   case 14:
       // pedal #2
       PEDALS_NotifyChange(2, pressed, timestamp);
       return;
-   case 29:
+   case 13:
       // pedal #3
       PEDALS_NotifyChange(3, pressed, timestamp);
       return;
-   case 28:
+   case 12:
       // pedal #4
       PEDALS_NotifyChange(4, pressed, timestamp);
       return;
-   case 27:
+   case 11:
       // pedal #5
       PEDALS_NotifyChange(5, pressed, timestamp);
       return;
-   case 26:
+   case 10:
       // pedal #6
       PEDALS_NotifyChange(6, pressed, timestamp);
       return;
-   case 25:
+   case 9:
       // pedal #7
       PEDALS_NotifyChange(7, pressed, timestamp);
       return;
-   case 24:
+   case 8:
       // pedal #8
       PEDALS_NotifyChange(8, pressed, timestamp);
       return;
-   case 17:
+   case 0:
       // pedal #9
       PEDALS_NotifyChange(9, pressed, timestamp);
       return;
-   case 18:
+   case 1:
       // pedal #10
       PEDALS_NotifyChange(10, pressed, timestamp);
       return;
-   case 19:
+   case 2:
       // pedal #11
       PEDALS_NotifyChange(11, pressed, timestamp);
       return;
-   case 20:
+   case 3:
       // pedal #12
       PEDALS_NotifyChange(12, pressed, timestamp);
       return;
-   case 21:
+   case 4:
       // make switch = num_pedals+1;
       PEDALS_NotifyChange(13, pressed, timestamp);
       return;
-   case 15:
+   case 23:
       HMI_NotifyToeToggle(1,pressed,timestamp);
       return;
-   case 14:
+   case 22:
       HMI_NotifyToeToggle(2,pressed,timestamp);
       return;
-   case 13:
+   case 21:
       HMI_NotifyToeToggle(3,pressed,timestamp);
       return;
-   case 12:
+   case 20:
       HMI_NotifyToeToggle(4,pressed,timestamp);
       return;
-   case 11:
+   case 19:
       HMI_NotifyToeToggle(5,pressed,timestamp);
       return;
-   case 10:
+   case 18:
       HMI_NotifyToeToggle(6,pressed,timestamp);
       return;
-   case 9:
+   case 17:
       HMI_NotifyToeToggle(7,pressed,timestamp);
       return;
-   case 8:
+   case 16:
       HMI_NotifyToeToggle(8,pressed,timestamp);
       return;   
-   case 7:
+   case 31:
       HMI_NotifyStompToggle(1,pressed,timestamp);
       return;
-   case 5:
+   case 29:
       HMI_NotifyStompToggle(2,pressed,timestamp);
       return;
-   case 2:
+   case 26:
       HMI_NotifyStompToggle(3,pressed,timestamp);
       return;
-   case 1:
+   case 25:
       HMI_NotifyStompToggle(4,pressed,timestamp);
       return;
-   case 16:
+   case 7:
       HMI_NotifyStompToggle(5,pressed,timestamp);
       return;  
-   case 6:
+   case 30:
       HMI_NotifyBackToggle(pressed,timestamp);
       return;               
    default:
