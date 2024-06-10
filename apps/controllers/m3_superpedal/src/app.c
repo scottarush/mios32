@@ -1,14 +1,11 @@
 // $Id$
 /*
- * Studio 90 Plus Midibox KB
+ * M3 SuperPedal
  *
  * ==========================================================================
- *
- *  Copyright (C) 2012 Thorsten Klose (tk@midibox.org)
+ *  Copyright (C) 2024 Scott Rush
  *  Licensed for personal non-commercial use only.
- *  All other rights reserved.
- *
- *  Extensions/Additions for Studio 90 Plus added by Scott Rush 2024
+ *  Uses open-source software from midibox.org subject to project licensing terms.
  * ==========================================================================
  */
 
@@ -219,9 +216,10 @@ void APP_DIN_NotifyToggle(u32 pin, u32 pin_value) {
 
    u8 pressed = 0;
    // pressed = 1 is more intuitive
-   (pin_value > 0) ? pressed = 0 : 1;
-
-   DEBUG_MSG("pin=%d value=%d",pin,pin_value);
+   if (pin_value == 0)
+      pressed = 1;
+      
+ //  DEBUG_MSG("pin=%d value=%d",pin,pin_value);
 
    switch (pin) {
    case 15:

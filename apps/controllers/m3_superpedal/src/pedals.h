@@ -1,4 +1,3 @@
-// $Id$
 /*
  * Header file for pedal handler
  *
@@ -20,7 +19,7 @@ typedef struct {
     u8 num_pedals;
 
     u8 note_offset;
-    u8 verbose_level
+    u8 verbose_level;
 
     u16 delay_fastest;
     u16 delay_fastest_black_pedals;

@@ -1,4 +1,3 @@
-// $Id$
 /*
  * Header file of application
  *

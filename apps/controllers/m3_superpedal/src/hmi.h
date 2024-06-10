@@ -1,4 +1,3 @@
-// $Id$
 /*
  * include for M3 super pedal HMI
  * ==========================================================================
@@ -25,8 +24,10 @@
 /////////////////////////////////////////////////////////////////////////////
 
 extern void HMI_Init(void);
-extern void HMI_Notify_Stomp_Toggle(u8 stompNum,u8 pressed,s32 timestamp);
-extern void HMI_Notify_Toe_Toggle(u8 stompNum,u8 pressed,s32 timestamp);
+extern void HMI_NotifyStompToggle(u8 stompNum,u8 pressed,s32 timestamp);
+extern void HMI_NotifyToeToggle(u8 stompNum,u8 pressed,s32 timestamp);
+extern void HMI_NotifyBackToggle(u8 pressed,s32 timestamp);
+extern void HMI_NotifyEncoderChange(s32 incrementer);
 
 /////////////////////////////////////////////////////////////////////////////
 // Export global variables

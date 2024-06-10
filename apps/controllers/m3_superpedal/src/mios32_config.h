@@ -21,6 +21,9 @@
 
 #define MIOS32_USB_MIDI_NUM_PORTS 1           // 1 MIDI Outs
 
+// Number of SRIO shift registers
+#define MIOS32_SRIO_NUM_SR 4
+
 // Don't use IIC or SPI
 #define MIOS32_DONT_USE_IIC_MIDI
 #define MIOS32_DONT_USE_SPI_MIDI
