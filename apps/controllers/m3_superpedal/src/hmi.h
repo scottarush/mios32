@@ -1,6 +1,10 @@
 /*
  * include for M3 super pedal HMI
- * ==========================================================================
+ *  
+ *  Copyright (C) 2024 Scott Rush
+ *  Licensed for personal non-commercial use only.
+ *  All other rights reserved.
+ *
  */
 
 #ifndef _HMI_H
