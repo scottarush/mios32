@@ -1,10 +1,10 @@
-//!
-//! M3 Pedal Handler
-//!
-//! \{
 /*
  * ==========================================================================
- *
+ *  M3 Pedal handler.
+ *   
+ *  Implements the MIDI pedal functionality.
+ *  Abstracted pedal and make switch inputs are received from app.c.
+ * 
  *  Copyright (C) 2024 Scott Rush
  *  Licensed for personal non-commercial use only.
  *  All other rights reserved.
@@ -63,7 +63,7 @@ void PEDALS_Init() {
 
    pedal_config_t* pc = (pedal_config_t*)&pedal_config;
 
-   pc->midi_ports = 0x1011;
+   pc->midi_ports = 0x0031;     // OUT1 and USB
    pc->midi_chn = 1;
 
    pc->num_pedals = 12;
@@ -198,6 +198,7 @@ s32 PEDALS_SendNote(u8 note_number, u8 velocity, u8 pressed) {
          // USB0/1/2/3, UART0/1/2/3, IIC0/1/2/3, OSC0/1/2/3
          mios32_midi_port_t port = 0x10 + ((i & 0xc) << 2) + (i & 3);
 
+         //DEBUG_MSG("midi tx:  port=0x%x",port);
          if (!pressed)
             MIOS32_MIDI_SendNoteOff(port, pc->midi_chn - 1, sent_note, velocity);
          else

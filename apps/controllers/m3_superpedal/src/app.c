@@ -2,7 +2,7 @@
  * M3 SuperPedal
  *
  * ==========================================================================
- *  Copyright (C) 2024 Scott Rush
+ *  Copyright (C) 2024 Scott Rush (scottarush@yahoo.com)
  *  Licensed for personal non-commercial use only.
  *  Uses open-source software from midibox.org subject to project licensing terms.
  * ==========================================================================
@@ -94,7 +94,7 @@ void APP_Init(void) {
    // Init the rotary encoder
    mios32_enc_config_t enc_config = MIOS32_ENC_ConfigGet(0);   
    enc_config.cfg.type = DETENTED2; // see mios32_enc.h for available types
-   enc_config.cfg.sr = 0;    // J3 of DINx4
+   enc_config.cfg.sr = 4;    // J6 of DINx4
    enc_config.cfg.pos = 4;   // D4/D5
    enc_config.cfg.speed = NORMAL;
    enc_config.cfg.speed_par = 0;
@@ -221,7 +221,7 @@ void APP_DIN_NotifyToggle(u32 pin, u32 pin_value) {
 
    u8 pedalPressed = pin_value;
       
- //  DEBUG_MSG("pin=%d value=%d",pin,pin_value);
+   // DEBUG_MSG("pin=%d value=%d",pin,pin_value);
 
    switch (pin) {
    case 15:
@@ -303,7 +303,7 @@ void APP_DIN_NotifyToggle(u32 pin, u32 pin_value) {
    case 31:
       HMI_NotifyStompToggle(1,switchPressed,timestamp);
       return;
-   case 29:
+   case 27:
       HMI_NotifyStompToggle(2,switchPressed,timestamp);
       return;
    case 26:
@@ -367,6 +367,11 @@ static s32 NOTIFY_MIDI_Rx(mios32_midi_port_t port, u8 midi_byte) {
    // filter MIDI In port which controls the MIDI clock
    if (MIDI_ROUTER_MIDIClockInGet(port) == 1) {
       // SEQ_BPM_NotifyMIDIRx(midi_byte);
+      u8 state = HMI_GetLEDIndicator(1);
+      if (state)
+         HMI_SetLEDIndicator(1,0);
+      else
+         HMI_SetLEDIndicator(1,1);
    }
 
    return 0; // no error, no filtering

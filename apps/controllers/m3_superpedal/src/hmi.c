@@ -4,6 +4,11 @@
  * Implements the HMI.  Inputs are abstracted from physical hardware in app.c, but
  * LED Indicator hardware abstraction is contained here as indicators are not 
  * accessed from any other file.
+ *  
+ *  Copyright (C) 2024 Scott Rush
+ *  Licensed for personal non-commercial use only.
+ *  All other rights reserved.
+ *
  */
 
  /////////////////////////////////////////////////////////////////////////////
@@ -28,7 +33,6 @@ static s32 toeSwitchTimestamp[NUM_TOE_SWITCHES];
 /////////////////////////////////////////////////////////////////////////////
 // Local prototypes
 /////////////////////////////////////////////////////////////////////////////
-void HMI_SetLEDIndicator(u8 indicatorNum,u8 state);
 
 /////////////////////////////////////////////////////////////////////////////
 // called at Init to initialize the J10B inputs
@@ -124,7 +128,7 @@ void HMI_NotifyBackToggle(u8 pressed,s32 timestamp){
 
 
 ///////////////////////////////////////////////////////////////////////////
-// Helper function to set/clear the LED indicators.
+// function to set/clear the LED indicators.
 // indicatorNum:  Number of led starting from left with indicator 1.
 // state = 1 for on, 0 for off
 //
@@ -163,4 +167,45 @@ void HMI_SetLEDIndicator(u8 indicatorNum,u8 state){
       break;
    }
    MIOS32_BOARD_J10_PinSet(pinNum,state);
+}
+
+//////////////////////////////////////////////////////////////////////////
+// function to get the LED indicator state.
+// indicatorNum:  Number of led starting from left with indicator 1.
+// returns 0 for off, 1 for on
+/////////////////////////////////////////////////////////////////////////////
+u8 HMI_GetLEDIndicator(u8 indicatorNum){
+      if (indicatorNum > NUM_LED_INDICATORS){
+      DEBUG_MSG("Invalid indicator number: %d",indicatorNum);
+      return;
+   }
+   // Compute pinNum from indicator num on J10B
+   u8 pinNum = 0;
+   switch(indicatorNum){
+      case 1:
+         pinNum = 15;
+      break;
+      case 2:
+         pinNum = 13;
+      break;
+      case 3:
+         pinNum = 11;
+      break;
+      case 4:
+         pinNum = 9;
+      break;
+      case 5:
+         pinNum = 14;
+      break;
+      case 6:
+         pinNum = 12;
+      break;
+      case 7:
+         pinNum = 10;
+      break;
+      case 8:
+         pinNum = 8;
+      break;
+   }
+   MIOS32_BOARD_J10_PinGet(pinNum);
 }
