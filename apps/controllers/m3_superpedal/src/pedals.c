@@ -43,9 +43,12 @@ u8 pendingPedalNum;
 // If a pedal is pending, the timestamp of the press.
 s32 pendingPedalTimestamp;
 
-// Last velocity sent for an On note.  Using this value allows multiple pedals
+// Last press velocity sent for an On note.  Using this value allows multiple pedals
 // to be pressed at same time with same velocity
-u8 lastVelocity;
+u8 lastPressVelocity;
+
+// timestamp of make release used to compute release velocity
+s32 makeReleaseTimestamp;
 
 /////////////////////////////////////////////////////////////////////////////
 // Local Prototypes
@@ -70,10 +73,15 @@ void PEDALS_Init() {
 
    pc->verbose_level = 0;
 
-   pc->velocity_enabled = 0;
-   pc->delay_fastest = 100;
-   pc->delay_fastest_black_pedals = 120;
-   pc->delay_slowest = 500;
+   pc->delay_fastest = 6;
+   pc->delay_fastest_black_pedals = 10;
+   pc->delay_slowest = 70;
+   pc->delay_slowest_black_pedals = 60;
+   pc->delay_release_fastest = 20;
+   pc->delay_release_slowest = 100;
+
+   pc->minimum_press_velocity = 20;
+   pc->minimum_release_velocity = 40;
 
    pc->octave = 1;
    pc->transpose = 0;
@@ -83,8 +91,8 @@ void PEDALS_Init() {
    makePressed = 1;
    pendingPedalNum = 0;   // not pending
    pendingPedalTimestamp = 0;
-   lastVelocity = 127;
-
+   makeReleaseTimestamp = 0;
+   lastPressVelocity = 127;
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -96,20 +104,16 @@ void PEDALS_Init() {
 void PEDALS_NotifyMakeChange(u8 pressed, u32 timestamp) {
    pedal_config_t* pc = (pedal_config_t*)&pedal_config;
 
-   if (!pc->velocity_enabled){
-      // Just set makePressed and return to effectively disable
-      makePressed = 1;
-      return;
-   }
+   DEBUG_MSG("PEDALS_NotifyMakeChange:  %s.  time=%d",pressed > 0 ? "pressed" : "released",timestamp);
 
-   u8 velocity = 127;
    u8 note_number = 0;
    if (!pressed) {
-      // clear everything since all pedals must be released
+      // Clear makePressed
       makePressed = 0;
-      pendingPedalNum = 0;
+      // save makeReleased timestamp for use in release velocity calculation
+      makeReleaseTimestamp = timestamp;
       // Default to max for robustness, but a new value should be computed on next press
-      lastVelocity = 127;
+      lastPressVelocity = 127;
       return;
    }
    // Otherwise, this is make pressed, so compute the velocity for any  pending pedal
@@ -118,19 +122,27 @@ void PEDALS_NotifyMakeChange(u8 pressed, u32 timestamp) {
    // send pending pedal press note on.
    if (pendingPedalNum != 0) {
 
-      // A press was active so get system time and compute velocity
-      s32 time_ms = MIOS32_TIMESTAMP_Get();
-      // TODO:  Handle rollover
-      s32 delta_ms = time_ms - pendingPedalTimestamp;
-      u16 delay = (u16)delta_ms;
+      // A press was active compute velocity
+      u32 delta = timestamp - pendingPedalTimestamp;
+      u16 delay = (u16)delta;
+      
       // compute velocity for press
-      // TODO:  handle black key determination.  Just assume all same for now
-      velocity = PEDALS_GetVelocity(delay, pc->delay_slowest, pc->delay_fastest);
+      u16 delayFastest = pc->delay_fastest;
+      u16 delaySlowest = pc->delay_slowest;
+      if ((pendingPedalNum == 2) || (pendingPedalNum ==4) || (pendingPedalNum == 7) || (pendingPedalNum ==9) || (pendingPedalNum == 11)){
+         delayFastest = pc->delay_fastest_black_pedals;
+         delaySlowest = pc->delay_slowest_black_pedals;
+      }
+      
+      lastPressVelocity = PEDALS_GetVelocity(delay, delaySlowest, delayFastest);
+      if (lastPressVelocity < pc->minimum_press_velocity){
+         lastPressVelocity = pc->minimum_press_velocity;
+      }
+      DEBUG_MSG("press delay=%d velocity=%d",delay,lastPressVelocity);
 
       // Compute the midi note_number, save the computed velocity and send Note On
       note_number = PEDALS_ComputeNoteNumber(pendingPedalNum);
-      lastVelocity = velocity;
-      PEDALS_SendNote(note_number, velocity, 1);
+      PEDALS_SendNote(note_number, lastPressVelocity, 1);
       pendingPedalNum = 0;  // clear for next time.
    }
 }
@@ -145,7 +157,8 @@ void PEDALS_NotifyMakeChange(u8 pressed, u32 timestamp) {
 void PEDALS_NotifyChange(u8 pedalNum, u8 pressed, u32 timestamp) {
    pedal_config_t* pc = (pedal_config_t*)&pedal_config;
 
-   u8 velocity = 127;
+   DEBUG_MSG("PEDALS_NotifyChange: pedal %d %s.  time=%d",pedalNum, pressed > 0 ? "pressed" : "released",timestamp);
+
    u8 note_number = 0;
 
    if ((pedalNum == 0) || (pedalNum > pc->num_pedals)) {
@@ -154,14 +167,23 @@ void PEDALS_NotifyChange(u8 pedalNum, u8 pressed, u32 timestamp) {
    note_number = PEDALS_ComputeNoteNumber(pedalNum);
 
    if (!pressed) {
-      // This is a release.  Just send note off event.
+      // This is a release.  compute release velocity using make release timestamp;
+      u32 delta = timestamp - makeReleaseTimestamp;
+      u16 delay = (u16)delta;
+      
+      u8 velocity = PEDALS_GetVelocity(delay, pc->delay_release_slowest, pc->delay_release_fastest);
+      if (velocity < pc->minimum_release_velocity){
+         velocity = pc->minimum_release_velocity;
+      }
+      DEBUG_MSG("release delay=%d velocity=%d",delay,velocity);
+
       PEDALS_SendNote(note_number, velocity, 0);
       return;
    }
-   // Otherwise, this is a regular pedal press.  If make already pressed or velocity is
-   // disable, then send the press at the last velocity
-   if (makePressed || !pc->velocity_enabled) {
-      PEDALS_SendNote(note_number, lastVelocity, 1);
+   // Otherwise, this is a regular pedal press.  If make already pressed then this is
+   // a subsequent pedal so just send at the last velocity which was computed for the first press.
+   if (makePressed) {
+      PEDALS_SendNote(note_number, lastPressVelocity, 1);
       return;
    }
    // Otherwise, this is an initial press without make so:

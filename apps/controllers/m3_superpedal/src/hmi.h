@@ -32,6 +32,8 @@ extern void HMI_NotifyStompToggle(u8 stompNum,u8 pressed,s32 timestamp);
 extern void HMI_NotifyToeToggle(u8 stompNum,u8 pressed,s32 timestamp);
 extern void HMI_NotifyBackToggle(u8 pressed,s32 timestamp);
 extern void HMI_NotifyEncoderChange(s32 incrementer);
+extern void HMI_SetLEDIndicator(u8 indicatorNum,u8 state);
+extern u8 HMI_GetLEDIndicator(u8 indicatorNum);
 
 /////////////////////////////////////////////////////////////////////////////
 // Export global variables

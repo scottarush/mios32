@@ -21,10 +21,15 @@ typedef struct {
    u8 note_offset;
    u8 verbose_level;
 
-   u8 velocity_enabled;
    u16 delay_fastest;
    u16 delay_fastest_black_pedals;
    u16 delay_slowest;
+   u16 delay_slowest_black_pedals;
+   u16 delay_release_fastest;
+   u16 delay_release_slowest;
+
+   u16 minimum_press_velocity;
+   u16 minimum_release_velocity;
 
    u8 left_pedal_note_number;
 

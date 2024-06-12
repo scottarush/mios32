@@ -221,7 +221,7 @@ void APP_DIN_NotifyToggle(u32 pin, u32 pin_value) {
 
    u8 pedalPressed = pin_value;
       
-   // DEBUG_MSG("pin=%d value=%d",pin,pin_value);
+   //DEBUG_MSG("pin=%d value=%d",pin,pin_value);
 
    switch (pin) {
    case 15:
@@ -274,7 +274,7 @@ void APP_DIN_NotifyToggle(u32 pin, u32 pin_value) {
       return;
    case 4:
       // make switch
-      PEDALS_NotifyMakeChange(pedalPressed, timestamp);
+      PEDALS_NotifyMakeChange(switchPressed, timestamp);
       return;
    case 23:
       HMI_NotifyToeToggle(1,switchPressed,timestamp);
