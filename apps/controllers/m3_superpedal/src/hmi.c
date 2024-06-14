@@ -22,7 +22,6 @@
 
 #define NUM_STOMP_SWITCHES 5
 #define NUM_TOE_SWITCHES 8
-#define NUM_LED_INDICATORS 8
 
 static u8 stompSwitchState[NUM_STOMP_SWITCHES];
 static s32 stompSwitchTimestamp[NUM_STOMP_SWITCHES];
@@ -35,7 +34,7 @@ static s32 toeSwitchTimestamp[NUM_TOE_SWITCHES];
 /////////////////////////////////////////////////////////////////////////////
 
 /////////////////////////////////////////////////////////////////////////////
-// called at Init to initialize the J10B inputs
+// called at Init to initialize the HMI
 /////////////////////////////////////////////////////////////////////////////
 void HMI_Init(void) {
    int i = 0;
@@ -47,12 +46,6 @@ void HMI_Init(void) {
       toeSwitchState[i] = 0;
       toeSwitchTimestamp[i] = 0;
    }
-
-   // Set LED outputs to push-pull on J10B, upper 8 outputs of J10
-   for(i=8;i < NUM_LED_INDICATORS+8;i++){
-      MIOS32_BOARD_J10_PinInit(i,MIOS32_BOARD_PIN_MODE_OUTPUT_PP);
-   }
-   MIOS32_BOARD_J10_Set(0);
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -75,9 +68,6 @@ void HMI_NotifyToeToggle(u8 toeNum,u8 pressed,s32 timestamp){
       toeSwitchState[toeNum-1] = 0;
    }
 
-   for(int i=0;i < NUM_TOE_SWITCHES;i++){
-      HMI_SetLEDIndicator(i+1,toeSwitchState[i]);
-   }
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -124,88 +114,4 @@ void HMI_NotifyBackToggle(u8 pressed,s32 timestamp){
       DEBUG_MSG("Back button released");
    }
 
-}
-
-
-///////////////////////////////////////////////////////////////////////////
-// function to set/clear the LED indicators.
-// indicatorNum:  Number of led starting from left with indicator 1.
-// state = 1 for on, 0 for off
-//
-/////////////////////////////////////////////////////////////////////////////
-void HMI_SetLEDIndicator(u8 indicatorNum,u8 state){
-   if (indicatorNum > NUM_LED_INDICATORS){
-      DEBUG_MSG("Invalid indicator number: %d",indicatorNum);
-      return;
-   }
-   // Compute pinNum from indicator num on J10B
-   u8 pinNum = 0;
-   switch(indicatorNum){
-      case 1:
-         pinNum = 15;
-      break;
-      case 2:
-         pinNum = 13;
-      break;
-      case 3:
-         pinNum = 11;
-      break;
-      case 4:
-         pinNum = 9;
-      break;
-      case 5:
-         pinNum = 14;
-      break;
-      case 6:
-         pinNum = 12;
-      break;
-      case 7:
-         pinNum = 10;
-      break;
-      case 8:
-         pinNum = 8;
-      break;
-   }
-   MIOS32_BOARD_J10_PinSet(pinNum,state);
-}
-
-//////////////////////////////////////////////////////////////////////////
-// function to get the LED indicator state.
-// indicatorNum:  Number of led starting from left with indicator 1.
-// returns 0 for off, 1 for on
-/////////////////////////////////////////////////////////////////////////////
-u8 HMI_GetLEDIndicator(u8 indicatorNum){
-      if (indicatorNum > NUM_LED_INDICATORS){
-      DEBUG_MSG("Invalid indicator number: %d",indicatorNum);
-      return;
-   }
-   // Compute pinNum from indicator num on J10B
-   u8 pinNum = 0;
-   switch(indicatorNum){
-      case 1:
-         pinNum = 15;
-      break;
-      case 2:
-         pinNum = 13;
-      break;
-      case 3:
-         pinNum = 11;
-      break;
-      case 4:
-         pinNum = 9;
-      break;
-      case 5:
-         pinNum = 14;
-      break;
-      case 6:
-         pinNum = 12;
-      break;
-      case 7:
-         pinNum = 10;
-      break;
-      case 8:
-         pinNum = 8;
-      break;
-   }
-   MIOS32_BOARD_J10_PinGet(pinNum);
 }

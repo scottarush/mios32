@@ -27,6 +27,7 @@
 #include "app.h"
 #include "hmi.h"
 #include "pedals.h"
+#include "indicators.h"
 #include "presets.h"
 #include "terminal.h"
 #include "tasks.h"
@@ -90,6 +91,9 @@ void APP_Init(void) {
 
    // init pedal functions
    PEDALS_Init(0);
+
+   // init the indicators
+   IND_Init();
 
    // Init the rotary encoder
    mios32_enc_config_t enc_config = MIOS32_ENC_ConfigGet(0);   
@@ -367,11 +371,11 @@ static s32 NOTIFY_MIDI_Rx(mios32_midi_port_t port, u8 midi_byte) {
    // filter MIDI In port which controls the MIDI clock
    if (MIDI_ROUTER_MIDIClockInGet(port) == 1) {
       // SEQ_BPM_NotifyMIDIRx(midi_byte);
-      u8 state = HMI_GetLEDIndicator(1);
+      u8 state = IND_GetIndicatorState(1);
       if (state)
-         HMI_SetLEDIndicator(1,0);
+         IND_SetIndicator(1,0);
       else
-         HMI_SetLEDIndicator(1,1);
+         IND_SetIndicator(1,1);
    }
 
    return 0; // no error, no filtering

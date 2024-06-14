@@ -1,41 +1,42 @@
 /*
- * include for M3 super pedal HMI
- *  
+ * include for M3 super pedal  LED indicators
+ *
  *  Copyright (C) 2024 Scott Rush
  *  Licensed for personal non-commercial use only.
  *  All other rights reserved.
  *
  */
 
-#ifndef _HMI_H
-#define _HMI_H
+#ifndef _IND_H
+#define _IND_H
 
 
 /////////////////////////////////////////////////////////////////////////////
 // Global definitions
 /////////////////////////////////////////////////////////////////////////////
-#define NUM_TOE_HMI 8
-#define NUM_STOMP_HMI 5
-
+#define NUM_LED_INDICATORS 8
 
 /////////////////////////////////////////////////////////////////////////////
 // Global Types
 /////////////////////////////////////////////////////////////////////////////
 
+typedef enum {
+   OFF = 0,
+   ON = 1,
+   FLASH_SLOW = 2,
+   FLASH_FAST = 3
+} indicator_state_t;
 
 /////////////////////////////////////////////////////////////////////////////
 // Prototypes
 /////////////////////////////////////////////////////////////////////////////
-
-extern void HMI_Init(void);
-extern void HMI_NotifyStompToggle(u8 stompNum,u8 pressed,s32 timestamp);
-extern void HMI_NotifyToeToggle(u8 stompNum,u8 pressed,s32 timestamp);
-extern void HMI_NotifyBackToggle(u8 pressed,s32 timestamp);
-extern void HMI_NotifyEncoderChange(s32 incrementer);
+extern void IND_Init(void);
+extern void IND_SetIndicator(u8 indicatorNum,u8 state);
+extern u8 IND_GetIndicatorState(u8 indicatorNum);
 
 /////////////////////////////////////////////////////////////////////////////
 // Export global variables
 /////////////////////////////////////////////////////////////////////////////
 
 
-#endif /* _TERMINAL_H */
+#endif /* _IND_H */
