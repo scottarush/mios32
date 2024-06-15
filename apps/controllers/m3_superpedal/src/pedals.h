@@ -46,6 +46,9 @@ typedef struct {
 extern void PEDALS_Init();
 extern void PEDALS_NotifyChange(u8 pedalNum, u8 value, u32 timestamp);
 extern void PEDALS_NotifyMakeChange(u8 pressed, u32 timestamp);
+extern void PEDALS_SetOctave(u8 octave);
+extern u8 PEDALS_GetOctave();
+
 
 /////////////////////////////////////////////////////////////////////////////
 // Export global variables

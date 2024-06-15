@@ -104,7 +104,7 @@ void PEDALS_Init() {
 void PEDALS_NotifyMakeChange(u8 pressed, u32 timestamp) {
    pedal_config_t* pc = (pedal_config_t*)&pedal_config;
 
-   DEBUG_MSG("PEDALS_NotifyMakeChange:  %s.  time=%d",pressed > 0 ? "pressed" : "released",timestamp);
+   //DEBUG_MSG("PEDALS_NotifyMakeChange:  %s.  time=%d",pressed > 0 ? "pressed" : "released",timestamp);
 
    u8 note_number = 0;
    if (!pressed) {
@@ -138,7 +138,7 @@ void PEDALS_NotifyMakeChange(u8 pressed, u32 timestamp) {
       if (lastPressVelocity < pc->minimum_press_velocity){
          lastPressVelocity = pc->minimum_press_velocity;
       }
-      DEBUG_MSG("press delay=%d velocity=%d",delay,lastPressVelocity);
+      //DEBUG_MSG("press delay=%d velocity=%d",delay,lastPressVelocity);
 
       // Compute the midi note_number, save the computed velocity and send Note On
       note_number = PEDALS_ComputeNoteNumber(pendingPedalNum);
@@ -157,7 +157,7 @@ void PEDALS_NotifyMakeChange(u8 pressed, u32 timestamp) {
 void PEDALS_NotifyChange(u8 pedalNum, u8 pressed, u32 timestamp) {
    pedal_config_t* pc = (pedal_config_t*)&pedal_config;
 
-   DEBUG_MSG("PEDALS_NotifyChange: pedal %d %s.  time=%d",pedalNum, pressed > 0 ? "pressed" : "released",timestamp);
+   //DEBUG_MSG("PEDALS_NotifyChange: pedal %d %s.  time=%d",pedalNum, pressed > 0 ? "pressed" : "released",timestamp);
 
    u8 note_number = 0;
 
@@ -175,7 +175,7 @@ void PEDALS_NotifyChange(u8 pedalNum, u8 pressed, u32 timestamp) {
       if (velocity < pc->minimum_release_velocity){
          velocity = pc->minimum_release_velocity;
       }
-      DEBUG_MSG("release delay=%d velocity=%d",delay,velocity);
+      //DEBUG_MSG("release delay=%d velocity=%d",delay,velocity);
 
       PEDALS_SendNote(note_number, velocity, 0);
       return;
@@ -250,4 +250,23 @@ int PEDALS_GetVelocity(u16 delay, u16 delay_slowest, u16 delay_fastest) {
    }
 
    return velocity;
+}
+/////////////////////////////////////////////////////////////////////////////
+// API to set the current octave
+// octave:  octave from 1 to 8
+/////////////////////////////////////////////////////////////////////////////
+void PEDALS_SetOctave(u8 octave){
+   if ((octave > 8) || (octave == 0)){
+      DEBUG_MSG("Invalid octave number=%d",octave);
+      return;
+   }
+   pedal_config.octave = octave;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// API to get the current octave
+// returns octave from 1 to 8
+/////////////////////////////////////////////////////////////////////////////
+u8 PEDALS_GetOctave(){
+   return pedal_config.octave;
 }

@@ -17,13 +17,14 @@ LCD       =     $(MIOS32_LCD)
 # Scott Rush:  January 2024.  Added Studio90Plus specific keyboard driver 
 # pending future pull into mainline keyboard module.
 THUMB_SOURCE    = src/app.c \
-		  src/switches.c \
-		  src/presets.c \
-		  src/terminal.c \
-		  src/shell.c \
- 		  src/keyboard.c
+ 		  src/pedals.c \
+		  src/indicators.c \
+		  src/hmi.c 
+#		  src/terminal.c 
+#		  src/presets.c \
+#		  src/shell.c \
 
-# (following source stubs not relevant for Cortex M3 derivatives)
+#  (following source stubs not relevant for Cortex M3 derivatives)
 THUMB_AS_SOURCE =
 ARM_SOURCE      =
 ARM_AS_SOURCE   =

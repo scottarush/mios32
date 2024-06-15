@@ -50,21 +50,16 @@
 /////////////////////////////////////////////////////////////////////////////
 // Global variables
 /////////////////////////////////////////////////////////////////////////////
-// Mutex for MIDI IN/OUT handler
+
+// Mutex for MIDI IN/OUT handler in modules/midi_router/midi_router.c
 xSemaphoreHandle xMIDIINSemaphore;
 xSemaphoreHandle xMIDIOUTSemaphore;
-
-
-/////////////////////////////////////////////////////////////////////////////
-//! global variables
-/////////////////////////////////////////////////////////////////////////////
-
 
 /////////////////////////////////////////////////////////////////////////////
 // Local prototypes
 /////////////////////////////////////////////////////////////////////////////
 
-// local prototype of the task function
+// local prototype of the 1ms task function
 static void TASK_Period_1mS(void* pvParameters);
 
 static s32 NOTIFY_MIDI_Rx(mios32_midi_port_t port, u8 byte);
@@ -95,6 +90,9 @@ void APP_Init(void) {
    // init the indicators
    IND_Init();
 
+   // init the HMI
+   HMI_Init();
+   
    // Init the rotary encoder
    mios32_enc_config_t enc_config = MIOS32_ENC_ConfigGet(0);   
    enc_config.cfg.type = DETENTED2; // see mios32_enc.h for available types
@@ -127,7 +125,7 @@ void APP_Init(void) {
    MIOS32_MIDI_SendDebugMessage("=================\n");
    MIOS32_MIDI_SendDebugMessage("\n");
 
-   // start tasks
+   // start 1ms task
    xTaskCreate(TASK_Period_1mS, "1mS", configMINIMAL_STACK_SIZE, NULL, PRIORITY_TASK_PERIOD_1mS, NULL);
 }
 
@@ -341,7 +339,7 @@ void APP_ENC_NotifyChange(u32 encoder, s32 incrementer) {
 }
 
 /////////////////////////////////////////////////////////////////////////////
-// This task is called periodically each mS to check for keyboard MIDI events
+// This task is called periodically every 1 ms to update the HMI state
 /////////////////////////////////////////////////////////////////////////////
 static void TASK_Period_1mS(void* pvParameters) {
    portTickType xLastExecutionTime;
@@ -358,9 +356,8 @@ static void TASK_Period_1mS(void* pvParameters) {
       if (xLastExecutionTime < (xCurrentTickCount - 5))
          xLastExecutionTime = xCurrentTickCount;
 
-      // MIDI In/Out monitor
-      // TODO: call from low-prio task
-      MIDI_PORT_Period1mS();
+      // Service the indicators
+      IND_1msTick();
    }
 }
 
@@ -371,13 +368,7 @@ static s32 NOTIFY_MIDI_Rx(mios32_midi_port_t port, u8 midi_byte) {
    // filter MIDI In port which controls the MIDI clock
    if (MIDI_ROUTER_MIDIClockInGet(port) == 1) {
       // SEQ_BPM_NotifyMIDIRx(midi_byte);
-      u8 state = IND_GetIndicatorState(1);
-      if (state)
-         IND_SetIndicator(1,0);
-      else
-         IND_SetIndicator(1,1);
    }
-
    return 0; // no error, no filtering
 }
 

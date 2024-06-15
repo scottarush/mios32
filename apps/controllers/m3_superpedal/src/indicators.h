@@ -21,18 +21,26 @@
 /////////////////////////////////////////////////////////////////////////////
 
 typedef enum {
-   OFF = 0,
-   ON = 1,
-   FLASH_SLOW = 2,
-   FLASH_FAST = 3
+   IND_OFF = 0,
+   IND_ON = 1,
+   IND_FLASH_SLOW = 2,
+   IND_FLASH_FAST = 3
 } indicator_state_t;
 
 /////////////////////////////////////////////////////////////////////////////
 // Prototypes
 /////////////////////////////////////////////////////////////////////////////
 extern void IND_Init(void);
-extern void IND_SetIndicator(u8 indicatorNum,u8 state);
-extern u8 IND_GetIndicatorState(u8 indicatorNum);
+
+extern void IND_1msTick();
+
+extern void IND_SetIndicatorState(u8 indicatorNum,indicator_state_t state);
+
+extern void IND_SetTempIndicatorState(u8 indicatorNum,indicator_state_t tempState,u16 duration_ms,indicator_state_t targetState);
+
+extern void IND_ClearAll();
+
+extern indicator_state_t IND_GetIndicatorState(u8 indicatorNum);
 
 /////////////////////////////////////////////////////////////////////////////
 // Export global variables
