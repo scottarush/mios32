@@ -40,6 +40,8 @@ extern void IND_SetTempIndicatorState(u8 indicatorNum,indicator_state_t tempStat
 
 extern void IND_ClearAll();
 
+extern void IND_FlashAll(u8 flashFast);
+
 extern indicator_state_t IND_GetIndicatorState(u8 indicatorNum);
 
 /////////////////////////////////////////////////////////////////////////////

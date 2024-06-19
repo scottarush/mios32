@@ -15,14 +15,31 @@
 /////////////////////////////////////////////////////////////////////////////
 // Global Types
 /////////////////////////////////////////////////////////////////////////////
+typedef enum {
+   GENERAL_MIDI_PRESET = 0,
+   MIDI_PRESET = 1,
+   PATTERN_PRESET = 2
+} midi_preset_type_t;
 
+typedef struct {   
+   u8 presetNumber;
+   u8 programNumber;
+   u8 bankNumber;
+   u8 midiOutput;
+   u8 midiChannel;
+} midi_preset_t;
 
 /////////////////////////////////////////////////////////////////////////////
 // Prototypes
 /////////////////////////////////////////////////////////////////////////////
 
 extern char * MIDI_PRESETS_GetGenMIDIPresetName(u8 progNum);
-extern u8 MIDI_PRESETS_GetNumPresets();
+extern u8 MIDI_PRESETS_GetNumGenMIDIPresets();
+
+extern u8 MIDI_PRESETS_ReplaceMIDIPreset(u8 presetNumber,u8 programNumber,u8 bankNumber,u8 midiOutput,u8 midiChannel);
+extern u8 MIDI_PRESETS_AddMIDIPreset(u8 programNumber,u8 bankNumber,u8 midiOutput,u8 midiChannel);
+extern u8 MIDI_PRESET_ActivateMIDIPreset(u8 presetNumber);
+extern midi_preset_t * MIDI_PRESETS_GetMidiPreset(u8 presetNumber);
 
 /////////////////////////////////////////////////////////////////////////////
 // Export global variables

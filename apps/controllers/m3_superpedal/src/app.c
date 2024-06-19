@@ -84,14 +84,6 @@ void APP_Init(void) {
    // install timeout callback function
    MIOS32_MIDI_TimeOutCallback_Init(&NOTIFY_MIDI_TimeOut);
 
-   // init pedal functions
-   PEDALS_Init(0);
-
-   // init the indicators
-   IND_Init();
-
-   // init the HMI
-   HMI_Init();
    
    // Init the rotary encoder
    mios32_enc_config_t enc_config = MIOS32_ENC_ConfigGet(0);   
@@ -124,6 +116,15 @@ void APP_Init(void) {
    MIOS32_MIDI_SendDebugMessage("%s\n", MIOS32_LCD_BOOT_MSG_LINE1);
    MIOS32_MIDI_SendDebugMessage("=================\n");
    MIOS32_MIDI_SendDebugMessage("\n");
+   
+   // init pedal functions
+   PEDALS_Init(0);
+
+   // init the indicators
+   IND_Init();
+
+   // init the HMI
+   HMI_Init();
 
    // start 1ms task
    xTaskCreate(TASK_Period_1mS, "1mS", configMINIMAL_STACK_SIZE, NULL, PRIORITY_TASK_PERIOD_1mS, NULL);
@@ -320,7 +321,10 @@ void APP_DIN_NotifyToggle(u32 pin, u32 pin_value) {
    case 30:
       HMI_NotifyBackToggle(switchPressed,timestamp);
       return;               
-   default:
+   case 24:
+      HMI_NotifyEncoderSwitchToggle(switchPressed,timestamp);
+      return;
+  default:
       // Invalid pin
       DEBUG_MSG("Invalid pin=%d, switchPressed=%d", pin, switchPressed);
       return;

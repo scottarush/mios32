@@ -21,7 +21,7 @@
 
 #define NUM_LED_INDICATORS 8
 
-#define FLASH_FAST_TIME_MS 100;
+#define FLASH_FAST_TIME_MS 75;
 #define FLASH_SLOW_TIME_MS 500;
 
 
@@ -114,24 +114,24 @@ void IND_1msTick() {
       if (ptr->timer_ms == 1) {
          // This is a temp state and the timer just expired.
          ptr->timer_ms = 0;
-         // Set the state to the target_state
-         ptr->state = ptr->target_state;
-       }
+         // Update the state to the target state
+         IND_SetIndicatorState(i + 1, ptr->target_state);
+      }
       else if (ptr->timer_ms > 0) {
          // Temporary state still continues so decrement the timer
          ptr->timer_ms--;
       }
       // Update the pin in case it changed
-      u8 pinNum = IND_GetLEDPin(i+1);
+      u8 pinNum = IND_GetLEDPin(i + 1);
       MIOS32_BOARD_J10_PinSet(pinNum, ptr->outputState);
-    }
+   }
 }
 
 ///////////////////////////////////////////////////////////////////////////
 // Sets all Indicators to Off.
 ///////////////////////////////////////////////////////////////////////////
-void IND_ClearAll(){
-  for (int i = 0;i < NUM_LED_INDICATORS;i++) {
+void IND_ClearAll() {
+   for (int i = 0;i < NUM_LED_INDICATORS;i++) {
       indicator_fullstate_t* ptr = &indicator_states[i];
       ptr->state = IND_OFF;
       ptr->timer_ms = 0;
@@ -143,9 +143,32 @@ void IND_ClearAll(){
 }
 
 ///////////////////////////////////////////////////////////////////////////
+// Sets all Indicators to Flash.
+// flashFast flag:  0 = flash slow, 1 flash fast
+///////////////////////////////////////////////////////////////////////////
+void IND_FlashAll(u8 flashFast) {
+   for (int i = 0;i < NUM_LED_INDICATORS;i++) {
+      indicator_fullstate_t* ptr = &indicator_states[i];
+      if (flashFast) {
+         ptr->state = IND_FLASH_FAST;
+         ptr->flash_timer_ms = FLASH_FAST_TIME_MS;
+      }
+      else {
+         ptr->state = IND_FLASH_SLOW;
+         ptr->flash_timer_ms = FLASH_SLOW_TIME_MS;
+      }
+      ptr->timer_ms = 0;
+      ptr->target_state = IND_OFF;
+      ptr->outputState = 1;
+   }
+   MIOS32_BOARD_J10_Set(0);
+}
+
+///////////////////////////////////////////////////////////////////////////
 // function to change the indicator state with persistence.
 // indicatorNum:  Number of led starting from left with indicator 1.
 // state to set the indicator to.
+//
 //
 /////////////////////////////////////////////////////////////////////////////
 void IND_SetIndicatorState(u8 indicatorNum, indicator_state_t state) {
@@ -153,7 +176,7 @@ void IND_SetIndicatorState(u8 indicatorNum, indicator_state_t state) {
       DEBUG_MSG("Invalid indicator number=%d", indicatorNum);
       return;
    }
-   DEBUG_MSG("IND_SetIndicatorState:  indicatorNum=%d",indicatorNum);
+   DEBUG_MSG("IND_SetIndicatorState:  indicatorNum=%d", indicatorNum);
    indicator_fullstate_t* ptr = &indicator_states[indicatorNum - 1];
    ptr->state = state;
    // set the output pin and init the flash timer
@@ -183,19 +206,19 @@ void IND_SetIndicatorState(u8 indicatorNum, indicator_state_t state) {
 // duration_ms:  duration of the state in milliseconds
 // targetState:  state to set at the end.
 /////////////////////////////////////////////////////////////////////////////
-void IND_SetTempIndicatorState(u8 indicatorNum,indicator_state_t tempState,u16 duration_ms,indicator_state_t targetState){
+void IND_SetTempIndicatorState(u8 indicatorNum, indicator_state_t tempState, u16 duration_ms, indicator_state_t targetState) {
    if (indicatorNum > 8) {
       DEBUG_MSG("Invalid indicator number=%d", indicatorNum);
       return;
    }
-   DEBUG_MSG("Setting indicator: %d",indicatorNum);
+   DEBUG_MSG("Setting indicator: %d", indicatorNum);
    // Set the target state to the current state and initialize the timer
    indicator_fullstate_t* ptr = &indicator_states[indicatorNum - 1];
    ptr->target_state = targetState;
    ptr->timer_ms = duration_ms;
 
    // Now set the state to the temporary state
-   IND_SetIndicatorState(indicatorNum,tempState);
+   IND_SetIndicatorState(indicatorNum, tempState);
 }
 
 //////////////////////////////////////////////////////////////////////////
