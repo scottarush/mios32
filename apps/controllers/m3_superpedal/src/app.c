@@ -28,7 +28,7 @@
 #include "hmi.h"
 #include "pedals.h"
 #include "indicators.h"
-#include "presets.h"
+#include "midi_presets.h"
 #include "terminal.h"
 #include "tasks.h"
 #include "uip_task.h"
@@ -125,6 +125,9 @@ void APP_Init(void) {
 
    // init the HMI
    HMI_Init();
+
+   // Init the MIDI Presets
+   MIDI_PRESETS_Init();
 
    // start 1ms task
    xTaskCreate(TASK_Period_1mS, "1mS", configMINIMAL_STACK_SIZE, NULL, PRIORITY_TASK_PERIOD_1mS, NULL);

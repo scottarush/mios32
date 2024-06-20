@@ -33,6 +33,8 @@ typedef struct {
 // Prototypes
 /////////////////////////////////////////////////////////////////////////////
 
+extern void MIDI_PRESETS_Init();
+
 extern char * MIDI_PRESETS_GetGenMIDIPresetName(u8 progNum);
 extern u8 MIDI_PRESETS_GetNumGenMIDIPresets();
 

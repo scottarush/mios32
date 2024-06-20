@@ -12,6 +12,9 @@
 #ifndef _PEDALS_H
 #define _PEDALS_H
 
+
+#define DEFAULT_OCTAVE_NUMBER 3
+
 typedef struct {
    u16 midi_ports;
    u8 midi_chn;

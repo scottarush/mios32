@@ -17,6 +17,7 @@
 #include <mios32.h>
 #include "indicators.h"
 
+#undef DEBUG
 #define DEBUG_MSG MIOS32_MIDI_SendDebugMessage
 
 #define NUM_LED_INDICATORS 8
@@ -176,7 +177,9 @@ void IND_SetIndicatorState(u8 indicatorNum, indicator_state_t state) {
       DEBUG_MSG("Invalid indicator number=%d", indicatorNum);
       return;
    }
+#ifdef DEBUG
    DEBUG_MSG("IND_SetIndicatorState:  indicatorNum=%d", indicatorNum);
+#endif
    indicator_fullstate_t* ptr = &indicator_states[indicatorNum - 1];
    ptr->state = state;
    // set the output pin and init the flash timer
@@ -208,10 +211,13 @@ void IND_SetIndicatorState(u8 indicatorNum, indicator_state_t state) {
 /////////////////////////////////////////////////////////////////////////////
 void IND_SetTempIndicatorState(u8 indicatorNum, indicator_state_t tempState, u16 duration_ms, indicator_state_t targetState) {
    if (indicatorNum > 8) {
+
       DEBUG_MSG("Invalid indicator number=%d", indicatorNum);
       return;
    }
+#ifdef DEBUG
    DEBUG_MSG("Setting indicator: %d", indicatorNum);
+#endif
    // Set the target state to the current state and initialize the timer
    indicator_fullstate_t* ptr = &indicator_states[indicatorNum - 1];
    ptr->target_state = targetState;

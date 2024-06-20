@@ -10,6 +10,11 @@
 #ifndef _MIOS32_CONFIG_H
 #define _MIOS32_CONFIG_H
 
+// This disables the boot message to the LCD display (still goes to the terminal)
+// Otherwise it overwrites the one in the call trace from APP_Init() since APP_Init is
+// called in programming_models/traditional/main.c before the MIOS32 boot messages
+#define MIOS32_LCD_BOOT_MSG_DELAY 0
+
 // The boot message which is print during startup and returned on a SysEx query
 #define MIOS32_LCD_BOOT_MSG_LINE1 "M3 Super Pedal"
 #define MIOS32_LCD_BOOT_MSG_LINE2 "(C) 2024 S. Rush"
@@ -31,9 +36,8 @@
 // No need for AINs
 #define MIOS32_DONT_USE_AIN
 
-// Need two UARTS:  MO1 (UART2) and MO2 (UART3)
-// TODO:  Figure out how to properly handle the UART defines
-#define MIOS32_UART_NUM 4                 
+// Need two UARTS for MO1, MO2, and MI1
+#define MIOS32_UART_NUM 2                
 
 // EEPROM emulation
 // SIZE == 2048 halfwords -> 4096 bytes

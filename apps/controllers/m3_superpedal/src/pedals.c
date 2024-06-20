@@ -83,7 +83,7 @@ void PEDALS_Init() {
    pc->minimum_press_velocity = 20;
    pc->minimum_release_velocity = 40;
 
-   pc->octave = 1;
+   pc->octave = DEFAULT_OCTAVE_NUMBER;
    pc->transpose = 0;
    pc->left_pedal_note_number = 23;
 
@@ -253,10 +253,10 @@ int PEDALS_GetVelocity(u16 delay, u16 delay_slowest, u16 delay_fastest) {
 }
 /////////////////////////////////////////////////////////////////////////////
 // API to set the current octave
-// octave:  octave from 1 to 8
+// octave:  MIDI octave from 0 to 7
 /////////////////////////////////////////////////////////////////////////////
 void PEDALS_SetOctave(u8 octave){
-   if ((octave > 8) || (octave == 0)){
+   if (octave > 7){
       DEBUG_MSG("Invalid octave number=%d",octave);
       return;
    }
