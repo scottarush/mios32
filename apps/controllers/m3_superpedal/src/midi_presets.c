@@ -19,20 +19,25 @@
 #define NUM_GEN_MIDI_PRESETS 8
 #define NUM_PATTERN_PRESETS 8
 
-
-
+/////////////////////////////////////////////////////////////////////////////
+// Local Variables
+/////////////////////////////////////////////////////////////////////////////
+const u8 defaultMIDIPresetProgramNumbers[] = {43,49,50,51,17,20,33,92};
+const u8 defaultMIDIPresetBankNumbers[] = {0,0,0,0,0,0,0,0};
+#define DEFAULT_PRESET_MIDI_OUTPUT 1
+#define DEFAULT_PRESET_MIDI_CHANNEL 1
 
 /////////////////////////////////////////////////////////////////////////////
 // Persisted data to E^2
 /////////////////////////////////////////////////////////////////////////////
 typedef struct persistedData_s {
    midi_preset_t generalMidiPresets[NUM_GEN_MIDI_PRESETS];
- //  midi_preset_t patternPresets[NUM_PATTERN_PRESETS];   
+   //  midi_preset_t patternPresets[NUM_PATTERN_PRESETS];   
 } persistedData_t;
 
 persistedData_t presets;
 
-char * genMIDINames[] = {" Acoustic Grand Piano"," Bright Acoustic Piano"," Electric Grand Piano"," Honky-tonk Piano"," Electric Piano 1",
+char* genMIDIVoiceNames[] = { " Acoustic Grand Piano"," Bright Acoustic Piano"," Electric Grand Piano"," Honky-tonk Piano"," Electric Piano 1",
 " Electric Piano 2"," Harpsichord"," Clavi"," Celesta"," Glockenspiel",
 " Music Box"," Vibraphone"," Marimba"," Xylophone"," Tubular Bells",
 " Dulcimer"," Drawbar Organ"," Percussive Organ"," Rock Organ"," Church Organ",
@@ -57,42 +62,46 @@ char * genMIDINames[] = {" Acoustic Grand Piano"," Bright Acoustic Piano"," Elec
 " Fiddle"," Shanai"," Tinkle Bell"," Agogo"," Steel Drums",
 " Woodblock"," Taiko Drum"," Melodic Tom"," Synth Drum"," Reverse Cymbal",
 " Guitar Fret Noise"," Breath Noise"," Seashore"," Bird Tweet"," Telephone Ring",
-" Helicopter"," Applause"," Gunshot"};
+" Helicopter"," Applause"," Gunshot" };
 
-void MIDI_PRESETS_Init(){
-    // Restore settings from E^2 if they exist.  If not the initialize to defaults
-   // TODO
+void MIDI_PRESETS_Init() {
+   // Restore settings from E^2 if they exist.  If not the initialize to defaults
+  // TODO
    u8 valid = 0;
    // valid = PRESETS_GetHMISettings(&settings);
    if (!valid) {
-      // Mark all presets as unused
-      for(int i=0;i < NUM_GEN_MIDI_PRESETS;i++){
-         presets.generalMidiPresets[i].presetNumber = 0;
+      // Set default presets
+      for (int i = 0;i < NUM_GEN_MIDI_PRESETS;i++) {
+         midi_preset_t* ptr = &presets.generalMidiPresets[i];
+         ptr->presetNumber = i;
+         ptr->programNumber = defaultMIDIPresetProgramNumbers[i];
+         ptr->programNumber = defaultMIDIPresetBankNumbers[i];
+         ptr->midiOutput = DEFAULT_PRESET_MIDI_OUTPUT;
+         ptr->midiChannel = DEFAULT_PRESET_MIDI_CHANNEL;
       }
 
    }
 
-
 }
 
-char * MIDI_PRESETS_GetGenMIDIPresetName(u8 progNum){
-   if ((progNum == 0) || (progNum > MIDI_PRESETS_GetNumGenMIDIPresets())){
-      DEBUG_MSG("MIDI_PRESETS_GetGenMIDIPresetName:  Invalid progNum=%d",progNum);
+const char* MIDI_PRESETS_GetGenMIDIVoiceName(u8 progNum) {
+   if ((progNum == 0) || (progNum > MIDI_PRESETS_GetNumGenMIDIVoices())) {
+      DEBUG_MSG("MIDI_PRESETS_GetGenMIDIVoiceName:  Invalid progNum=%d", progNum);
       return NULL;
    }
-   return genMIDINames[progNum-1];
+   return genMIDIVoiceNames[progNum - 1];
 }
 
 
-u8 MIDI_PRESETS_GetNumGenMIDIPresets(){
-   size_t length = sizeof(genMIDINames) / sizeof(char *);
+u8 MIDI_PRESETS_GetNumGenMIDIVoices() {
+   size_t length = sizeof(genMIDIVoiceNames) / sizeof(char*);
    return length;
 }
 
-u8 MIDI_PRESET_ActivateMIDIPreset(u8 presetNumber){
-   for(int i=0;i < NUM_GEN_MIDI_PRESETS;i++){
-      midi_preset_t * gPtr = &presets.generalMidiPresets[i];
-      if (gPtr->presetNumber == presetNumber){
+u8 MIDI_PRESET_ActivateMIDIPreset(u8 presetNumber) {
+   for (int i = 0;i < NUM_GEN_MIDI_PRESETS;i++) {
+      midi_preset_t* gPtr = &presets.generalMidiPresets[i];
+      if (gPtr->presetNumber == presetNumber) {
          // Activate this preset on the requested midi output and channel
          // TODO
 
@@ -102,46 +111,39 @@ u8 MIDI_PRESET_ActivateMIDIPreset(u8 presetNumber){
    return 0; // error
 }
 
-u8 MIDI_PRESETS_AddMIDIPreset(u8 programNumber,u8 bankNumber,u8 midiOutput,u8 midiChannel){
-   for(int i=0;i < NUM_GEN_MIDI_PRESETS;i++){
-      midi_preset_t * gPtr = &presets.generalMidiPresets[i];
-      if (gPtr->presetNumber == 0){
-         // Use this slot
-         gPtr->presetNumber = i+1;
-         gPtr->programNumber = programNumber;
-         gPtr->bankNumber = bankNumber;
-         gPtr->midiOutput = midiOutput;
-         gPtr->midiChannel = midiChannel;
-         return gPtr->presetNumber;
-      }
+/////////////////////////////////////////////////////////////////////////////
+// Sets a MIDI Preset.
+// presetNumber:  0 to NUM_GEN_MIDI_PRESETS-1
+// programNumber:  The General MIDI program number
+// bankNumber: General MIDI bank number
+// midiOutput: MIDI hardware output
+// midiChannel:  MIDI channel
+/////////////////////////////////////////////////////////////////////////////
+const midi_preset_t* MIDI_PRESETS_SetMIDIPreset(u8 presetNumber, u8 programNumber, u8 bankNumber, u8 midiOutput, u8 midiChannel) {
+   if (presetNumber >= NUM_GEN_MIDI_PRESETS) {
+      DEBUG_MSG("MIDI_PRESETS_SetMIDIPreset: Invalid presetNumber: %d", presetNumber);
+      return NULL;
    }
-   // Otherwise, no open slots so return 0 for error
-   return 0;
+   midi_preset_t* gPtr = &presets.generalMidiPresets[presetNumber];
+   gPtr->programNumber = programNumber;
+   gPtr->bankNumber = bankNumber;
+   gPtr->midiOutput = midiOutput;
+   gPtr->midiChannel = midiChannel;
+   return gPtr;
 }
 
-u8 MIDI_PRESETS_ReplaceMIDIPreset(u8 presetNumber,u8 programNumber,u8 bankNumber,u8 midiOutput,u8 midiChannel){
-   // search for tag
-   for(int i=0;i < NUM_GEN_MIDI_PRESETS;i++){
-      midi_preset_t * gPtr = &presets.generalMidiPresets[i];
-      if (gPtr->presetNumber == presetNumber){
-         gPtr->programNumber = programNumber;
-         gPtr->bankNumber = bankNumber;
-         gPtr->midiOutput = midiOutput;
-         gPtr->midiChannel = midiChannel;
-         return presetNumber;
-      }
+/////////////////////////////////////////////////////////////////////////////
+// Returns the MIDI Preset.
+// presetNumber:  0 to NUM_GEN_MIDI_PRESETS-1
+/////////////////////////////////////////////////////////////////////////////
+const midi_preset_t* MIDI_PRESETS_GetMidiPreset(u8 presetNumber) {
+   if (presetNumber >= NUM_GEN_MIDI_PRESETS) {
+      DEBUG_MSG("MIDI_PRESETS_GetMidiPreset: Invalid presetNumber: %d", presetNumber);
+      return NULL;
    }
-   // Otherwise, presetNumber was invalid so just add one
-   return MIDI_PRESETS_AddMIDIPreset(programNumber,bankNumber,midiOutput,midiChannel);
-}
+   midi_preset_t* ptr = &presets.generalMidiPresets[presetNumber];
+   DEBUG_MSG("MIDI_PRESETS_GetMidiPreset: preset#:%d, progNumber=%d",ptr->presetNumber,ptr->programNumber);
 
-midi_preset_t * MIDI_PRESETS_GetMidiPreset(u8 presetNumber){
-      for(int i=0;i < NUM_GEN_MIDI_PRESETS;i++){
-      midi_preset_t * gPtr = &presets.generalMidiPresets[i];
-      if (gPtr->presetNumber == presetNumber){
-         return gPtr;
-      }
-   }
-   return NULL;
+   return ptr;
 }
 

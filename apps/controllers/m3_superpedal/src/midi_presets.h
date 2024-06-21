@@ -35,13 +35,12 @@ typedef struct {
 
 extern void MIDI_PRESETS_Init();
 
-extern char * MIDI_PRESETS_GetGenMIDIPresetName(u8 progNum);
-extern u8 MIDI_PRESETS_GetNumGenMIDIPresets();
+extern const char * MIDI_PRESETS_GetGenMIDIVoiceName(u8 progNum);
+extern u8 MIDI_PRESETS_GetNumGenMIDIVoices();
 
-extern u8 MIDI_PRESETS_ReplaceMIDIPreset(u8 presetNumber,u8 programNumber,u8 bankNumber,u8 midiOutput,u8 midiChannel);
-extern u8 MIDI_PRESETS_AddMIDIPreset(u8 programNumber,u8 bankNumber,u8 midiOutput,u8 midiChannel);
+extern const midi_preset_t*  MIDI_PRESETS_SetMIDIPreset(u8 presetNumber,u8 programNumber,u8 bankNumber,u8 midiOutput,u8 midiChannel);
 extern u8 MIDI_PRESET_ActivateMIDIPreset(u8 presetNumber);
-extern midi_preset_t * MIDI_PRESETS_GetMidiPreset(u8 presetNumber);
+extern const midi_preset_t * MIDI_PRESETS_GetMidiPreset(u8 presetNumber);
 
 /////////////////////////////////////////////////////////////////////////////
 // Export global variables

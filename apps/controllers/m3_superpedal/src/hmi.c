@@ -87,12 +87,13 @@ u8 lastSelectedMainPageEntry;
 typedef enum {
    TOE_SWITCH_OCTAVE = 0,
    TOE_SWITCH_MIDI_PRESETS = 1,
-   TOE_SWITCH_PATTERN_PRESETS = 2
+   TOE_SWITCH_PATTERN_PRESETS = 2,
+   TOE_SWITCH_ARPEGGIATOR = 3
 } toeSwitchMode_t;
 #define NUM_TOE_SWITCH_MODES 4
 
 // Text for the toe switch
-char* pToeSwitchModeTitles[] = { "Octave","MIDI Presets","Pattern Presets" };
+char* pToeSwitchModeTitles[] = { "Octave","MIDI Presets","Pattern Presets","Arpeggiator" };
 
 // When > 0, toe selection mode is active
 u8 toeSelectionModeActive;
@@ -114,7 +115,8 @@ typedef enum {
    STOMP_SWITCH_UNASSIGNED = 0,
    STOMP_SWITCH_OCTAVE = 1,
    STOMP_SWITCH_MIDI_PRESETS = 2,
-   STOMP_SWITCH_PATTERN_PRESETS = 3
+   STOMP_SWITCH_PATTERN_PRESETS = 3,
+   STOMP_SWITCH_ARPEGGIATOR = 4
 } stomp_switch_setting_t;
 
 
@@ -131,7 +133,7 @@ typedef struct persistedData_s {
    toeSwitchMode_t toeSwitchMode;
 
    // Last selected toe switch in each mode
-   u8 selectedToeSwitches[NUM_TOE_SWITCH_MODES];
+   u8 selectedToeIndicator[NUM_TOE_SWITCH_MODES];
 
    // presetNumbers for toe switch gen MIDI presets. 0 is unset
    u8 toeSwitchMIDIPresetNumbers[NUM_TOE_SWITCHES];
@@ -157,14 +159,14 @@ persistedData_t settings;
 // Local prototypes
 /////////////////////////////////////////////////////////////////////////////
 void HMI_UpdateDisplay();
-void HMI_RenderLine(u8, char*, u8);
+void HMI_RenderLine(u8, const char*, u8);
 void HMI_ClearLine(u8);
 void HMI_InitPages();
 void HMI_HomePage_RotaryEncoderChanged(s8);
 void HMI_MainPage_RotaryEncoderChanged(s8);
 void HMI_MainPage_RotaryEncoderSelected();
-void HMI_GenMIDISelectPage_RotaryEncoderChanged(s8 increment);
-void HMI_GenMIDISelectPage_RotaryEncoderSelected();
+void HMI_MIDIPresetSelectPage_RotaryEncoderChanged(s8 increment);
+void HMI_MIDIPresetSelectPage_RotaryEncoderSelected();
 void HMI_EditToePresetPage_PedalSelected(u8);
 void HMI_HomePage_RotaryEncoderSelect();
 
@@ -203,21 +205,27 @@ void HMI_Init(void) {
    u8 valid = 0;
    // valid = PRESETS_GetHMISettings(&settings);
    if (!valid) {
+      // stomp switch settings
       settings.stompSwitchSetting[4] = STOMP_SWITCH_OCTAVE;
       settings.stompSwitchSetting[3] = STOMP_SWITCH_MIDI_PRESETS;
       settings.stompSwitchSetting[2] = STOMP_SWITCH_PATTERN_PRESETS;
       settings.stompSwitchSetting[1] = STOMP_SWITCH_UNASSIGNED;
-      settings.stompSwitchSetting[0] = STOMP_SWITCH_UNASSIGNED;
+      settings.stompSwitchSetting[0] = STOMP_SWITCH_ARPEGGIATOR;
       settings.toeSwitchMode = TOE_SWITCH_OCTAVE;
 
+      // Toe switch settings
+      settings.selectedToeIndicator[TOE_SWITCH_OCTAVE] = DEFAULT_OCTAVE_NUMBER;
+      settings.selectedToeIndicator[TOE_SWITCH_MIDI_PRESETS] = 1;
+      settings.selectedToeIndicator[TOE_SWITCH_PATTERN_PRESETS] = 1;
+      settings.selectedToeIndicator[TOE_SWITCH_ARPEGGIATOR] = 1;
+      
+      // Misc persisted stats in the HMI
       settings.lastSelectedGenMIDIProgNumber = 1;
       settings.lastSelectedMidiOutput = 1;
       settings.lastSelectedMidiChannel = 1;
-
-      settings.selectedToeSwitches[TOE_SWITCH_OCTAVE] = DEFAULT_OCTAVE_NUMBER;
-      settings.selectedToeSwitches[TOE_SWITCH_MIDI_PRESETS] = 1;
-      settings.selectedToeSwitches[STOMP_SWITCH_PATTERN_PRESETS] = 1;
    }
+   // Initialize toe indicators to the current mode
+   IND_SetIndicatorState(settings.selectedToeIndicator[settings.toeSwitchMode],IND_ON);
 
    // Init the display pages now that settings are restored
    HMI_InitPages();
@@ -273,8 +281,8 @@ void HMI_InitPages() {
    selectGenMIDIPresetPage.pageID = PAGE_GEN_MIDI_PRESET_SELECT;
    char* selectPresetTitle = { "Select Gen MIDI Pset" };
    selectGenMIDIPresetPage.pPageTitle = selectPresetTitle;
-   selectGenMIDIPresetPage.pRotaryEncoderChangedCallback = HMI_GenMIDISelectPage_RotaryEncoderChanged;
-   selectGenMIDIPresetPage.pRotaryEncoderSelectCallback = HMI_GenMIDISelectPage_RotaryEncoderSelected;
+   selectGenMIDIPresetPage.pRotaryEncoderChangedCallback = HMI_MIDIPresetSelectPage_RotaryEncoderChanged;
+   selectGenMIDIPresetPage.pRotaryEncoderSelectCallback = HMI_MIDIPresetSelectPage_RotaryEncoderSelected;
    selectGenMIDIPresetPage.pPedalSelectedCallback = NULL;
    selectGenMIDIPresetPage.pBackPage = &assignToeMIDIPresetPage;
 }
@@ -287,14 +295,14 @@ void HMI_InitPages() {
 /////////////////////////////////////////////////////////////////////////////
 void HMI_NotifyToeToggle(u8 toeNum, u8 pressed, s32 timestamp) {
    if ((toeNum < 1) || (toeNum > NUM_TOE_SWITCHES)) {
-      DEBUG_MSG("Invalid toe switch=%d", toeNum);
+      DEBUG_MSG("HMI_NotifyToeToggle: Invalid toe switch=%d", toeNum);
       return;
    }
 
    // Save the state for long press detection although we may not need this
    if (pressed) {
 #ifdef DEBUG
-      DEBUG_MSG("Toe switch %d pressed", toeNum);
+      DEBUG_MSG("HMI_NotifyToeToggle: Toe switch %d pressed", toeNum);
 #endif
       if (toeSwitchState[toeNum - 1].switchState == 0) {
          // Save initial press timestamp         
@@ -304,7 +312,7 @@ void HMI_NotifyToeToggle(u8 toeNum, u8 pressed, s32 timestamp) {
    }
    else {
 #ifdef DEBUG
-      DEBUG_MSG("Toe switch %d released", toeNum);
+      DEBUG_MSG("HMI_NotifyToeToggle: Toe switch %d released", toeNum);
 #endif
       toeSwitchState[toeNum - 1].switchState = 0;
    }
@@ -318,10 +326,10 @@ void HMI_NotifyToeToggle(u8 toeNum, u8 pressed, s32 timestamp) {
       // Toe selection dialog is up so end the dialog
       // after shutting off the flashing indicators and setting the selected one.
 #ifdef DEBUG
-      DEBUG_MSG("Toeselection mode.  Toe #: %d", toeNum);
+      DEBUG_MSG("HMI_NotifyToeToggle: Toeselection mode.  Toe #: %d", toeNum);
 #endif
       IND_ClearAll();
-      IND_SetTempIndicatorState(toeNum, IND_FLASH_FAST, 450, IND_ON);
+      IND_SetTempIndicatorState(toeNum, IND_FLASH_FAST, IND_TEMP_FLASH_STATE_DEFAULT_DURATION, IND_ON);
       toeSelectionModeActive = 0;  // clear to restore selection mode
       // Now process the selection by going to the selection page
       switch (currentPage->pageID) {
@@ -346,46 +354,55 @@ void HMI_NotifyToeToggle(u8 toeNum, u8 pressed, s32 timestamp) {
    switch (settings.toeSwitchMode) {
    case TOE_SWITCH_OCTAVE:
 #ifdef DEBUG
-      DEBUG_MSG("HMI: Setting to Octave mode");
+      DEBUG_MSG("HMI_NotifyToeToggle: Setting to Octave mode");
 #endif
       // Set the octave
       PEDALS_SetOctave(toeNum - 1);
+      // Save the selected change using GetOctave to close loop
+      settings.selectedToeIndicator[TOE_SWITCH_OCTAVE] = PEDALS_GetOctave()+1;
       // Clear the indicators to turn off the current one (if any)
       IND_ClearAll();
       // Now set the one for the toe after flashing fast for 3 cycles
 //        IND_SetIndicatorState(toeNum,IND_FLASH_FAST);
-      IND_SetTempIndicatorState(toeNum, IND_FLASH_FAST, 450, IND_ON);
+      IND_SetTempIndicatorState(toeNum, IND_FLASH_FAST, IND_TEMP_FLASH_STATE_DEFAULT_DURATION, IND_ON);
       // And update the display
       HMI_UpdateDisplay();
       break;
    case TOE_SWITCH_MIDI_PRESETS:
 #ifdef DEBUG
-      DEBUG_MSG("HMI: Setting to MIDI Presets mode");
+      DEBUG_MSG("HMI_NotifyToeToggle: Setting to MIDI Presets mode");
 #endif     
       u8 presetNum = settings.toeSwitchMIDIPresetNumbers[toeNum - 1];
       if (presetNum == 0) {
          // no preset on this one.  Just flash indicator briefly to provide feedback
-         IND_SetTempIndicatorState(toeNum, IND_FLASH_FAST, 450, IND_OFF);
+         IND_SetTempIndicatorState(toeNum, IND_FLASH_FAST, IND_TEMP_FLASH_STATE_DEFAULT_DURATION, IND_OFF);
          return;
       }
       else {
          // Activate this preset
          u8 errorNum = MIDI_PRESET_ActivateMIDIPreset(presetNum);
          if (errorNum > 0) {
-            IND_SetTempIndicatorState(toeNum, IND_FLASH_FAST, 450, IND_ON);
+            IND_SetTempIndicatorState(toeNum, IND_FLASH_FAST, IND_TEMP_FLASH_STATE_DEFAULT_DURATION, IND_ON);
+            settings.selectedToeIndicator[TOE_SWITCH_MIDI_PRESETS] = toeNum;
          }
          else {
-            IND_SetTempIndicatorState(toeNum, IND_FLASH_FAST, 450, IND_OFF);
+            // Invalid preset.  Flash and then off
+            IND_SetTempIndicatorState(toeNum, IND_FLASH_FAST, IND_TEMP_FLASH_STATE_DEFAULT_DURATION, IND_OFF);
          }
       }
       break;
    case TOE_SWITCH_PATTERN_PRESETS:
 #ifdef DEBUG
-      DEBUG_MSG("HMI: Setting to Pattern Presets mode");
+      DEBUG_MSG("HMI_NotifyToeToggle: Setting to Pattern Presets mode");
 #endif  
       // TODO
       break;
-   default:
+    case TOE_SWITCH_ARPEGGIATOR:
+#ifdef DEBUG
+      DEBUG_MSG("HMI_NotifyToeToggle: Setting to Arpeggiator mode");
+#endif  
+      // TODO
+      break;  default:
    }
 }
 
@@ -397,13 +414,13 @@ void HMI_NotifyToeToggle(u8 toeNum, u8 pressed, s32 timestamp) {
 /////////////////////////////////////////////////////////////////////////////
 void HMI_NotifyStompToggle(u8 stompNum, u8 pressed, s32 timestamp) {
    if ((stompNum < 1) || (stompNum > NUM_STOMP_SWITCHES)) {
-      DEBUG_MSG("Invalid stomp switch=%d", stompNum);
+      DEBUG_MSG("HMI_NotifyStompToggle:  Invalid stomp switch=%d", stompNum);
       return;
    }
    // Save the state for long press detection although we likely will not need this
    if (pressed) {
 #ifdef DEBUG
-      DEBUG_MSG("Toe switch %d pressed", stompNum);
+      DEBUG_MSG("HMI_NotifyStompToggle:  Toe switch %d pressed", stompNum);
 #endif
       if (stompSwitchState[stompNum - 1].switchState == 0) {
          // Save initial press timestamp         
@@ -413,7 +430,7 @@ void HMI_NotifyStompToggle(u8 stompNum, u8 pressed, s32 timestamp) {
    }
    else {
 #ifdef DEBUG
-      DEBUG_MSG("Toe switch %d released", stompNum);
+      DEBUG_MSG("HMI_NotifyStompToggle: Toe switch %d released", stompNum);
 #endif
       stompSwitchState[stompNum - 1].switchState = 0;
    }
@@ -433,13 +450,16 @@ void HMI_NotifyStompToggle(u8 stompNum, u8 pressed, s32 timestamp) {
    case STOMP_SWITCH_PATTERN_PRESETS:
       settings.toeSwitchMode = TOE_SWITCH_PATTERN_PRESETS;
       break;
+   case STOMP_SWITCH_ARPEGGIATOR:
+      settings.toeSwitchMode = TOE_SWITCH_ARPEGGIATOR;
+      break;
    case STOMP_SWITCH_UNASSIGNED:
       //unassigned on, so just return;
       return;
    }
    // Update the toe switch indicators and the display in case the mode changed.
    IND_ClearAll();
-   IND_SetIndicatorState(settings.selectedToeSwitches[settings.toeSwitchMode], IND_ON);
+   IND_SetIndicatorState(settings.selectedToeIndicator[settings.toeSwitchMode], IND_ON);
    HMI_UpdateDisplay();
 }
 
@@ -450,7 +470,7 @@ void HMI_NotifyStompToggle(u8 stompNum, u8 pressed, s32 timestamp) {
 /////////////////////////////////////////////////////////////////////////////
 void HMI_NotifyEncoderChange(s32 incrementer) {
 #ifdef DEBUG
-   DEBUG_MSG("Rotary encoder change: %d", incrementer);
+   DEBUG_MSG("HMI_NotifyEncoderChange:  Rotary encoder change: %d", incrementer);
 #endif
 
    // Send the encoder to the page if the callback is non-null
@@ -574,7 +594,7 @@ void HMI_UpdateDisplay() {
    char lineBuffer[DISPLAY_CHAR_WIDTH];
 
    // Now render according to the mode
-   u8 selectedToeSwitch = settings.selectedToeSwitches[settings.toeSwitchMode];
+   u8 selectedToeSwitch = settings.selectedToeIndicator[settings.toeSwitchMode];
    char* pModeName = pToeSwitchModeTitles[settings.toeSwitchMode];
    switch (currentPage->pageID) {
    case PAGE_HOME:
@@ -586,13 +606,13 @@ void HMI_UpdateDisplay() {
       case TOE_SWITCH_MIDI_PRESETS:
          HMI_RenderLine(1, pModeName, 0);
          u8 presetNum = settings.toeSwitchMIDIPresetNumbers[selectedToeSwitch];
-         midi_preset_t* preset = MIDI_PRESETS_GetMidiPreset(presetNum);
+         const midi_preset_t* preset = MIDI_PRESETS_GetMidiPreset(presetNum);
          if (preset == NULL) {
             HMI_RenderLine(1, "Invalid Preset Number", 0);
             DEBUG_MSG("Invalid preset number:  %d", presetNum);
          }
          else {
-            char* pName = MIDI_PRESETS_GetGenMIDIPresetName(preset->programNumber);
+            const char* pName = MIDI_PRESETS_GetGenMIDIVoiceName(preset->programNumber);
             HMI_RenderLine(2, pName, 0);
          }
          break;
@@ -611,21 +631,21 @@ void HMI_UpdateDisplay() {
       // Print 3 presets centered around the current selection.
 
       // Selected entry on line 2
-      u8 lastSelectedPreset = settings.lastSelectedGenMIDIProgNumber;
-      HMI_RenderLine(2, MIDI_PRESETS_GetGenMIDIPresetName(lastSelectedPreset), 1);
-      if (lastSelectedPreset == 0) {
+      u8 lastProgNumber = settings.lastSelectedGenMIDIProgNumber;
+      HMI_RenderLine(2, MIDI_PRESETS_GetGenMIDIVoiceName(lastProgNumber), 1);
+      if (lastProgNumber == 1) {
          // At the beginning. Clear line 1
          HMI_ClearLine(1);
       }
       else {
-         HMI_RenderLine(1, MIDI_PRESETS_GetGenMIDIPresetName(lastSelectedPreset - 1), 0);
+         HMI_RenderLine(1, MIDI_PRESETS_GetGenMIDIVoiceName(lastProgNumber - 1), 0);
       }
-      if (lastSelectedPreset == MIDI_PRESETS_GetNumGenMIDIPresets() - 1) {
+      if (lastProgNumber == MIDI_PRESETS_GetNumGenMIDIVoices() - 1) {
          // At the end, clear line 3
          HMI_ClearLine(3);
       }
       else {
-         HMI_RenderLine(3, MIDI_PRESETS_GetGenMIDIPresetName(lastSelectedPreset + 1), 0);
+         HMI_RenderLine(3, MIDI_PRESETS_GetGenMIDIVoiceName(lastProgNumber + 1), 0);
       }
       break;
    case PAGE_MAIN:
@@ -660,7 +680,7 @@ void HMI_UpdateDisplay() {
 // Helper function renders a line and pads out to full display width or
 // truncates to width
 /////////////////////////////////////////////////////////////////////////////
-void HMI_RenderLine(u8 lineNum, char* pLineText, u8 selected) {
+void HMI_RenderLine(u8 lineNum, const char* pLineText, u8 selected) {
    char lineBuffer[DISPLAY_CHAR_WIDTH + 1] = "";
    if (selected) {
       strcpy(lineBuffer, "<");
@@ -748,13 +768,13 @@ void HMI_MainPage_RotaryEncoderSelected() {
 /////////////////////////////////////////////////////////////////////////////
 // Callback for rotary encoder change on general MIDI select page
 /////////////////////////////////////////////////////////////////////////////
-void HMI_GenMIDISelectPage_RotaryEncoderChanged(s8 increment) {
+void HMI_MIDIPresetSelectPage_RotaryEncoderChanged(s8 increment) {
    settings.lastSelectedGenMIDIProgNumber += increment;
    if (settings.lastSelectedGenMIDIProgNumber < 1) {
       settings.lastSelectedGenMIDIProgNumber = 1;
    }
-   if (settings.lastSelectedGenMIDIProgNumber > MIDI_PRESETS_GetNumGenMIDIPresets()) {
-      settings.lastSelectedGenMIDIProgNumber = MIDI_PRESETS_GetNumGenMIDIPresets();
+   if (settings.lastSelectedGenMIDIProgNumber > MIDI_PRESETS_GetNumGenMIDIVoices()) {
+      settings.lastSelectedGenMIDIProgNumber = MIDI_PRESETS_GetNumGenMIDIVoices();
    }
 
    HMI_UpdateDisplay();
@@ -762,31 +782,32 @@ void HMI_GenMIDISelectPage_RotaryEncoderChanged(s8 increment) {
 /////////////////////////////////////////////////////////////////////////////
 // Callback for rotary encoder select on gen MIDI select page
 /////////////////////////////////////////////////////////////////////////////
-void HMI_GenMIDISelectPage_RotaryEncoderSelected() {
+void HMI_MIDIPresetSelectPage_RotaryEncoderSelected() {
    // Assign the selected General MIDI preset to the currently selected toe switch
    // for this mode
    if (pendingToeSelection > 0) {
       u8* ptr = &settings.toeSwitchMIDIPresetNumbers[pendingToeSelection - 1];
-      u8 presetNumber = 0;
       if (*ptr > 0) {
-         // There was already a preset on this one so replace it
-         presetNumber = MIDI_PRESETS_ReplaceMIDIPreset(*ptr,
+         // There was already a preset on this one so replace it after confirmation
+         // TODO:  Do a confirmation dialog
+
+         const midi_preset_t* presetPtr = MIDI_PRESETS_SetMIDIPreset(
+            pendingToeSelection,    // toe number is preset number
             settings.lastSelectedGenMIDIProgNumber,
             0,
             settings.lastSelectedMidiOutput,
             settings.lastSelectedMidiChannel);
+         if (presetPtr == NULL){
+            DEBUG_MSG("HMI_MIDIPresetSelectPage_RotaryEncoderSelected:  Error adding preset");
+         }
+         else{
+            // Success, set the selected indicator to pending and synch it
+            settings.selectedToeIndicator[TOE_SWITCH_MIDI_PRESETS] = pendingToeSelection;
+            IND_SetTempIndicatorState(pendingToeSelection,IND_FLASH_FAST,IND_TEMP_FLASH_STATE_DEFAULT_DURATION,IND_ON);
+            pendingToeSelection = 0;  //clear for next time
+         }
       }
-      else {
-         // No preset so add another one.
-         presetNumber = MIDI_PRESETS_AddMIDIPreset(
-            settings.lastSelectedGenMIDIProgNumber,
-            0,
-            settings.lastSelectedMidiOutput,
-            settings.lastSelectedMidiChannel);
-      }
-      if (presetNumber == 0) {
-         DEBUG_MSG("HMI_GenMIDISelectPage_RotaryEncoderSelected:  cannot add preset");
-      }
+
    }
    // Clear for next time to go back to the current toe mode 
    pendingToeSelection = 0;
@@ -795,7 +816,7 @@ void HMI_GenMIDISelectPage_RotaryEncoderSelected() {
 
    // And restore the currently selected mode toe indicator.
    IND_ClearAll();
-   IND_SetIndicatorState(settings.selectedToeSwitches[settings.toeSwitchMode], IND_ON);
+   IND_SetIndicatorState(settings.selectedToeIndicator[settings.toeSwitchMode], IND_ON);
 
    lastPage = currentPage;
    currentPage = &homePage;
