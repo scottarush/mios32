@@ -66,33 +66,41 @@ void PEDALS_Init() {
 
    pedal_config_t* pc = (pedal_config_t*)&pedal_config;
 
-   pc->midi_ports = 0x0031;     // OUT1 and USB
-   pc->midi_chn = 1;
+   u8 valid = 0;
+   // TODO
+   // valid = SETTINGS_Deserialize(pc,SETTINGS_PEDALS);
+   if (!valid) {
+      // EEPROM settings not valid.  Initialize defaults and save to E2
+      pc->midi_ports = 0x0031;     // OUT1 and USB
+      pc->midi_chn = 1;
 
-   pc->num_pedals = 12;
+      pc->num_pedals = 12;
 
-   pc->verbose_level = 0;
+      pc->verbose_level = 0;
 
-   pc->delay_fastest = 6;
-   pc->delay_fastest_black_pedals = 10;
-   pc->delay_slowest = 70;
-   pc->delay_slowest_black_pedals = 60;
-   pc->delay_release_fastest = 20;
-   pc->delay_release_slowest = 100;
+      pc->delay_fastest = 6;
+      pc->delay_fastest_black_pedals = 10;
+      pc->delay_slowest = 70;
+      pc->delay_slowest_black_pedals = 60;
+      pc->delay_release_fastest = 20;
+      pc->delay_release_slowest = 100;
 
-   pc->minimum_press_velocity = 20;
-   pc->minimum_release_velocity = 40;
+      pc->minimum_press_velocity = 20;
+      pc->minimum_release_velocity = 40;
 
-   pc->octave = DEFAULT_OCTAVE_NUMBER;
-   pc->transpose = 0;
-   pc->left_pedal_note_number = 23;
+      pc->octave = DEFAULT_OCTAVE_NUMBER;
+      pc->transpose = 0;
+      pc->left_pedal_note_number = 23;
 
-   // Clear locals
-   makePressed = 1;
-   pendingPedalNum = 0;   // not pending
-   pendingPedalTimestamp = 0;
-   makeReleaseTimestamp = 0;
-   lastPressVelocity = 127;
+      // Clear locals
+      makePressed = 1;
+      pendingPedalNum = 0;   // not pending
+      pendingPedalTimestamp = 0;
+      makeReleaseTimestamp = 0;
+      lastPressVelocity = 127;
+
+      // SETTINGS_Serialize(pc,SETTINGS_PEDALS);
+   }
 }
 
 /////////////////////////////////////////////////////////////////////////////

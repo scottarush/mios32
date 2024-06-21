@@ -11,6 +11,15 @@
 // Global definitions
 /////////////////////////////////////////////////////////////////////////////
 
+// Both of these defines are used in PERSIST.C to calculate the current 
+// size and make sure it is under the max
+#define NUM_GEN_MIDI_PRESETS 8
+#define NUM_PATTERN_PRESETS 8
+
+// OUT1 and USB
+#define DEFAULT_PRESET_MIDI_PORTS 0x0031
+
+#define DEFAULT_PRESET_MIDI_CHANNEL 1
 
 /////////////////////////////////////////////////////////////////////////////
 // Global Types
@@ -19,15 +28,31 @@ typedef enum {
    GENERAL_MIDI_PRESET = 0,
    MIDI_PRESET = 1,
    PATTERN_PRESET = 2
-} midi_preset_type_t;
+} midi_preset_bank_t;
 
 typedef struct {   
+   // Preset #s start at 1
    u8 presetNumber;
+   // Per Gen MIDI 1 spec programNumbers 1-128
    u8 programNumber;
+   // bankNumber is device specific.  For GenMIDI, set to 0.
    u8 bankNumber;
-   u8 midiOutput;
+   // midiPorts uses standard MIOS32 format
+   u8 midiPorts;
+   // midiChannel number common for all ports
    u8 midiChannel;
 } midi_preset_t;
+// This define is used in PERSIST.C to compute the persisted size.
+#define MIDI_PRESET_T_SIZE_BYTES 5
+
+
+typedef struct {
+   // First 4 bytes must be serialization version ID.  Big-ended order
+   u32 serializationID;
+
+   midi_preset_t generalMidiPresets[NUM_GEN_MIDI_PRESETS];
+   //  midi_preset_t patternPresets[NUM_PATTERN_PRESETS];   
+} persisted_midi_presets_t;
 
 /////////////////////////////////////////////////////////////////////////////
 // Prototypes

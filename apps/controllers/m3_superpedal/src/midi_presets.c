@@ -7,6 +7,7 @@
  /////////////////////////////////////////////////////////////////////////////
 
 #include <mios32.h>
+#include <mios32_midi.h>
 
 #include "midi_presets.h"
 
@@ -16,26 +17,19 @@
 # define DEBUG_MSG MIOS32_MIDI_SendDebugMessage
 #endif
 
-#define NUM_GEN_MIDI_PRESETS 8
-#define NUM_PATTERN_PRESETS 8
-
 /////////////////////////////////////////////////////////////////////////////
 // Local Variables
 /////////////////////////////////////////////////////////////////////////////
 u8 defaultMIDIPresetProgramNumbers[] = {43,49,50,51,17,20,33,92};
 u8 defaultMIDIPresetBankNumbers[] = {0,0,0,0,0,0,0,0};
-#define DEFAULT_PRESET_MIDI_OUTPUT 1
-#define DEFAULT_PRESET_MIDI_CHANNEL 1
+
 
 /////////////////////////////////////////////////////////////////////////////
 // Persisted data to E^2
 /////////////////////////////////////////////////////////////////////////////
-typedef struct persistedData_s {
-   midi_preset_t generalMidiPresets[NUM_GEN_MIDI_PRESETS];
-   //  midi_preset_t patternPresets[NUM_PATTERN_PRESETS];   
-} persistedData_t;
 
-persistedData_t presets;
+
+persisted_midi_presets_t presets;
 
 char* genMIDIVoiceNames[] = { " Acoustic Grand Piano"," Bright Acoustic Piano"," Electric Grand Piano"," Honky-tonk Piano"," Electric Piano 1",
 " Electric Piano 2"," Harpsichord"," Clavi"," Celesta"," Glockenspiel",
@@ -70,13 +64,16 @@ void MIDI_PRESETS_Init() {
    u8 valid = 0;
    // valid = PRESETS_GetHMISettings(&settings);
    if (valid == 0) {
+      // Update this ID whenever the persisted structure changes.  
+      presets.serializationID = 0x4D494401;   // 'MID1'
+
       // Set default presets
       for (int i = 0;i < NUM_GEN_MIDI_PRESETS;i++) {
          midi_preset_t* ptr = &presets.generalMidiPresets[i];
-         ptr->presetNumber = i;
+         ptr->presetNumber = i+1;
          ptr->programNumber = defaultMIDIPresetProgramNumbers[i];
-         ptr->programNumber = defaultMIDIPresetBankNumbers[i];
-         ptr->midiOutput = DEFAULT_PRESET_MIDI_OUTPUT;
+         ptr->bankNumber = defaultMIDIPresetBankNumbers[i];
+         ptr->midiPorts = DEFAULT_PRESET_MIDI_PORTS;
          ptr->midiChannel = DEFAULT_PRESET_MIDI_CHANNEL;
       }
 
@@ -98,50 +95,67 @@ u8 MIDI_PRESETS_GetNumGenMIDIVoices() {
    return length;
 }
 
+/////////////////////////////////////////////////////////////////////////////
+// Activates a MIDI Preset.
+// presetNumber:  1 to NUM_GEN_MIDI_PRESETS
+// returns:  activated presetNumber on success, 0 on error.
+/////////////////////////////////////////////////////////////////////////////
 u8 MIDI_PRESET_ActivateMIDIPreset(u8 presetNumber) {
-   for (int i = 0;i < NUM_GEN_MIDI_PRESETS;i++) {
-      midi_preset_t* gPtr = &presets.generalMidiPresets[i];
-      if (gPtr->presetNumber == presetNumber) {
-         // Activate this preset on the requested midi output and channel
-         // TODO
-
-         return gPtr->presetNumber;  // for success
-      }
+   if (presetNumber >= NUM_GEN_MIDI_PRESETS) {
+      DEBUG_MSG("MIDI_PRESET_ActivateMIDIPreset: Invalid presetNumber: %d", presetNumber);
+      return 0;
    }
-   return 0; // error
+   midi_preset_t* gPtr = &presets.generalMidiPresets[presetNumber-1];
+   u16 mask = 1;
+   for (int porti = 0; porti < 16; ++porti, mask <<= 1) {
+      if (gPtr->midiPorts & mask) {
+         // USB0/1/2/3, UART0/1/2/3, IIC0/1/2/3, OSC0/1/2/3
+         mios32_midi_port_t port = 0x10 + ((porti & 0xc) << 2) + (porti & 3);
+
+         //DEBUG_MSG("midi tx:  port=0x%x",port);
+         MIOS32_MIDI_SendProgramChange(port,gPtr->midiChannel,gPtr->programNumber);
+      }
+
+      return gPtr->presetNumber;  // for success
+   }
+
+   return 0; // can't happen
 }
 
 /////////////////////////////////////////////////////////////////////////////
 // Sets a MIDI Preset.
-// presetNumber:  0 to NUM_GEN_MIDI_PRESETS-1
+// presetNumber:  1 to NUM_GEN_MIDI_PRESETS
 // programNumber:  The General MIDI program number
 // bankNumber: General MIDI bank number
-// midiOutput: MIDI hardware output
+// midiPorts: MIDI hardware output
 // midiChannel:  MIDI channel
+// returns: pointer to updated preset on success, NULL on invalid preset data
 /////////////////////////////////////////////////////////////////////////////
-const midi_preset_t* MIDI_PRESETS_SetMIDIPreset(u8 presetNumber, u8 programNumber, u8 bankNumber, u8 midiOutput, u8 midiChannel) {
-   if (presetNumber >= NUM_GEN_MIDI_PRESETS) {
+const midi_preset_t* MIDI_PRESETS_SetMIDIPreset(u8 presetNumber, u8 programNumber, u8 bankNumber, u8 midiPorts, u8 midiChannel) {
+   if ((presetNumber == 0) || (presetNumber > NUM_GEN_MIDI_PRESETS)) {
       DEBUG_MSG("MIDI_PRESETS_SetMIDIPreset: Invalid presetNumber: %d", presetNumber);
       return NULL;
    }
-   midi_preset_t* gPtr = &presets.generalMidiPresets[presetNumber];
+   midi_preset_t* gPtr = &presets.generalMidiPresets[presetNumber-1];
+   // TODO:  Validate programNumber, bankNumber, etc.
    gPtr->programNumber = programNumber;
    gPtr->bankNumber = bankNumber;
-   gPtr->midiOutput = midiOutput;
+   gPtr->midiPorts = midiPorts;
    gPtr->midiChannel = midiChannel;
    return gPtr;
 }
 
 /////////////////////////////////////////////////////////////////////////////
 // Returns the MIDI Preset.
-// presetNumber:  0 to NUM_GEN_MIDI_PRESETS-1
+// presetNumber:  1 to NUM_GEN_MIDI_PRESETS
+// returns: pointer to updated preset on success, NULL on invalid presetNumber
 /////////////////////////////////////////////////////////////////////////////
 const midi_preset_t* MIDI_PRESETS_GetMidiPreset(u8 presetNumber) {
-   if (presetNumber >= NUM_GEN_MIDI_PRESETS) {
+   if ((presetNumber == 0) || (presetNumber > NUM_GEN_MIDI_PRESETS)) {
       DEBUG_MSG("MIDI_PRESETS_GetMidiPreset: Invalid presetNumber: %d", presetNumber);
       return NULL;
    }
-   midi_preset_t* ptr = &presets.generalMidiPresets[presetNumber];
+   midi_preset_t* ptr = &presets.generalMidiPresets[presetNumber-1];
 #ifdef DEBUG_ENABLED
    DEBUG_MSG("MIDI_PRESETS_GetMidiPreset: preset#:%d, progNumber=%d",ptr->presetNumber,ptr->programNumber);
 #endif

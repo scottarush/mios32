@@ -16,6 +16,9 @@
 #define DEFAULT_OCTAVE_NUMBER 3
 
 typedef struct {
+   // First 4 bytes must be serialization version ID.  Big-ended order
+   u32 serializationID;
+
    u16 midi_ports;
    u8 midi_chn;
 

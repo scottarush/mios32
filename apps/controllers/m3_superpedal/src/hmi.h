@@ -14,13 +14,55 @@
 /////////////////////////////////////////////////////////////////////////////
 // Global definitions
 /////////////////////////////////////////////////////////////////////////////
-#define NUM_TOE_HMI 8
-#define NUM_STOMP_HMI 5
-
+#define NUM_STOMP_SWITCHES 5
+#define NUM_TOE_SWITCHES 8
 
 /////////////////////////////////////////////////////////////////////////////
 // Global Types
 /////////////////////////////////////////////////////////////////////////////
+// Following type is used as an array index so must be 0 based and consecutive
+typedef enum {
+   STOMP_SWITCH_UNASSIGNED = 0,
+   STOMP_SWITCH_OCTAVE = 1,
+   STOMP_SWITCH_MIDI_PRESETS = 2,
+   STOMP_SWITCH_PATTERN_PRESETS = 3,
+   STOMP_SWITCH_ARPEGGIATOR = 4
+} stomp_switch_setting_t;
+
+typedef enum {
+   TOE_SWITCH_OCTAVE = 0,
+   TOE_SWITCH_MIDI_PRESETS = 1,
+   TOE_SWITCH_PATTERN_PRESETS = 2,
+   TOE_SWITCH_ARPEGGIATOR = 3
+} toeSwitchMode_t;
+#define NUM_TOE_SWITCH_MODES 4
+
+typedef struct {
+   // First 4 bytes must be serialization version ID.  Big-ended order
+   u32 serializationID;
+
+   // The current mode of the toe switches
+   toeSwitchMode_t toeSwitchMode;
+
+   // Last selected toe switch in each mode
+   u8 selectedToeIndicator[NUM_TOE_SWITCH_MODES];
+
+   // presetNumbers for toe switch gen MIDI presets. 0 is unset
+   u8 toeSwitchMIDIPresetNumbers[NUM_TOE_SWITCHES];
+
+   // Last selected MIDI preset program number in the assignment dialog
+   u8 lastSelectedMIDIProgNumber;
+
+   // Midi output to be used for preset editing
+   u8 lastSelectedMidiOutput;
+
+   // Midi channel to be used for preset editing
+   u8 lastSelectedMidiChannel;
+
+   // stomp switch settings
+   stomp_switch_setting_t stompSwitchSetting[NUM_STOMP_SWITCHES];
+
+} persisted_hmi_settings_t;
 
 
 /////////////////////////////////////////////////////////////////////////////
