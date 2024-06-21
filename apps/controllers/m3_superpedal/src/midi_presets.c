@@ -10,7 +10,7 @@
 
 #include "midi_presets.h"
 
-#undef DEBUG_ENABLED
+#define DEBUG_ENABLED
 
 #ifndef DEBUG_MSG
 # define DEBUG_MSG MIOS32_MIDI_SendDebugMessage
@@ -22,8 +22,8 @@
 /////////////////////////////////////////////////////////////////////////////
 // Local Variables
 /////////////////////////////////////////////////////////////////////////////
-const u8 defaultMIDIPresetProgramNumbers[] = {43,49,50,51,17,20,33,92};
-const u8 defaultMIDIPresetBankNumbers[] = {0,0,0,0,0,0,0,0};
+u8 defaultMIDIPresetProgramNumbers[] = {43,49,50,51,17,20,33,92};
+u8 defaultMIDIPresetBankNumbers[] = {0,0,0,0,0,0,0,0};
 #define DEFAULT_PRESET_MIDI_OUTPUT 1
 #define DEFAULT_PRESET_MIDI_CHANNEL 1
 
@@ -69,7 +69,7 @@ void MIDI_PRESETS_Init() {
   // TODO
    u8 valid = 0;
    // valid = PRESETS_GetHMISettings(&settings);
-   if (!valid) {
+   if (valid == 0) {
       // Set default presets
       for (int i = 0;i < NUM_GEN_MIDI_PRESETS;i++) {
          midi_preset_t* ptr = &presets.generalMidiPresets[i];
@@ -142,8 +142,9 @@ const midi_preset_t* MIDI_PRESETS_GetMidiPreset(u8 presetNumber) {
       return NULL;
    }
    midi_preset_t* ptr = &presets.generalMidiPresets[presetNumber];
+#ifdef DEBUG_ENABLED
    DEBUG_MSG("MIDI_PRESETS_GetMidiPreset: preset#:%d, progNumber=%d",ptr->presetNumber,ptr->programNumber);
-
+#endif
    return ptr;
 }
 
