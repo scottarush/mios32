@@ -38,12 +38,13 @@ s32 PERSIST_Write32(u16 addr, u32 value);
 // Reads the EEPROM content during boot
 // If EEPROM content isn't valid (magic number mismatch), clear EEPROM
 // with default data
+// mode:  0 for regular init, 1 for forced re-format.
 /////////////////////////////////////////////////////////////////////////////
 s32 PERSIST_Init(u32 mode) {
    s32 status = 0;
 
    // init EEPROM emulation
-   if ((status = EEPROM_Init(0)) < 0) {
+   if ((status = EEPROM_Init(mode)) < 0) {
 #ifdef DEBUG_ENABLED
       DEBUG_MSG("[PRESETS] EEPROM initialisation failed with status %d!\n Attempting to re-format", status);
 #endif

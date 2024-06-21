@@ -20,10 +20,10 @@ THUMB_SOURCE    = src/app.c \
  		  src/pedals.c \
 		  src/indicators.c \
 		  src/hmi.c \
-		  src/midi_presets.c
-#		  src/terminal.c 
-#		  src/presets.c \
-#		  src/shell.c \
+		  src/midi_presets.c\
+                  src/persist.c\
+		  src/terminal.c\
+		  src/shell.c 
 
 #  (following source stubs not relevant for Cortex M3 derivatives)
 THUMB_AS_SOURCE =
