@@ -20,6 +20,8 @@
 
 #include "pedals.h"
 
+#include "persist.h"
+
 /////////////////////////////////////////////////////////////////////////////
 // Local defines
 /////////////////////////////////////////////////////////////////////////////
@@ -66,11 +68,12 @@ void PEDALS_Init() {
 
    pedal_config_t* pc = (pedal_config_t*)&pedal_config;
 
-   u8 valid = 0;
-   // TODO
-   // valid = SETTINGS_Deserialize(pc,SETTINGS_PEDALS);
-   if (!valid) {
+   s32 valid = 0;
+   valid = PERSIST_ReadBlock(PERSIST_PEDALS_BLOCK, (unsigned char*)&pedal_config, sizeof(pedal_config));
+   if (valid < 0) {
       // EEPROM settings not valid.  Initialize defaults and save to E2
+      DEBUG_MSG("PEDALS_Init:  PERSIST_ReadBlock return invalid.   Reinitializing EEPROM Block");
+
       pc->midi_ports = 0x0031;     // OUT1 and USB
       pc->midi_chn = 1;
 
@@ -99,7 +102,10 @@ void PEDALS_Init() {
       makeReleaseTimestamp = 0;
       lastPressVelocity = 127;
 
-      // SETTINGS_Serialize(pc,SETTINGS_PEDALS);
+      valid = PERSIST_StoreBlock(PERSIST_PEDALS_BLOCK, (unsigned char*)&pedal_config, sizeof(pedal_config));
+      if (valid < 0){
+         DEBUG_MSG("PEDALS_Init:  Error persisting setting to EEPROM");
+      }
    }
 }
 

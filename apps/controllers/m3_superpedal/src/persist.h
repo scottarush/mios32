@@ -35,6 +35,7 @@ typedef enum {
 extern s32 PERSIST_Init(u32 mode);
 
 extern s32 PERSIST_StoreBlock(persist_block_t blockType, const unsigned char* pData,u16 length);
+extern s32 PERSIST_ReadBlock(persist_block_t block, unsigned char* pData, u16 length);
 
 extern u16 PERSIST_GetStartAddress(persist_block_t blockType);
 

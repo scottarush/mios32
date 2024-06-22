@@ -169,7 +169,7 @@ s32 TERMINAL_ParseLine(char* input, void* _output_function)
          UIP_TERMINAL_Help(_output_function);
          MIDIMON_TerminalHelp(_output_function);
          MIDI_ROUTER_TerminalHelp(_output_function);
-         out("  clearEE:                           clears E2PROM.  Will be re'inited at next boot.");
+ //        out("  reinit:                           Reinitializes MIDI_PRESETS, HMI, and PEDALS to persist to E2.");
          out("  reset:                            resets the MIDIbox (!)\n");
          out("  help:                             this page");
          out("  exit:                             (telnet only) exits the terminal");
@@ -177,15 +177,18 @@ s32 TERMINAL_ParseLine(char* input, void* _output_function)
       else if (strcmp(parameter, "system") == 0) {
          TERMINAL_PrintSystem(_output_function);
       }
-      else if (strcmp(parameter, "clearEE") == 0) {
+ /*   else if (strcmp(parameter, "reinit") == 0) {
          s32 status = PERSIST_Init(1);
          if (status >= 0) {
-            out("Presets stored in internal EEPROM!");
+            MIDI_PRESETS_Init();
+            HMI_Init();
+            PEDALS_Init();
          }
          else {
-            out("ERROR: failed to store presets in internal EEPROM (status %d)!", status);
+            out("ERROR: failed to clear EEPROM (status %d)!", status);
          }
       }
+*/
       else if (strcmp(parameter, "reset") == 0) {
          MIOS32_SYS_Reset();
       }

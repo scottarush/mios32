@@ -29,6 +29,8 @@
 #include "pedals.h"
 #include "indicators.h"
 #include "midi_presets.h"
+#include "persist.h"
+
 #include "terminal.h"
 #include "tasks.h"
 #include "uip_task.h"
@@ -94,15 +96,12 @@ void APP_Init(void) {
    enc_config.cfg.speed_par = 0;
    MIOS32_ENC_ConfigSet(0, enc_config);
 
-   // read EEPROM content
-  // PRESETS_Init(0);
-
    // init MIDI port/router handling
    MIDI_PORT_Init(0);
    MIDI_ROUTER_Init(0);
 
    // init terminal
-   //TERMINAL_Init(0);
+   TERMINAL_Init(0);
 
    // init MIDImon
    MIDIMON_Init(0);
@@ -117,6 +116,11 @@ void APP_Init(void) {
    MIOS32_MIDI_SendDebugMessage("=================\n");
    MIOS32_MIDI_SendDebugMessage("\n");
    
+   // Init the persistence handler
+   if (PERSIST_Init(0) < 0){
+      MIOS32_MIDI_SendDebugMessage("Error initializing EEPROM");
+   }
+
    // init pedal functions
    PEDALS_Init(0);
 

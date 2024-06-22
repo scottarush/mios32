@@ -73,7 +73,7 @@ s32 PERSIST_ReadBlock(persist_block_t block, unsigned char* pData, u16 length) {
    u32 eeSerializationID = PERSIST_Read32(startAddress);
    if (serializationID != eeSerializationID) {
       // serializationID doesn't match.  
-      DEBUG_MSG("[PERSIST] serializationID: %x doesn't match E^2 id: %x.  Re-formatting EEPROM.  You will need to reboot to write fresh persisted data.", serializationID, eeSerializationID);
+      DEBUG_MSG("[PERSIST] serializationID: %x doesn't match E^2 id: %x. Reformatting EEPROM",serializationID, eeSerializationID);
       EEPROM_Init(1);
       return -1;
    }
@@ -99,6 +99,9 @@ s32 PERSIST_StoreBlock(persist_block_t blockType, const unsigned char* pData, u1
 
    u16 startAddress = PERSIST_GetStartAddress(blockType);
    u16 endAddress = startAddress + length;
+#ifdef DEBUG_ENABLED
+   DEBUG_MSG("PERSIST_StoreBlock called:  blockType %d, length %d, startAddr=0x%x, endAddr=0x%x",blockType,length,startAddress,endAddress);
+#endif
    while (startAddress < endAddress) {
       u16 word = *pData++;
       word <<= 8;

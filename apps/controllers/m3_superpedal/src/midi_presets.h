@@ -63,7 +63,8 @@ extern void MIDI_PRESETS_Init();
 extern const char * MIDI_PRESETS_GetGenMIDIVoiceName(u8 progNum);
 extern u8 MIDI_PRESETS_GetNumGenMIDIVoices();
 
-extern const midi_preset_t*  MIDI_PRESETS_SetMIDIPreset(u8 presetNumber,u8 programNumber,u8 bankNumber,u8 midiOutput,u8 midiChannel);
+extern const midi_preset_t* MIDI_PRESETS_SetMIDIPreset(u8 presetNumber, u8 programNumber, u8 bankNumber, u8 octave,u8 midiPorts, u8 midiChannel);
+
 extern u8 MIDI_PRESET_ActivateMIDIPreset(u8 presetNumber);
 extern const midi_preset_t * MIDI_PRESETS_GetMidiPreset(u8 presetNumber);
 
