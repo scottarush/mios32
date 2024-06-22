@@ -22,6 +22,7 @@
 /////////////////////////////////////////////////////////////////////////////
 u8 defaultMIDIPresetProgramNumbers[] = {43,49,50,51,17,20,33,92};
 u8 defaultMIDIPresetBankNumbers[] = {0,0,0,0,0,0,0,0};
+u8 defaultMIDIPresetOctaveNumbers[] = {3,3,3,3,3,3,3,3};
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -75,6 +76,7 @@ void MIDI_PRESETS_Init() {
          ptr->bankNumber = defaultMIDIPresetBankNumbers[i];
          ptr->midiPorts = DEFAULT_PRESET_MIDI_PORTS;
          ptr->midiChannel = DEFAULT_PRESET_MIDI_CHANNEL;
+         ptr->octave = defaultMIDIPresetOctaveNumbers[i];
       }
 
    }
@@ -101,7 +103,7 @@ u8 MIDI_PRESETS_GetNumGenMIDIVoices() {
 // returns:  activated presetNumber on success, 0 on error.
 /////////////////////////////////////////////////////////////////////////////
 u8 MIDI_PRESET_ActivateMIDIPreset(u8 presetNumber) {
-   if (presetNumber >= NUM_GEN_MIDI_PRESETS) {
+   if ((presetNumber == 0)  || (presetNumber > NUM_GEN_MIDI_PRESETS)) {
       DEBUG_MSG("MIDI_PRESET_ActivateMIDIPreset: Invalid presetNumber: %d", presetNumber);
       return 0;
    }

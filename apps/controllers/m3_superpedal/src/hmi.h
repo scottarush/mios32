@@ -24,14 +24,14 @@
 typedef enum {
    STOMP_SWITCH_UNASSIGNED = 0,
    STOMP_SWITCH_OCTAVE = 1,
-   STOMP_SWITCH_MIDI_PRESETS = 2,
+   STOMP_SWITCH_VOICE_PRESETS = 2,
    STOMP_SWITCH_PATTERN_PRESETS = 3,
    STOMP_SWITCH_ARPEGGIATOR = 4
 } stomp_switch_setting_t;
 
 typedef enum {
    TOE_SWITCH_OCTAVE = 0,
-   TOE_SWITCH_MIDI_PRESETS = 1,
+   TOE_SWITCH_VOICE_PRESETS = 1,
    TOE_SWITCH_PATTERN_PRESETS = 2,
    TOE_SWITCH_ARPEGGIATOR = 3
 } toeSwitchMode_t;
@@ -48,7 +48,7 @@ typedef struct {
    u8 selectedToeIndicator[NUM_TOE_SWITCH_MODES];
 
    // presetNumbers for toe switch gen MIDI presets. 0 is unset
-   u8 toeSwitchMIDIPresetNumbers[NUM_TOE_SWITCHES];
+   u8 toeSwitchVoicePresetNumbers[NUM_TOE_SWITCHES];
 
    // Last selected MIDI preset program number in the assignment dialog
    u8 lastSelectedMIDIProgNumber;

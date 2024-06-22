@@ -19,7 +19,7 @@
 // OUT1 and USB
 #define DEFAULT_PRESET_MIDI_PORTS 0x0031
 
-#define DEFAULT_PRESET_MIDI_CHANNEL 1
+#define DEFAULT_PRESET_MIDI_CHANNEL Chn1
 
 /////////////////////////////////////////////////////////////////////////////
 // Global Types
@@ -41,9 +41,9 @@ typedef struct {
    u8 midiPorts;
    // midiChannel number common for all ports
    u8 midiChannel;
+   // octave for pedals: 0 to 7
+   u8 octave;
 } midi_preset_t;
-// This define is used in PERSIST.C to compute the persisted size.
-#define MIDI_PRESET_T_SIZE_BYTES 5
 
 
 typedef struct {
