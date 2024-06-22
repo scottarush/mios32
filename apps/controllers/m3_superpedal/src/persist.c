@@ -19,13 +19,11 @@
 # define DEBUG_MSG MIOS32_MIDI_SendDebugMessage
 #endif
 
-// Address for the blocks
-
+// Address for the blocks.  All in 16-bit word size
 #define GAP_SIZE 50
-
 #define MIDI_PRESETS_START_ADDR 0
-#define HMI_START_ADDR (MIDI_PRESETS_START_ADDR+sizeof(persisted_midi_presets_t)+GAP_SIZE)
-#define PEDALS_START_ADDR (HMI_START_ADDR+sizeof(pedal_config_t)+GAP_SIZE)
+#define HMI_START_ADDR (MIDI_PRESETS_START_ADDR+sizeof(persisted_midi_presets_t)/2+GAP_SIZE)
+#define PEDALS_START_ADDR (HMI_START_ADDR+sizeof(pedal_config_t)/2+GAP_SIZE)
 
 
 u16 PERSIST_Read16(u16 addr);
@@ -46,47 +44,60 @@ s32 PERSIST_Init(u32 mode) {
    // init EEPROM emulation
    if ((status = EEPROM_Init(mode)) < 0) {
 #ifdef DEBUG_ENABLED
-      DEBUG_MSG("[PRESETS] EEPROM initialisation failed with status %d!\n Attempting to re-format", status);
+      DEBUG_MSG("PERSIST_Init: EEPROM initialisation failed with status %d!\n", status);
 #endif
+ 
+ /**
       // Reformat
       if ((status = EEPROM_Init(1)) < 0) {
 #ifdef DEBUG_ENABLED
          DEBUG_MSG("[PRESETS] EEPROM reformatting failed with status %d!\n", status);
 #endif   
       }
+   **/
    }
+   
    return status;
 }
 
 /////////////////////////////////////////////////////////////////////////////
 // Persists a block identified by type
+// block:  block type persist_block_t enum - used internally to compute the starting EEPROM addresses
+// pData:  point to serialized client block
+// length: length in bytes
+//
+// First 4 bytes of pData must be the expected serializationID in Little-Endian  If not found
+// in EEPROM, then an error will be returned.
 /////////////////////////////////////////////////////////////////////////////
 s32 PERSIST_ReadBlock(persist_block_t block, unsigned char* pData, u16 length) {
-   //Form the serialization in the first 4 bytes from the data
-   const unsigned char* dataPtr = pData;
+   //Form the serialization in the first 4 bytes from the data little undian
    u32 serializationID = 0;
-   for (int i = 0;i < 4;i++) {
-      serializationID <<= *dataPtr++;
+   for (int i = 3;i >= 0;i--) {
+      u8 byte = *(pData+i);
+      serializationID |= (0x000000FF && byte);
+      serializationID <<= 8;   
+      DEBUG_MSG("PERSIST_ReadBlock: forming serializationID=0x%X",serializationID);
    }
    // Get the startAddress
    u16 startAddress = PERSIST_GetStartAddress(block);
    u32 eeSerializationID = PERSIST_Read32(startAddress);
    if (serializationID != eeSerializationID) {
       // serializationID doesn't match.  
-      DEBUG_MSG("[PERSIST] serializationID: %x doesn't match E^2 id: %x. Reformatting EEPROM",serializationID, eeSerializationID);
-      EEPROM_Init(1);
+      DEBUG_MSG("PERSIST_ReadBlock: serializationID: 0x%X doesn't match E^2 id: 0x%X.",serializationID, eeSerializationID);
       return -1;
    }
-   // Otherwise read the block Big-Endian
-   u16 address = startAddress + 4;
-   u16 endAddress = startAddress + length;
-   while (address < endAddress) {
+   // Otherwise read the block Big-Endian.  Remember E2 addresses are in 16-bit Word length
+   u16 address = startAddress;
+   u16 byteCount = 0;                 
+   while (byteCount < length) {
       u16 word = PERSIST_Read16(address);
       u8 lower = word & 0x00FF;
       u8 upper = word >> 8;
       *pData++ = upper;
       *pData++ = lower;
-      address += 2;
+
+      address += 1;
+      byteCount += 2;
    }
    return length;
 }
@@ -97,23 +108,43 @@ s32 PERSIST_ReadBlock(persist_block_t block, unsigned char* pData, u16 length) {
 s32 PERSIST_StoreBlock(persist_block_t blockType, const unsigned char* pData, u16 length) {
    s32 status = 0;
 
-   u16 startAddress = PERSIST_GetStartAddress(blockType);
-   u16 endAddress = startAddress + length;
+   u16 wordAddress = PERSIST_GetStartAddress(blockType);
 #ifdef DEBUG_ENABLED
-   DEBUG_MSG("PERSIST_StoreBlock called:  blockType %d, length %d, startAddr=0x%x, endAddr=0x%x",blockType,length,startAddress,endAddress);
+   DEBUG_MSG("PERSIST_StoreBlock called:  blockType %d, length %d, startAddr=%d",blockType,length,wordAddress);
 #endif
-   while (startAddress < endAddress) {
-      u16 word = *pData++;
-      word <<= 8;
-      word |= *pData++;
+   u16 byteOffset = 0;
+   while (byteOffset < length) {
+      // Form little-endian word
+      u16 word = *(pData+byteOffset);
+      byteOffset++;
+      
+      u8 upper = *(pData+byteOffset);
+      upper <<= 8;
+      word |= (0xFF00 & upper);
+      byteOffset++;
 
-      status = PERSIST_Write16(startAddress, word);
+      status = PERSIST_Write16(wordAddress, word);
       if (status < 0) {
-         DEBUG_MSG("PERSIST_StoreBlock: Error writing word to address: 0x%x for block: %d.  Aborting", startAddress, blockType);
+         DEBUG_MSG("PERSIST_StoreBlock: Error writing word to wordAddress: %d for block: %d.  Aborting", wordAddress, blockType);
          return status;
       }
-      startAddress += 2;
+      wordAddress++;
    }
+#ifdef DEBUG_ENABLED
+   // Do a readback check if DEBUG_ENABLED
+   unsigned char checkDataBuffer[length];
+   PERSIST_ReadBlock(blockType,checkDataBuffer,length);
+   u8 errorcount = 0;
+   for(int i=0;i < length;i++){
+      DEBUG_MSG("PERSIST_StoreBlock:  Readback. offset=%d written=%u read=%u",i,*(pData+i),checkDataBuffer[i]);
+      if (checkDataBuffer[i] != *(pData+i)){
+         errorcount++;
+      }
+   }
+   if (errorcount > 0){
+      DEBUG_MSG("PERSIST_StoreBlock:  Failed readback count=%d",errorcount);
+   }
+#endif
    return status;
 }
 /////////////////////////////////////////////////////////////////////////////

@@ -180,12 +180,13 @@ void HMI_Init(void) {
 
    // Restore settings from E^2 if they exist.  If not then initialize to defaults
    s32 valid = 0;
+
+   // Set the expected serializedID in the supplied block.  Update this ID whenever the persisted structure changes.  
+   settings.serializationID = 0x484D4901;   // 'HMI1'
+
    valid = PERSIST_ReadBlock(PERSIST_HMI_BLOCK, (unsigned char*)&settings, sizeof(settings));
    if (valid < 0) {
       DEBUG_MSG("HMI_Init:  PERSIST_ReadBlock return invalid.   Reinitializing EEPROM Block");
-
-      // Update this ID whenever the persisted structure changes.  
-      settings.serializationID = 0x484D4901;   // 'HMI1'
 
       // stomp switch settings
       settings.stompSwitchSetting[4] = STOMP_SWITCH_OCTAVE;

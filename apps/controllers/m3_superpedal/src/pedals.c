@@ -68,6 +68,9 @@ void PEDALS_Init() {
 
    pedal_config_t* pc = (pedal_config_t*)&pedal_config;
 
+   // Set the expected serializedID in the supplied block.  Update this ID whenever the persisted structure changes.  
+   pedal_config.serializationID = 0x50454401;  // "PED1"
+   
    s32 valid = 0;
    valid = PERSIST_ReadBlock(PERSIST_PEDALS_BLOCK, (unsigned char*)&pedal_config, sizeof(pedal_config));
    if (valid < 0) {

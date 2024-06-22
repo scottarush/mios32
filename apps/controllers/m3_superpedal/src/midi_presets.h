@@ -47,7 +47,7 @@ typedef struct {
 
 
 typedef struct {
-   // First 4 bytes must be serialization version ID.  Big-ended order
+   // First 4 bytes must be serialization version ID. Little-endian order
    u32 serializationID;
 
    midi_preset_t generalMidiPresets[NUM_GEN_MIDI_PRESETS];

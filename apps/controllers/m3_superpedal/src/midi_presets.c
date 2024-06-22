@@ -25,14 +25,13 @@ u8 defaultMIDIPresetProgramNumbers[] = { 43,49,50,51,17,20,33,92 };
 u8 defaultMIDIPresetBankNumbers[] = { 0,0,0,0,0,0,0,0 };
 u8 defaultMIDIPresetOctaveNumbers[] = { 3,3,3,3,3,3,3,3 };
 
-// If > 0, then preset data has been changed and needs to be serialized to E2.
-u8 presetsDirty;
-
 /////////////////////////////////////////////////////////////////////////////
 // Persisted data to E^2
 /////////////////////////////////////////////////////////////////////////////
-
 persisted_midi_presets_t presets;
+
+s32 MIDI_PRESETS_PersistData();
+
 
 char* genMIDIVoiceNames[] = { " Acoustic Grand Piano"," Bright Acoustic Piano"," Electric Grand Piano"," Honky-tonk Piano"," Electric Piano 1",
 " Electric Piano 2"," Harpsichord"," Clavi"," Celesta"," Glockenspiel",
@@ -64,12 +63,12 @@ char* genMIDIVoiceNames[] = { " Acoustic Grand Piano"," Bright Acoustic Piano","
 void MIDI_PRESETS_Init() {
    // Restore settings from E^2 if they exist.  If not the initialize to defaults
    s32 valid = 0;
+   // Set the expected serializedID in the supplied block.  Update this ID whenever the persisted structure changes.  
+   presets.serializationID = 0x4D494401;   // 'MID1'
+   
    valid = PERSIST_ReadBlock(PERSIST_MIDI_PRESETS_BLOCK, (unsigned char*)&presets, sizeof(presets));
    if (valid < 0) {
       DEBUG_MSG("MIDI_PRESETS_Init:  PERSIST_ReadBlock return invalid.   Reinitializing EEPROM Block");
-      // Update this ID whenever the persisted structure changes.  
-      presets.serializationID = 0x4D494401;   // 'MID1'
-
       // Set default presets
       for (int i = 0;i < NUM_GEN_MIDI_PRESETS;i++) {
          midi_preset_t* ptr = &presets.generalMidiPresets[i];
@@ -80,12 +79,8 @@ void MIDI_PRESETS_Init() {
          ptr->midiChannel = DEFAULT_PRESET_MIDI_CHANNEL;
          ptr->octave = defaultMIDIPresetOctaveNumbers[i];
       }
-      valid =PERSIST_StoreBlock(PERSIST_MIDI_PRESETS_BLOCK, (unsigned char*)&presets, sizeof(presets));
-      if (valid < 0){
-         DEBUG_MSG("MIDI_PRESETS_Init:  Error persisting setting to EEPROM");
-      }
+      valid = MIDI_PRESETS_PersistData();
    }
-   presetsDirty = 0;
 
 }
 
@@ -152,9 +147,8 @@ const midi_preset_t* MIDI_PRESETS_SetMIDIPreset(u8 presetNumber, u8 programNumbe
    gPtr->midiPorts = midiPorts;
    gPtr->midiChannel = midiChannel;
 
-   // Set dirty flag
-   presetsDirty = 1;
-
+   // Update presets to E2
+   MIDI_PRESETS_PersistData();
    return gPtr;
 }
 
@@ -174,5 +168,19 @@ const midi_preset_t* MIDI_PRESETS_GetMidiPreset(u8 presetNumber) {
    DEBUG_MSG("MIDI_PRESETS_GetMidiPreset: preset#:%d, progNumber=%d", ptr->presetNumber, ptr->programNumber);
 #endif
    return ptr;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// Helper to store persisted data to EEPROM
+/////////////////////////////////////////////////////////////////////////////
+s32 MIDI_PRESETS_PersistData(){
+   #ifdef DEBUG_ENABLED
+      DEBUG_MSG("MIDI_PRESETS_PersistData: Writing persisted data");
+   #endif
+   s32 valid =PERSIST_StoreBlock(PERSIST_MIDI_PRESETS_BLOCK, (unsigned char*)&presets, sizeof(presets));
+      if (valid < 0){
+         DEBUG_MSG("MIDI_PRESETS_Init:  Error persisting setting to EEPROM");
+      }
+   return valid;
 }
 
