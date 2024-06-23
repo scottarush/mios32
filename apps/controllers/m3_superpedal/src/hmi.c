@@ -203,8 +203,8 @@ void HMI_Init(void) {
       // stomp switch settings
       settings.stompSwitchSetting[4] = STOMP_SWITCH_OCTAVE;
       settings.stompSwitchSetting[3] = STOMP_SWITCH_VOLUME;
-      settings.stompSwitchSetting[2] = STOMP_SWITCH_PATTERN_PRESETS;
-      settings.stompSwitchSetting[1] = STOMP_SWITCH_VOICE_PRESETS;
+      settings.stompSwitchSetting[2] = STOMP_SWITCH_VOICE_PRESETS;
+      settings.stompSwitchSetting[1] = STOMP_SWITCH_PATTERN_PRESETS;
       settings.stompSwitchSetting[0] = STOMP_SWITCH_ARPEGGIATOR;
       settings.toeSwitchMode = TOE_SWITCH_OCTAVE;
 
