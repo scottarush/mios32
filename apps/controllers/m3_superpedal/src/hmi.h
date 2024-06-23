@@ -22,8 +22,8 @@
 /////////////////////////////////////////////////////////////////////////////
 // Following type is used as an array index so must be 0 based and consecutive
 typedef enum {
-   STOMP_SWITCH_UNASSIGNED = 0,
-   STOMP_SWITCH_OCTAVE = 1,
+   STOMP_SWITCH_OCTAVE = 0,
+   STOMP_SWITCH_VOLUME = 1,
    STOMP_SWITCH_VOICE_PRESETS = 2,
    STOMP_SWITCH_PATTERN_PRESETS = 3,
    STOMP_SWITCH_ARPEGGIATOR = 4
@@ -31,11 +31,12 @@ typedef enum {
 
 typedef enum {
    TOE_SWITCH_OCTAVE = 0,
-   TOE_SWITCH_VOICE_PRESETS = 1,
-   TOE_SWITCH_PATTERN_PRESETS = 2,
-   TOE_SWITCH_ARPEGGIATOR = 3
+   TOE_SWITCH_VOLUME = 1,
+   TOE_SWITCH_VOICE_PRESETS = 2,
+   TOE_SWITCH_PATTERN_PRESETS = 3,
+   TOE_SWITCH_ARPEGGIATOR = 4
 } toeSwitchMode_t;
-#define NUM_TOE_SWITCH_MODES 4
+#define NUM_TOE_SWITCH_MODES 5
 
 typedef struct {
    // First 4 bytes must be serialization version ID.  Big-ended order

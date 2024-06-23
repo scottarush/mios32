@@ -192,7 +192,7 @@ u32 PERSIST_ParseSerializationID(const unsigned char* pData) {
          serializationID <<= 8;
 #ifdef DEBUG_ENABLED
       DEBUG_MSG("PERSIST_ParseSerializationID: forming byte=%u serializationID=0x%X", byte, serializationID);
-#endif;
+#endif
    }
    return serializationID;
 }

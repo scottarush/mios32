@@ -103,7 +103,7 @@ struct page_s editPatternPresetPage;
 
 
 // Text for the toe switch
-char* pToeSwitchModeTitles[] = { "Octave","MIDI Presets","Pattern Presets","Arpeggiator" };
+char* pToeSwitchModeTitles[] = {"Octave","Volume","MIDI Presets","Pattern Presets","Arpeggiator" };
 
 typedef struct switchState_s {
    u8 switchState;
@@ -111,6 +111,9 @@ typedef struct switchState_s {
    u8 handled;
 } switchState_t;
 switchState_t toeSwitchState[NUM_TOE_SWITCHES];
+
+// Toe volume levels even split from 1 to 127
+u8 toeVolumeLevels[NUM_TOE_SWITCHES] = {1,16,32,48,64,96,112,127};
 
 /////////////////////////////////////////////////////////////////////////////
 // Stomp Switch types and non-persisted variables
@@ -151,6 +154,7 @@ void HMI_MIDIProgramSelectPage_UpdateDisplay();
 void HMI_MIDIProgramSelectPage_RotaryEncoderChanged(s8 increment);
 void HMI_MIDIProgramSelectPage_RotaryEncoderSelected();
 
+void HMI_PersistData();
 
 /////////////////////////////////////////////////////////////////////////////
 // called at Init to initialize the HMI
@@ -190,14 +194,15 @@ void HMI_Init(void) {
 
       // stomp switch settings
       settings.stompSwitchSetting[4] = STOMP_SWITCH_OCTAVE;
-      settings.stompSwitchSetting[3] = STOMP_SWITCH_VOICE_PRESETS;
+      settings.stompSwitchSetting[3] = STOMP_SWITCH_VOLUME;
       settings.stompSwitchSetting[2] = STOMP_SWITCH_PATTERN_PRESETS;
-      settings.stompSwitchSetting[1] = STOMP_SWITCH_UNASSIGNED;
+      settings.stompSwitchSetting[1] = STOMP_SWITCH_VOICE_PRESETS;
       settings.stompSwitchSetting[0] = STOMP_SWITCH_ARPEGGIATOR;
       settings.toeSwitchMode = TOE_SWITCH_OCTAVE;
 
       // Toe switch settings
-      settings.selectedToeIndicator[TOE_SWITCH_OCTAVE] = DEFAULT_OCTAVE_NUMBER;
+      settings.selectedToeIndicator[TOE_SWITCH_OCTAVE] = PEDALS_DEFAULT_OCTAVE_NUMBER;
+      settings.selectedToeIndicator[TOE_SWITCH_VOLUME] = 8;     // Corresponds to maximum volume
       settings.selectedToeIndicator[TOE_SWITCH_VOICE_PRESETS] = 1;
       settings.selectedToeIndicator[TOE_SWITCH_PATTERN_PRESETS] = 1;
       settings.selectedToeIndicator[TOE_SWITCH_ARPEGGIATOR] = 1;
@@ -326,15 +331,33 @@ void HMI_NotifyToeToggle(u8 toeNum, u8 pressed, s32 timestamp) {
    // process the stomp switch
    switch (settings.toeSwitchMode) {
    case TOE_SWITCH_OCTAVE:
-      // Set the octave
+      // Set the octave in PEDALS
       PEDALS_SetOctave(toeNum - 1);
       // Save the selected change using GetOctave to close loop
       settings.selectedToeIndicator[TOE_SWITCH_OCTAVE] = PEDALS_GetOctave() + 1;
+      // Persist the updated volume indicator setting
+      HMI_PersistData();
       // Clear the indicators to turn off the current one (if any)
       IND_ClearAll();
       // Now set the one for the toe 
       IND_SetIndicatorState(toeNum,IND_ON);
       //IND_SetTempIndicatorState(toeNum, IND_FLASH_FAST, IND_TEMP_FLASH_STATE_DEFAULT_DURATION, IND_ON);
+      // And update the current page display
+      currentPage->pUpdateDisplayCallback();
+      break;
+   case TOE_SWITCH_VOLUME:
+      // Get the volumeLevel corresponding to the pressed switch
+      u8 volumeLevel = toeVolumeLevels[toeNum-1];
+      // Set the volume in PEDALS
+      PEDALS_SetVolume(volumeLevel);
+      // Save the selected change using GetVolume to close loop
+      settings.selectedToeIndicator[TOE_SWITCH_VOLUME] = PEDALS_GetVolume() + 1;
+      // Persist the updated volume indicator setting
+      HMI_PersistData();
+      // Clear the indicators to turn off the current one (if any)
+      IND_ClearAll();
+      // Now set the one for the selected toe 
+      IND_SetIndicatorState(toeNum,IND_ON);
       // And update the current page display
       currentPage->pUpdateDisplayCallback();
       break;
@@ -417,8 +440,12 @@ void HMI_NotifyStompToggle(u8 stompNum, u8 pressed, s32 timestamp) {
    case STOMP_SWITCH_ARPEGGIATOR:
       settings.toeSwitchMode = TOE_SWITCH_ARPEGGIATOR;
       break;
-   case STOMP_SWITCH_UNASSIGNED:
-      //unassigned on, so just return;
+   case STOMP_SWITCH_VOLUME:
+      settings.toeSwitchMode = TOE_SWITCH_VOLUME;
+      break;
+   default:
+      // Invalid.  Just return;
+      DEBUG_MSG("HMI_NotifyStompToggle:  Invalid setting %d",settings.stompSwitchSetting[stompNum - 1]);
       return;
    }
    // Update the toe switch indicators and the display in case the mode changed.
@@ -600,6 +627,10 @@ void HMI_HomePage_UpdateDisplay() {
    switch (settings.toeSwitchMode) {
    case TOE_SWITCH_OCTAVE:
       snprintf(lineBuffer, DISPLAY_CHAR_WIDTH, "%s %d", pModeName, PEDALS_GetOctave());
+      HMI_RenderLine(1, lineBuffer, 0);
+      break;
+   case TOE_SWITCH_VOLUME:
+      snprintf(lineBuffer, DISPLAY_CHAR_WIDTH, "%s %d", pModeName, PEDALS_GetVolume());
       HMI_RenderLine(1, lineBuffer, 0);
       break;
    case TOE_SWITCH_VOICE_PRESETS:
@@ -861,4 +892,17 @@ void HMI_MIDIProgramSelectPage_RotaryEncoderSelected() {
    // And force an update to the current page display
    currentPage->pUpdateDisplayCallback();
    // And send out the preset change
+}
+/////////////////////////////////////////////////////////////////////////////
+// Helper to store persisted data 
+/////////////////////////////////////////////////////////////////////////////
+void HMI_PersistData(){
+   #ifdef DEBUG_ENABLED
+      DEBUG_MSG("MIDI_PRESETS_PersistData: Writing persisted data:  sizeof(presets)=%d bytes",sizeof(presets));
+   #endif
+   s32 valid =PERSIST_StoreBlock(PERSIST_HMI_BLOCK, (unsigned char*)&settings, sizeof(settings));
+      if (valid < 0){
+         DEBUG_MSG("HMI_PersistData:  Error persisting setting to EEPROM");
+      }
+   return;
 }

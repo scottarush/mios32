@@ -30,7 +30,10 @@ u8 defaultMIDIPresetOctaveNumbers[] = { 3,3,3,3,3,3,3,3 };
 /////////////////////////////////////////////////////////////////////////////
 persisted_midi_presets_t presets;
 
-s32 MIDI_PRESETS_PersistData();
+/////////////////////////////////////////////////////////////////////////////
+// Local Prototypes
+/////////////////////////////////////////////////////////////////////////////
+void MIDI_PRESETS_PersistData();
 
 
 char* genMIDIVoiceNames[] = { " Acoustic Grand Piano"," Bright Acoustic Piano"," Electric Grand Piano"," Honky-tonk Piano"," Electric Piano 1",
@@ -79,7 +82,7 @@ void MIDI_PRESETS_Init() {
          ptr->midiChannel = DEFAULT_PRESET_MIDI_CHANNEL;
          ptr->octave = defaultMIDIPresetOctaveNumbers[i];
       }
-      valid = MIDI_PRESETS_PersistData();
+      MIDI_PRESETS_PersistData();
    }
 
 }
@@ -173,7 +176,7 @@ const midi_preset_t* MIDI_PRESETS_GetMidiPreset(u8 presetNumber) {
 /////////////////////////////////////////////////////////////////////////////
 // Helper to store persisted data to EEPROM
 /////////////////////////////////////////////////////////////////////////////
-s32 MIDI_PRESETS_PersistData(){
+void MIDI_PRESETS_PersistData(){
    #ifdef DEBUG_ENABLED
       DEBUG_MSG("MIDI_PRESETS_PersistData: Writing persisted data:  sizeof(presets)=%d bytes",sizeof(presets));
    #endif
@@ -181,6 +184,6 @@ s32 MIDI_PRESETS_PersistData(){
       if (valid < 0){
          DEBUG_MSG("MIDI_PRESETS_Init:  Error persisting setting to EEPROM");
       }
-   return valid;
+   return;
 }
 

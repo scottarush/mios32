@@ -17,6 +17,7 @@
  /////////////////////////////////////////////////////////////////////////////
 #include <mios32.h>
 #include <string.h>
+#include <math.h>
 
 #include "pedals.h"
 
@@ -31,7 +32,7 @@
 /////////////////////////////////////////////////////////////////////////////
 // Global Variables
 /////////////////////////////////////////////////////////////////////////////
-pedal_config_t pedal_config;
+persisted_pedal_confg_t pedal_config;
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -52,12 +53,16 @@ u8 lastPressVelocity;
 // timestamp of make release used to compute release velocity
 s32 makeReleaseTimestamp;
 
+// Current volume scale to be applied to all NoteOn velocities
+float currentVolumeScale;
+
 /////////////////////////////////////////////////////////////////////////////
 // Local Prototypes
 /////////////////////////////////////////////////////////////////////////////
 int PEDALS_GetVelocity(u16 delay, u16 delay_slowest, u16 delay_fastest);
 s32 PEDALS_SendNote(u8 note_number, u8 velocity, u8 released);
 u8 PEDALS_ComputeNoteNumber(u8 pedalNum);
+void PEDALS_PersistData();
 
 /////////////////////////////////////////////////////////////////////////////
 // Initialize the pedal handler
@@ -66,11 +71,11 @@ void PEDALS_Init() {
 
    // Initialize pedal configuration
 
-   pedal_config_t* pc = (pedal_config_t*)&pedal_config;
+   persisted_pedal_confg_t* pc = (persisted_pedal_confg_t*)&pedal_config;
 
    // Set the expected serializedID in the supplied block.  Update this ID whenever the persisted structure changes.  
    pedal_config.serializationID = 0x50454401;  // "PED1"
-   
+
    s32 valid = 0;
    valid = PERSIST_ReadBlock(PERSIST_PEDALS_BLOCK, (unsigned char*)&pedal_config, sizeof(pedal_config));
    if (valid < 0) {
@@ -94,8 +99,9 @@ void PEDALS_Init() {
       pc->minimum_press_velocity = 20;
       pc->minimum_release_velocity = 40;
 
-      pc->octave = DEFAULT_OCTAVE_NUMBER;
+      pc->octave = PEDALS_DEFAULT_OCTAVE_NUMBER;
       pc->transpose = 0;
+      pc->volumeLevel = PEDALS_MAX_VOLUME;
       pc->left_pedal_note_number = 23;
 
       // Clear locals
@@ -110,6 +116,8 @@ void PEDALS_Init() {
          DEBUG_MSG("PEDALS_Init:  Error persisting setting to EEPROM");
       }
    }
+   // Initialize the volume scale
+   currentVolumeScale = PEDALS_ComputeVolumeScaling(pc->volumeLevel);
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -119,7 +127,7 @@ void PEDALS_Init() {
 // @param timestamp:  event timestamp
 /////////////////////////////////////////////////////////////////////////////
 void PEDALS_NotifyMakeChange(u8 pressed, u32 timestamp) {
-   pedal_config_t* pc = (pedal_config_t*)&pedal_config;
+   persisted_pedal_confg_t* pc = (persisted_pedal_confg_t*)&pedal_config;
 
    //DEBUG_MSG("PEDALS_NotifyMakeChange:  %s.  time=%d",pressed > 0 ? "pressed" : "released",timestamp);
 
@@ -172,7 +180,7 @@ void PEDALS_NotifyMakeChange(u8 pressed, u32 timestamp) {
 // @param timestamp:  event timestamp
 /////////////////////////////////////////////////////////////////////////////
 void PEDALS_NotifyChange(u8 pedalNum, u8 pressed, u32 timestamp) {
-   pedal_config_t* pc = (pedal_config_t*)&pedal_config;
+   persisted_pedal_confg_t* pc = (persisted_pedal_confg_t*)&pedal_config;
 
    //DEBUG_MSG("PEDALS_NotifyChange: pedal %d %s.  time=%d",pedalNum, pressed > 0 ? "pressed" : "released",timestamp);
 
@@ -224,9 +232,10 @@ inline u8 PEDALS_ComputeNoteNumber(u8 pedalNum) {
 
 /////////////////////////////////////////////////////////////////////////////
 //! Help function to send a MIDI note over given ports
+// For NoteOns, the supplied velocity will be scaled by the currentVolumeScaling
 /////////////////////////////////////////////////////////////////////////////
 s32 PEDALS_SendNote(u8 note_number, u8 velocity, u8 pressed) {
-   pedal_config_t* pc = (pedal_config_t*)&pedal_config;
+   persisted_pedal_confg_t* pc = (persisted_pedal_confg_t*)&pedal_config;
 
    u8 sent_note = note_number;
 
@@ -240,8 +249,17 @@ s32 PEDALS_SendNote(u8 note_number, u8 velocity, u8 pressed) {
          //DEBUG_MSG("midi tx:  port=0x%x",port);
          if (!pressed)
             MIOS32_MIDI_SendNoteOff(port, pc->midi_chn - 1, sent_note, velocity);
-         else
-            MIOS32_MIDI_SendNoteOn(port, pc->midi_chn - 1, sent_note, velocity);
+         else{
+            float fvelocity = currentVolumeScale * velocity;
+            int ivelocity = (int) roundf(fvelocity);
+            if (ivelocity < 1){
+               ivelocity = 1;
+            }
+            else if (ivelocity > PEDALS_MAX_VOLUME){
+               ivelocity = PEDALS_MAX_VOLUME;
+            }
+            MIOS32_MIDI_SendNoteOn(port, pc->midi_chn - 1, sent_note, ivelocity);
+         }
       }
    }
 
@@ -270,14 +288,18 @@ int PEDALS_GetVelocity(u16 delay, u16 delay_slowest, u16 delay_fastest) {
 }
 /////////////////////////////////////////////////////////////////////////////
 // API to set the current octave
-// octave:  MIDI octave from 0 to 7
+// octave:  MIDI octave from 0 to 7.
+// On change the persisted data will automatically be updated.
 /////////////////////////////////////////////////////////////////////////////
 void PEDALS_SetOctave(u8 octave){
    if (octave > 7){
       DEBUG_MSG("Invalid octave number=%d",octave);
       return;
    }
-   pedal_config.octave = octave;
+   if (pedal_config.octave != octave){
+      pedal_config.octave = octave;
+      PEDALS_PersistData();
+   }
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -286,4 +308,50 @@ void PEDALS_SetOctave(u8 octave){
 /////////////////////////////////////////////////////////////////////////////
 u8 PEDALS_GetOctave(){
    return pedal_config.octave;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// API to set the current volume scaling
+// The E2 block will be updated automatically on change.
+// volumeLevel:  from 1 to PEDALS_MAX_VOLUME
+/////////////////////////////////////////////////////////////////////////////
+void PEDALS_SetVolume(u8 volumeLevel){
+   if (pedal_config.volumeLevel != volumeLevel){
+      pedal_config.volumeLevel = volumeLevel;
+      PEDALS_PersistData();
+   }
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// API to get the current volume level
+// volume:  volume scaling level from 1 to PEDALS_MAX_VOLUME
+/////////////////////////////////////////////////////////////////////////////
+u8 PEDALS_GetVolume(){
+   return pedal_config.volumeLevel;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+// Global function to store persisted pedal data 
+/////////////////////////////////////////////////////////////////////////////
+void PEDALS_PersistData(){
+   #ifdef DEBUG_ENABLED
+      DEBUG_MSG("MIDI_PRESETS_PersistData: Writing persisted data:  sizeof(presets)=%d bytes",sizeof(presets));
+   #endif
+   s32 valid =PERSIST_StoreBlock(PERSIST_PEDALS_BLOCK, (unsigned char*)&pedal_config, sizeof(pedal_config));
+      if (valid < 0){
+         DEBUG_MSG("PEDALS_PersistData:  Error persisting setting to EEPROM");
+      }
+   return;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// Global helper to compute volume scaling factor from level.  
+// Centralizing this function allows for a single volume curve.
+// volumeLevel:  level from 1 to PEDALS_MAX_VOLUME
+// returns:  float scaling level
+/////////////////////////////////////////////////////////////////////////////
+float PEDALS_ComputeVolumeScaling(u8 volumeLevel){
+   float volumeScale = volumeLevel / PEDALS_MAX_VOLUME;
+   return volumeScale;
 }

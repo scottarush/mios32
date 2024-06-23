@@ -43,6 +43,7 @@ typedef struct {
    u8 midiChannel;
    // octave for pedals: 0 to 7
    u8 octave;
+   // volume scaling fraction from 
 } midi_preset_t;
 
 
