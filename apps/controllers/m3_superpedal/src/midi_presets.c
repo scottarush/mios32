@@ -175,7 +175,7 @@ const midi_preset_t* MIDI_PRESETS_GetMidiPreset(u8 presetNumber) {
 /////////////////////////////////////////////////////////////////////////////
 s32 MIDI_PRESETS_PersistData(){
    #ifdef DEBUG_ENABLED
-      DEBUG_MSG("MIDI_PRESETS_PersistData: Writing persisted data");
+      DEBUG_MSG("MIDI_PRESETS_PersistData: Writing persisted data:  sizeof(presets)=%d bytes",sizeof(presets));
    #endif
    s32 valid =PERSIST_StoreBlock(PERSIST_MIDI_PRESETS_BLOCK, (unsigned char*)&presets, sizeof(presets));
       if (valid < 0){

@@ -186,7 +186,7 @@ void HMI_Init(void) {
 
    valid = PERSIST_ReadBlock(PERSIST_HMI_BLOCK, (unsigned char*)&settings, sizeof(settings));
    if (valid < 0) {
-      DEBUG_MSG("HMI_Init:  PERSIST_ReadBlock return invalid.   Reinitializing EEPROM Block");
+      DEBUG_MSG("HMI_Init:  PERSIST_ReadBlock return invalid. Re-initing persisted settings to defaults");
 
       // stomp switch settings
       settings.stompSwitchSetting[4] = STOMP_SWITCH_OCTAVE;
@@ -216,14 +216,17 @@ void HMI_Init(void) {
          DEBUG_MSG("HMI_Init:  Error persisting setting to EEPROM");
       }
    }
-   // Initialize toe indicators to the current mode
-   IND_SetIndicatorState(settings.selectedToeIndicator[settings.toeSwitchMode], IND_ON);
+   // Now that settings are init'ed/restored, then synch the HMI
 
    // Init the display pages now that settings are restored
    HMI_InitPages();
 
-   // Initialize the consumer of the current toe switch mode
-   // TODO
+   // Set toe indicators to the current mode
+   IND_SetIndicatorState(settings.selectedToeIndicator[settings.toeSwitchMode], IND_ON);
+
+   // Activate the last selected preset
+   u8 presetNumber = settings.selectedToeIndicator[TOE_SWITCH_VOICE_PRESETS];
+   MIDI_PRESET_ActivateMIDIPreset(presetNumber);
 
    // Clear the display and update
    MIOS32_LCD_Clear();
