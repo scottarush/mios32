@@ -17,8 +17,6 @@
  /////////////////////////////////////////////////////////////////////////////
 #include <mios32.h>
 #include <string.h>
-#include <math.h>
-
 #include "pedals.h"
 
 #include "persist.h"
@@ -26,6 +24,8 @@
 /////////////////////////////////////////////////////////////////////////////
 // Local defines
 /////////////////////////////////////////////////////////////////////////////
+
+#undef DEBUG_ENABLED
 
 #define DEBUG_MSG MIOS32_MIDI_SendDebugMessage
 
@@ -53,8 +53,6 @@ u8 lastPressVelocity;
 // timestamp of make release used to compute release velocity
 s32 makeReleaseTimestamp;
 
-// Current volume scale to be applied to all NoteOn velocities
-float currentVolumeScale;
 
 /////////////////////////////////////////////////////////////////////////////
 // Local Prototypes
@@ -96,7 +94,7 @@ void PEDALS_Init() {
       pc->delay_release_fastest = 20;
       pc->delay_release_slowest = 100;
 
-      pc->minimum_press_velocity = 20;
+      pc->minimum_press_velocity = 1;
       pc->minimum_release_velocity = 40;
 
       pc->octave = PEDALS_DEFAULT_OCTAVE_NUMBER;
@@ -116,8 +114,6 @@ void PEDALS_Init() {
          DEBUG_MSG("PEDALS_Init:  Error persisting setting to EEPROM");
       }
    }
-   // Initialize the volume scale
-   currentVolumeScale = PEDALS_ComputeVolumeScaling(pc->volumeLevel);
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -250,15 +246,11 @@ s32 PEDALS_SendNote(u8 note_number, u8 velocity, u8 pressed) {
          if (!pressed)
             MIOS32_MIDI_SendNoteOff(port, pc->midi_chn - 1, sent_note, velocity);
          else{
-            float fvelocity = currentVolumeScale * velocity;
-            int ivelocity = (int) roundf(fvelocity);
-            if (ivelocity < 1){
-               ivelocity = 1;
-            }
-            else if (ivelocity > PEDALS_MAX_VOLUME){
-               ivelocity = PEDALS_MAX_VOLUME;
-            }
-            MIOS32_MIDI_SendNoteOn(port, pc->midi_chn - 1, sent_note, ivelocity);
+            u8 scaledVelocity = PEDALS_ScaleVelocity(velocity,PEDALS_GetVolume());
+#ifdef DEBUG_ENABLED
+            DEBUG_MSG("PEDALS_SendNote: velocity=%d scaledVelocity=%d",velocity,scaledVelocity);
+#endif      
+            MIOS32_MIDI_SendNoteOn(port, pc->midi_chn - 1, sent_note, scaledVelocity);
          }
       }
    }
@@ -336,7 +328,7 @@ u8 PEDALS_GetVolume(){
 /////////////////////////////////////////////////////////////////////////////
 void PEDALS_PersistData(){
    #ifdef DEBUG_ENABLED
-      DEBUG_MSG("MIDI_PRESETS_PersistData: Writing persisted data:  sizeof(presets)=%d bytes",sizeof(presets));
+      DEBUG_MSG("MIDI_PRESETS_PersistData: Writing persisted data:  sizeof(presets)=%d bytes",sizeof(persisted_pedal_confg_t));
    #endif
    s32 valid =PERSIST_StoreBlock(PERSIST_PEDALS_BLOCK, (unsigned char*)&pedal_config, sizeof(pedal_config));
       if (valid < 0){
@@ -346,12 +338,18 @@ void PEDALS_PersistData(){
 }
 
 /////////////////////////////////////////////////////////////////////////////
-// Global helper to compute volume scaling factor from level.  
-// Centralizing this function allows for a single volume curve.
+// Global helper to scale a velocity a the current volume level
 // volumeLevel:  level from 1 to PEDALS_MAX_VOLUME
-// returns:  float scaling level
+// returns:  scaled velocity
 /////////////////////////////////////////////////////////////////////////////
-float PEDALS_ComputeVolumeScaling(u8 volumeLevel){
-   float volumeScale = volumeLevel / PEDALS_MAX_VOLUME;
-   return volumeScale;
+u8 PEDALS_ScaleVelocity(u8 velocity,u8 volumeLevel){
+
+   u32 scaledVelocity = (volumeLevel * velocity)/PEDALS_MAX_VOLUME;
+   if (scaledVelocity < 1){
+      scaledVelocity = 1;
+   }
+   else if (scaledVelocity > 127){
+      scaledVelocity = 127;
+   }
+   return (u8)scaledVelocity;
 }

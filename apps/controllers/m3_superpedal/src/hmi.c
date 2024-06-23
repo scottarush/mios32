@@ -95,6 +95,13 @@ u8 lastSelectedEditVoicePresetPageEntry;
 // Edit Pattern Preset page variables
 struct page_s editPatternPresetPage;
 
+typedef enum {
+   RENDER_LINE_LEFT = 0,
+   RENDER_LINE_CENTER = 1,
+   RENDER_LINE_SELECT = 2,
+   RENDER_LINE_RIGHT = 3
+} render_line_mode_t;
+
 /////////////////////////////////////////////////////////////////////////////
 // Toe Switch types and non-persisted variables
 /////////////////////////////////////////////////////////////////////////////
@@ -103,7 +110,7 @@ struct page_s editPatternPresetPage;
 
 
 // Text for the toe switch
-char* pToeSwitchModeTitles[] = {"Octave","Volume","MIDI Presets","Pattern Presets","Arpeggiator" };
+char* pToeSwitchModeTitles[] = { "Octave","Volume","MIDI Presets","Pattern Presets","Arpeggiator" };
 
 typedef struct switchState_s {
    u8 switchState;
@@ -112,8 +119,8 @@ typedef struct switchState_s {
 } switchState_t;
 switchState_t toeSwitchState[NUM_TOE_SWITCHES];
 
-// Toe volume levels even split from 1 to 127
-u8 toeVolumeLevels[NUM_TOE_SWITCHES] = {1,16,32,48,64,96,112,127};
+// Toe volume levels even split from 5 to 127
+u8 toeVolumeLevels[NUM_TOE_SWITCHES] = { 5,23,41,58,77,93,110,127 };
 
 /////////////////////////////////////////////////////////////////////////////
 // Stomp Switch types and non-persisted variables
@@ -134,7 +141,7 @@ persisted_hmi_settings_t settings;
 /////////////////////////////////////////////////////////////////////////////
 // Local prototypes
 /////////////////////////////////////////////////////////////////////////////
-void HMI_RenderLine(u8, const char*, u8);
+void HMI_RenderLine(u8, const char*, render_line_mode_t);
 void HMI_ClearLine(u8);
 void HMI_InitPages();
 
@@ -217,7 +224,7 @@ void HMI_Init(void) {
       settings.lastSelectedMidiChannel = DEFAULT_PRESET_MIDI_CHANNEL;
 
       valid = PERSIST_StoreBlock(PERSIST_HMI_BLOCK, (unsigned char*)&settings, sizeof(settings));
-      if (valid < 0){
+      if (valid < 0) {
          DEBUG_MSG("HMI_Init:  Error persisting setting to EEPROM");
       }
    }
@@ -276,7 +283,7 @@ void HMI_InitPages() {
    char* patternPresetTitle = { "Edit Toe Ptrn Pset" };
    editPatternPresetPage.pPageTitle = patternPresetTitle;
    // TODO - add callback functions below and replace dummy home page one
-   editPatternPresetPage.pUpdateDisplayCallback = HMI_HomePage_UpdateDisplay; 
+   editPatternPresetPage.pUpdateDisplayCallback = HMI_HomePage_UpdateDisplay;
    editPatternPresetPage.pRotaryEncoderChangedCallback = NULL;
    editPatternPresetPage.pRotaryEncoderSelectCallback = NULL;
    editPatternPresetPage.pPedalSelectedCallback = NULL;
@@ -340,14 +347,14 @@ void HMI_NotifyToeToggle(u8 toeNum, u8 pressed, s32 timestamp) {
       // Clear the indicators to turn off the current one (if any)
       IND_ClearAll();
       // Now set the one for the toe 
-      IND_SetIndicatorState(toeNum,IND_ON);
+      IND_SetIndicatorState(toeNum, IND_ON);
       //IND_SetTempIndicatorState(toeNum, IND_FLASH_FAST, IND_TEMP_FLASH_STATE_DEFAULT_DURATION, IND_ON);
       // And update the current page display
       currentPage->pUpdateDisplayCallback();
       break;
    case TOE_SWITCH_VOLUME:
       // Get the volumeLevel corresponding to the pressed switch
-      u8 volumeLevel = toeVolumeLevels[toeNum-1];
+      u8 volumeLevel = toeVolumeLevels[toeNum - 1];
       // Set the volume in PEDALS
       PEDALS_SetVolume(volumeLevel);
       // Save the selected change using GetVolume to close loop
@@ -357,7 +364,7 @@ void HMI_NotifyToeToggle(u8 toeNum, u8 pressed, s32 timestamp) {
       // Clear the indicators to turn off the current one (if any)
       IND_ClearAll();
       // Now set the one for the selected toe 
-      IND_SetIndicatorState(toeNum,IND_ON);
+      IND_SetIndicatorState(toeNum, IND_ON);
       // And update the current page display
       currentPage->pUpdateDisplayCallback();
       break;
@@ -370,8 +377,8 @@ void HMI_NotifyToeToggle(u8 toeNum, u8 pressed, s32 timestamp) {
          // Clear the indicators to turn off the current one (if any)
          IND_ClearAll();
          // Now set the one for the toe     
-         IND_SetIndicatorState(toeNum,IND_ON);
-       //  IND_SetTempIndicatorState(toeNum, IND_FLASH_FAST, IND_TEMP_FLASH_STATE_DEFAULT_DURATION, IND_ON);
+         IND_SetIndicatorState(toeNum, IND_ON);
+         //  IND_SetTempIndicatorState(toeNum, IND_FLASH_FAST, IND_TEMP_FLASH_STATE_DEFAULT_DURATION, IND_ON);
          settings.selectedToeIndicator[TOE_SWITCH_VOICE_PRESETS] = toeNum;
          // And update the current page display
          currentPage->pUpdateDisplayCallback();
@@ -445,7 +452,7 @@ void HMI_NotifyStompToggle(u8 stompNum, u8 pressed, s32 timestamp) {
       break;
    default:
       // Invalid.  Just return;
-      DEBUG_MSG("HMI_NotifyStompToggle:  Invalid setting %d",settings.stompSwitchSetting[stompNum - 1]);
+      DEBUG_MSG("HMI_NotifyStompToggle:  Invalid setting %d", settings.stompSwitchSetting[stompNum - 1]);
       return;
    }
    // Update the toe switch indicators and the display in case the mode changed.
@@ -575,21 +582,52 @@ void HMI_NotifyBackToggle(u8 pressed, s32 timestamp) {
 // Helper function renders a line and pads out to full display width or
 // truncates to width
 /////////////////////////////////////////////////////////////////////////////
-void HMI_RenderLine(u8 lineNum, const char* pLineText, u8 selected) {
+void HMI_RenderLine(u8 lineNum, const char* pLineText, render_line_mode_t renderMode) {
    char lineBuffer[DISPLAY_CHAR_WIDTH + 1] = "";
-   if (selected) {
-      strcpy(lineBuffer, "<");
-      strncat(lineBuffer, pLineText, DISPLAY_CHAR_WIDTH - 2);
-      while (strlen(lineBuffer) < DISPLAY_CHAR_WIDTH - 1) {
+   u8 leftIndent = 0;
+   switch (renderMode) {
+   case RENDER_LINE_CENTER:
+      if (strlen(pLineText) < DISPLAY_CHAR_WIDTH) {
+         leftIndent = (DISPLAY_CHAR_WIDTH - strlen(pLineText) + 1) / 2;
+      }
+      for (int i = 0;i < leftIndent;i++) {
          strcat(lineBuffer, " ");
       }
-      strcat(lineBuffer, ">");
-   }
-   else {
       strncat(lineBuffer, pLineText, DISPLAY_CHAR_WIDTH);
       while (strlen(lineBuffer) < DISPLAY_CHAR_WIDTH) {
          strcat(lineBuffer, " ");
       }
+      break;
+   case RENDER_LINE_LEFT:
+      strncat(lineBuffer, pLineText, DISPLAY_CHAR_WIDTH);
+      while (strlen(lineBuffer) < DISPLAY_CHAR_WIDTH) {
+         strcat(lineBuffer, " ");
+      }
+      break;
+   case RENDER_LINE_RIGHT:
+      if (strlen(pLineText) < DISPLAY_CHAR_WIDTH) {
+         leftIndent = DISPLAY_CHAR_WIDTH - strlen(pLineText);
+      }
+      for (int i = 0;i < leftIndent;i++) {
+         strcat(lineBuffer, " ");
+      }
+      strncat(lineBuffer, pLineText, DISPLAY_CHAR_WIDTH);
+      break;
+   case RENDER_LINE_SELECT:
+      u8 spaceCount = DISPLAY_CHAR_WIDTH-strlen(pLineText)-2;
+      leftIndent = spaceCount/2;
+      strcpy(lineBuffer, "<");
+      for(int i=0;i < leftIndent;i++){
+         strcat(lineBuffer," ");       
+      }
+      strncat(lineBuffer, pLineText, DISPLAY_CHAR_WIDTH - 2);
+      // Compute right side spaces
+      spaceCount -=leftIndent;
+      for(int i=0;i < spaceCount;i++){
+         strcat(lineBuffer," ");       
+      }      
+      strcat(lineBuffer, ">");
+      break;
    }
 #ifdef DEBUG
    DEBUG_MSG("HMI_RenderLine %d: '%s'", lineNum, lineBuffer);
@@ -615,40 +653,44 @@ void HMI_HomePage_UpdateDisplay() {
       // Set to keep from redrawing the entire display next time.
       lastPage = currentPage;
    }
-   MIOS32_LCD_CursorSet(0, 0);
-   MIOS32_LCD_PrintString(currentPage->pPageTitle);
 
    char lineBuffer[DISPLAY_CHAR_WIDTH];
 
-   // Now render according to the mode
-   u8 selectedToeSwitch = settings.selectedToeIndicator[settings.toeSwitchMode];
-   char* pModeName = pToeSwitchModeTitles[settings.toeSwitchMode];
+   // Current octave and volume always go on line 3
+   snprintf(lineBuffer, DISPLAY_CHAR_WIDTH, "%s #%d %s %d",
+      pToeSwitchModeTitles[TOE_SWITCH_OCTAVE], PEDALS_GetOctave(),
+      pToeSwitchModeTitles[TOE_SWITCH_VOLUME], PEDALS_GetVolume());
+   HMI_RenderLine(3, lineBuffer, RENDER_LINE_LEFT);
 
+   // Now render reset of lines according to according to the mode
+   u8 selectedToeSwitch = settings.selectedToeIndicator[settings.toeSwitchMode];
+   // Show the Current Mode on top line.
+   snprintf(lineBuffer, DISPLAY_CHAR_WIDTH, "%s Mode",
+      pToeSwitchModeTitles[settings.toeSwitchMode]);
+   HMI_RenderLine(0, lineBuffer, RENDER_LINE_CENTER);
+   HMI_RenderLine(1, "--------------------", RENDER_LINE_LEFT);
+
+   // Render lines 2 and 3 based on the current mode
    switch (settings.toeSwitchMode) {
    case TOE_SWITCH_OCTAVE:
-      snprintf(lineBuffer, DISPLAY_CHAR_WIDTH, "%s %d", pModeName, PEDALS_GetOctave());
-      HMI_RenderLine(1, lineBuffer, 0);
-      break;
    case TOE_SWITCH_VOLUME:
-      snprintf(lineBuffer, DISPLAY_CHAR_WIDTH, "%s %d", pModeName, PEDALS_GetVolume());
-      HMI_RenderLine(1, lineBuffer, 0);
+      HMI_ClearLine(2);
       break;
    case TOE_SWITCH_VOICE_PRESETS:
-      HMI_RenderLine(1, pModeName, 0);
       u8 presetNum = settings.toeSwitchVoicePresetNumbers[selectedToeSwitch - 1];
       const midi_preset_t* preset = MIDI_PRESETS_GetMidiPreset(presetNum);
       if (preset == NULL) {
-         HMI_RenderLine(1, "Invalid Preset Number", 0);
+         HMI_RenderLine(2, "Invalid Preset Number", RENDER_LINE_CENTER);
          DEBUG_MSG("Invalid pset#:  %d", presetNum);
       }
       else {
          const char* pName = MIDI_PRESETS_GetGenMIDIVoiceName(preset->programNumber);
-         HMI_RenderLine(2, pName, 0);
+         HMI_RenderLine(2, pName, RENDER_LINE_CENTER);
       }
       break;
    case TOE_SWITCH_PATTERN_PRESETS:
-      snprintf(lineBuffer, DISPLAY_CHAR_WIDTH, "%s", pModeName);
-      HMI_RenderLine(1, lineBuffer, 0);
+      // TODO
+      HMI_ClearLine(2);
       break;
    default:
 #ifdef DEBUG
@@ -656,6 +698,7 @@ void HMI_HomePage_UpdateDisplay() {
       return;
 #endif
    }
+
 }
 /////////////////////////////////////////////////////////////////////////////
 // Callback for rotary encoder change on home page.
@@ -686,22 +729,22 @@ void HMI_MainPage_UpdateDisplay() {
    }
    MIOS32_LCD_CursorSet(0, 0);
    MIOS32_LCD_PrintString(currentPage->pPageTitle);
-
+   
    // Selected entry on line 2
-   HMI_RenderLine(2, mainPageEntries[lastSelectedMainPageEntry], 1);
+   HMI_RenderLine(2, mainPageEntries[lastSelectedMainPageEntry], RENDER_LINE_SELECT);
    if (lastSelectedMainPageEntry == 0) {
       // At the beginning. Clear line 1
       HMI_ClearLine(1);
    }
    else {
-      HMI_RenderLine(1, mainPageEntries[lastSelectedMainPageEntry - 1], 0);
+      HMI_RenderLine(1, mainPageEntries[lastSelectedMainPageEntry - 1], RENDER_LINE_RIGHT);
    }
    if (lastSelectedMainPageEntry == NUM_MAIN_PAGE_ENTRIES - 1) {
       // At the end, clear line 3
       HMI_ClearLine(3);
    }
    else {
-      HMI_RenderLine(3, mainPageEntries[lastSelectedMainPageEntry + 1], 0);
+      HMI_RenderLine(3, mainPageEntries[lastSelectedMainPageEntry + 1], RENDER_LINE_RIGHT);
    }
 }
 
@@ -710,12 +753,12 @@ void HMI_MainPage_UpdateDisplay() {
 /////////////////////////////////////////////////////////////////////////////
 void HMI_MainPage_RotaryEncoderChanged(s8 increment) {
    // Check if we are already at the top or bottom
-   if (increment < 0){
-      if (lastSelectedMainPageEntry == 0){
+   if (increment < 0) {
+      if (lastSelectedMainPageEntry == 0) {
          return;  // at the top
       }
    }
-   else if (lastSelectedMainPageEntry == NUM_MAIN_PAGE_ENTRIES-1){
+   else if (lastSelectedMainPageEntry == NUM_MAIN_PAGE_ENTRIES - 1) {
       return;  // at the bottom
    }
    // Otherwise, at least one more detent either way so update.
@@ -758,37 +801,37 @@ void HMI_EditVoicePresetPage_UpdateDisplay() {
    MIOS32_LCD_PrintString(currentPage->pPageTitle);
 
    // Selected entry on line 2
-   HMI_RenderLine(2, editVoicePageEntries[lastSelectedEditVoicePresetPageEntry], 1);
+   HMI_RenderLine(2, editVoicePageEntries[lastSelectedEditVoicePresetPageEntry], RENDER_LINE_SELECT);
    if (lastSelectedEditVoicePresetPageEntry == 0) {
       // At the beginning. Clear line 1
       HMI_ClearLine(1);
    }
    else {
-      HMI_RenderLine(1, mainPageEntries[lastSelectedEditVoicePresetPageEntry - 1], 0);
+      HMI_RenderLine(1, mainPageEntries[lastSelectedEditVoicePresetPageEntry - 1], RENDER_LINE_CENTER);
    }
    if (lastSelectedEditVoicePresetPageEntry == NUM_EDIT_VOICE_PRESET_PAGE_ENTRIES - 1) {
       // At the end, clear line 3
       HMI_ClearLine(3);
    }
    else {
-      HMI_RenderLine(3, mainPageEntries[lastSelectedEditVoicePresetPageEntry + 1], 0);
+      HMI_RenderLine(3, mainPageEntries[lastSelectedEditVoicePresetPageEntry + 1], RENDER_LINE_CENTER);
    }
 }
 /////////////////////////////////////////////////////////////////////////////
 // Callback for rotary encoder change on Edit Voice Preset page
 /////////////////////////////////////////////////////////////////////////////
 void HMI_EditVoicePresetPage_RotaryEncoderChanged(s8 increment) {
-    // Check if we are already at the top or bottom
-   if (increment < 0){
-      if (lastSelectedEditVoicePresetPageEntry == 0){
+   // Check if we are already at the top or bottom
+   if (increment < 0) {
+      if (lastSelectedEditVoicePresetPageEntry == 0) {
          return;  // at the top
       }
    }
-   else if (lastSelectedEditVoicePresetPageEntry == NUM_EDIT_VOICE_PRESET_PAGE_ENTRIES-1){
+   else if (lastSelectedEditVoicePresetPageEntry == NUM_EDIT_VOICE_PRESET_PAGE_ENTRIES - 1) {
       return;  // at the bottom
    }
    // Otherwise, at least one more detent either way so update.
-   lastSelectedEditVoicePresetPageEntry += increment;   
+   lastSelectedEditVoicePresetPageEntry += increment;
    // And force an update to the current page display
    currentPage->pUpdateDisplayCallback();
 }
@@ -833,20 +876,20 @@ void HMI_MIDIProgramSelectPage_UpdateDisplay() {
 
    // Selected entry on line 2
    u8 lastProgNumber = settings.lastSelectedMIDIProgNumber;
-   HMI_RenderLine(2, MIDI_PRESETS_GetGenMIDIVoiceName(lastProgNumber), 1);
+   HMI_RenderLine(2, MIDI_PRESETS_GetGenMIDIVoiceName(lastProgNumber), RENDER_LINE_SELECT);
    if (lastProgNumber == 1) {
       // At the beginning. Clear line 1
       HMI_ClearLine(1);
    }
    else {
-      HMI_RenderLine(1, MIDI_PRESETS_GetGenMIDIVoiceName(lastProgNumber - 1), 0);
+      HMI_RenderLine(1, MIDI_PRESETS_GetGenMIDIVoiceName(lastProgNumber - 1), RENDER_LINE_CENTER);
    }
    if (lastProgNumber == MIDI_PRESETS_GetNumGenMIDIVoices() - 1) {
       // At the end, clear line 3
       HMI_ClearLine(3);
    }
    else {
-      HMI_RenderLine(3, MIDI_PRESETS_GetGenMIDIVoiceName(lastProgNumber + 1), 0);
+      HMI_RenderLine(3, MIDI_PRESETS_GetGenMIDIVoiceName(lastProgNumber + 1), RENDER_LINE_CENTER);
    }
 }
 /////////////////////////////////////////////////////////////////////////////
@@ -896,13 +939,13 @@ void HMI_MIDIProgramSelectPage_RotaryEncoderSelected() {
 /////////////////////////////////////////////////////////////////////////////
 // Helper to store persisted data 
 /////////////////////////////////////////////////////////////////////////////
-void HMI_PersistData(){
-   #ifdef DEBUG_ENABLED
-      DEBUG_MSG("MIDI_PRESETS_PersistData: Writing persisted data:  sizeof(presets)=%d bytes",sizeof(presets));
-   #endif
-   s32 valid =PERSIST_StoreBlock(PERSIST_HMI_BLOCK, (unsigned char*)&settings, sizeof(settings));
-      if (valid < 0){
-         DEBUG_MSG("HMI_PersistData:  Error persisting setting to EEPROM");
-      }
+void HMI_PersistData() {
+#ifdef DEBUG_ENABLED
+   DEBUG_MSG("MIDI_PRESETS_PersistData: Writing persisted data:  sizeof(presets)=%d bytes", sizeof(presets));
+#endif
+   s32 valid = PERSIST_StoreBlock(PERSIST_HMI_BLOCK, (unsigned char*)&settings, sizeof(settings));
+   if (valid < 0) {
+      DEBUG_MSG("HMI_PersistData:  Error persisting setting to EEPROM");
+   }
    return;
 }
