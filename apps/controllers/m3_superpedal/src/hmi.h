@@ -76,6 +76,7 @@ extern void HMI_NotifyToeToggle(u8 stompNum,u8 pressed,s32 timestamp);
 extern void HMI_NotifyBackToggle(u8 pressed,s32 timestamp);
 extern void HMI_NotifyEncoderChange(s32 incrementer);
 extern void HMI_NotifyEncoderSwitchToggle(u8 pressed,s32 timestamp);
+extern void HMI_NotifyOctaveChange(u8);
 
 /////////////////////////////////////////////////////////////////////////////
 // Export global variables

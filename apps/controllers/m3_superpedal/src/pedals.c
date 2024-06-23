@@ -291,6 +291,8 @@ void PEDALS_SetOctave(u8 octave){
    if (pedal_config.octave != octave){
       pedal_config.octave = octave;
       PEDALS_PersistData();
+      // Notify HMI of the change
+      HMI_NotifyOctaveChange(octave);
    }
 }
 

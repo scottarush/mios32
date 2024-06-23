@@ -52,6 +52,7 @@ typedef struct {
    u32 serializationID;
 
    midi_preset_t generalMidiPresets[NUM_GEN_MIDI_PRESETS];
+   u8 lastActivatedVoicePreset;
    //  midi_preset_t patternPresets[NUM_PATTERN_PRESETS];   
 } persisted_midi_presets_t;
 
@@ -66,8 +67,11 @@ extern u8 MIDI_PRESETS_GetNumGenMIDIVoices();
 
 extern const midi_preset_t* MIDI_PRESETS_SetMIDIPreset(u8 presetNumber, u8 programNumber, u8 bankNumber, u8 octave,u8 midiPorts, u8 midiChannel);
 
-extern u8 MIDI_PRESET_ActivateMIDIPreset(u8 presetNumber);
+extern u8 MIDI_PRESETS_ActivateMIDIPreset(u8 presetNumber);
+extern u8 MIDI_PRESETS_ActivateMIDIVoice(u8 programNumber, u8 bankNumber, u8 midiPorts, u8 midiChannel);
+
 extern const midi_preset_t * MIDI_PRESETS_GetMidiPreset(u8 presetNumber);
+extern const midi_preset_t* MIDI_PRESETS_GetLastActivatedPreset();
 
 /////////////////////////////////////////////////////////////////////////////
 // Export global variables

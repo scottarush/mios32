@@ -36,32 +36,32 @@ persisted_midi_presets_t presets;
 void MIDI_PRESETS_PersistData();
 
 
-char* genMIDIVoiceNames[] = { " Acoustic Grand Piano"," Bright Acoustic Piano"," Electric Grand Piano"," Honky-tonk Piano"," Electric Piano 1",
-" Electric Piano 2"," Harpsichord"," Clavi"," Celesta"," Glockenspiel",
-" Music Box"," Vibraphone"," Marimba"," Xylophone"," Tubular Bells",
-" Dulcimer"," Drawbar Organ"," Percussive Organ"," Rock Organ"," Church Organ",
-" Reed Organ"," Accordion"," Harmonica"," Tango Accordion"," Acoustic Guitar (nylon",
-" Acoustic Guitar (steel)"," Electric Guitar (jazz)"," Electric Guitar (clean)"," Electric Guitar (muted"," Overdriven Guitar",
-" Distortion Guitar"," Guitar harmonics"," Acoustic Bass"," Electric Bass (finger)"," Electric Bass (pick)",
-" Fretless Bass"," Slap Bass 1"," Slap Bass 2"," Synth Bass 1"," Synth Bass 2",
-" Violin"," Viola"," Cello"," Contrabass"," Tremolo Strings",
-" Pizzicato Strings"," Orchestral Harp"," Timpani"," String Ensemble 1"," String Ensemble 2",
-" SynthStrings 1"," SynthStrings 2"," Choir Aahs"," Voice Oohs"," Synth Voice",
-" Orchestra Hit"," Trumpet"," Trombone"," Tuba"," Muted Trumpet",
-" French Horn"," Brass Section"," SynthBrass 1"," SynthBrass 2"," Soprano Sax",
-" Alto Sax"," Tenor Sax"," Baritone Sax"," Oboe"," English Horn",
-" Bassoon"," Clarinet"," Piccolo"," Flute"," Recorder",
-" Pan Flute"," Blown Bottle"," Shakuhachi"," Whistle"," Ocarina",
-" Lead 1 (square)"," Lead 2 (sawtooth)"," Lead 3 (calliope)"," Lead 4 (chiff)"," Lead 5 (charang)",
-" Lead 6 (voice)"," Lead 7 (fifths)"," Lead 8 (bass + lead)"," Pad 1 (new age)"," Pad 2 (warm)",
-" Pad 3 (polysynth)"," Pad 4 (choir)"," Pad 5 (bowed)"," Pad 6 (metallic)"," Pad 7 (halo)",
-" Pad 8 (sweep)"," FX 1 (rain)"," FX 2 (soundtrack)"," FX 3 (crystal)"," FX 4 (atmosphere)",
-" FX 5 (brightness)"," FX 6 (goblins)"," FX 7 (echoes)"," FX 8 (sci-fi)"," Sitar",
-" Banjo"," Shamisen"," Koto"," Kalimba"," Bag pipe",
-" Fiddle"," Shanai"," Tinkle Bell"," Agogo"," Steel Drums",
-" Woodblock"," Taiko Drum"," Melodic Tom"," Synth Drum"," Reverse Cymbal",
-" Guitar Fret Noise"," Breath Noise"," Seashore"," Bird Tweet"," Telephone Ring",
-" Helicopter"," Applause"," Gunshot" };
+char* genMIDIVoiceNames[] = { "Acoustic Grand Piano","Bright Acoustic Piano","Electric Grand Piano","Honky-tonk Piano","Electric Piano 1",
+"Electric Piano 2","Harpsichord","Clavi","Celesta","Glockenspiel",
+"Music Box","Vibraphone","Marimba","Xylophone","Tubular Bells",
+"Dulcimer","Drawbar Organ","Percussive Organ","Rock Organ","Church Organ",
+"Reed Organ","Accordion","Harmonica","Tango Accordion","Nylon Acoustic Guitar",
+"Acoustic Guitar (steel)","Electric Guitar (jazz)","Clean Electric Guitar","Muted Electric Guitar","Overdriven Guitar",
+"Distortion Guitar","Guitar harmonics","Acoustic Bass","Finger Electric Bass","Picked Electric Bass",
+"Fretless Bass","Slap Bass 1","Slap Bass 2","Synth Bass 1","Synth Bass 2",
+"Violin","Viola","Cello","Contrabass","Tremolo Strings",
+"Pizzicato Strings","Orchestral Harp","Timpani","String Ensemble 1","String Ensemble 2",
+"SynthStrings 1","SynthStrings 2","Choir Aahs","Voice Oohs","Synth Voice",
+"Orchestra Hit","Trumpet","Trombone","Tuba","Muted Trumpet",
+"French Horn","Brass Section","SynthBrass 1","SynthBrass 2",
+"Soprano Sax","Alto Sax","Tenor Sax","Baritone Sax","Oboe","English Horn",
+"Bassoon","Clarinet","Piccolo","Flute","Recorder",
+"Pan Flute","Blown Bottle","Shakuhachi","Whistle","Ocarina",
+"Lead 1 (square)","Lead 2 (sawtooth)","Lead 3 (calliope)","Lead 4 (chiff)","Lead 5 (charang)",
+"Lead 6 (voice)","Lead 7 (fifths)","Lead 8 (bass + lead)","Pad 1 (new age)","Pad 2 (warm)",
+"Pad 3 (polysynth)","Pad 4 (choir)","Pad 5 (bowed)","Pad 6 (metallic)","Pad 7 (halo)",
+"Pad 8 (sweep)","FX 1 (rain)","FX 2 (soundtrack)","FX 3 (crystal)","FX 4 (atmosphere)",
+"FX 5 (brightness)","FX 6 (goblins)","FX 7 (echoes)","FX 8 (sci-fi)","Sitar",
+"Banjo","Shamisen","Koto","Kalimba","Bag pipe",
+"Fiddle","Shanai","Tinkle Bell","Agogo","Steel Drums",
+"Woodblock","Taiko Drum","Melodic Tom","Synth Drum","Reverse Cymbal",
+"Guitar Fret Noise","Breath Noise","Seashore","Bird Tweet","Telephone Ring",
+"Helicopter","Applause","Gunshot"};
 
 void MIDI_PRESETS_Init() {
    // Restore settings from E^2 if they exist.  If not the initialize to defaults
@@ -82,6 +82,8 @@ void MIDI_PRESETS_Init() {
          ptr->midiChannel = DEFAULT_PRESET_MIDI_CHANNEL;
          ptr->octave = defaultMIDIPresetOctaveNumbers[i];
       }
+      // Default to preset 1
+      presets.lastActivatedVoicePreset = 1;
       MIDI_PRESETS_PersistData();
    }
 
@@ -106,26 +108,49 @@ u8 MIDI_PRESETS_GetNumGenMIDIVoices() {
 // presetNumber:  1 to NUM_GEN_MIDI_PRESETS
 // returns:  activated presetNumber on success, 0 on error.
 /////////////////////////////////////////////////////////////////////////////
-u8 MIDI_PRESET_ActivateMIDIPreset(u8 presetNumber) {
+u8 MIDI_PRESETS_ActivateMIDIPreset(u8 presetNumber) {
    if ((presetNumber == 0) || (presetNumber > NUM_GEN_MIDI_PRESETS)) {
       DEBUG_MSG("MIDI_PRESET_ActivateMIDIPreset: Invalid presetNumber: %d", presetNumber);
-      return 0;
+      return 0; // for error
    }
    midi_preset_t* gPtr = &presets.generalMidiPresets[presetNumber - 1];
+
+   MIDI_PRESETS_ActivateMIDIVoice(gPtr->programNumber,gPtr->bankNumber,gPtr->midiPorts,gPtr->midiChannel);
+
+   // Set the octave
+   PEDALS_SetOctave(gPtr->octave);
+
+   // Save last activate preset number
+   presets.lastActivatedVoicePreset = presetNumber;
+   // And persist
+   MIDI_PRESETS_PersistData();
+
+   return gPtr->presetNumber;  // for success
+}
+/////////////////////////////////////////////////////////////////////////////
+// Direct voice activation without preset
+// programNumber:  The General MIDI program number
+// bankNumber: General MIDI bank number
+// midiPorts: MIDI hardware outputs
+// midiChannel:  MIDI channel
+// returns: pointer to updated preset on success, NULL on invalid preset data
+/////////////////////////////////////////////////////////////////////////////
+u8 MIDI_PRESETS_ActivateMIDIVoice(u8 programNumber, u8 bankNumber, u8 midiPorts, u8 midiChannel) {
    u16 mask = 1;
    for (int porti = 0; porti < 16; ++porti, mask <<= 1) {
-      if (gPtr->midiPorts & mask) {
+      if (midiPorts & mask) {
          // USB0/1/2/3, UART0/1/2/3, IIC0/1/2/3, OSC0/1/2/3
          mios32_midi_port_t port = 0x10 + ((porti & 0xc) << 2) + (porti & 3);
 
          //DEBUG_MSG("midi tx:  port=0x%x",port);
-         MIOS32_MIDI_SendProgramChange(port, gPtr->midiChannel, gPtr->programNumber);
+         MIOS32_MIDI_SendProgramChange(port, midiChannel,programNumber);
+         // Send bankNumber if non-zero
+         if (bankNumber != 0){
+            // TODO
+         }
       }
-
-      return gPtr->presetNumber;  // for success
    }
-
-   return 0; // can't happen
+   return programNumber;
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -133,7 +158,8 @@ u8 MIDI_PRESET_ActivateMIDIPreset(u8 presetNumber) {
 // presetNumber:  1 to NUM_GEN_MIDI_PRESETS
 // programNumber:  The General MIDI program number
 // bankNumber: General MIDI bank number
-// midiPorts: MIDI hardware output
+// octave:  from 0 to 7
+// midiPorts: MIDI hardware outputs
 // midiChannel:  MIDI channel
 // returns: pointer to updated preset on success, NULL on invalid preset data
 /////////////////////////////////////////////////////////////////////////////
@@ -171,6 +197,15 @@ const midi_preset_t* MIDI_PRESETS_GetMidiPreset(u8 presetNumber) {
    DEBUG_MSG("MIDI_PRESETS_GetMidiPreset: preset#:%d, progNumber=%d", ptr->presetNumber, ptr->programNumber);
 #endif
    return ptr;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+// Returns the last activated MIDI preset
+// returns: pointer to last activated preset.  Must be valid
+/////////////////////////////////////////////////////////////////////////////
+const midi_preset_t* MIDI_PRESETS_GetLastActivatedPreset() {
+   return MIDI_PRESETS_GetMidiPreset(presets.lastActivatedVoicePreset);
 }
 
 /////////////////////////////////////////////////////////////////////////////
