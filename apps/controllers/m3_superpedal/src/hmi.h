@@ -34,9 +34,10 @@ typedef enum {
    TOE_SWITCH_VOLUME = 1,
    TOE_SWITCH_VOICE_PRESETS = 2,
    TOE_SWITCH_PATTERN_PRESETS = 3,
-   TOE_SWITCH_ARPEGGIATOR = 4
+   TOE_SWITCH_ARP_PRESETS = 4,
+   TOE_SWITCH_ARP_SETTINGS = 5
 } toeSwitchMode_t;
-#define NUM_TOE_SWITCH_MODES 5
+#define NUM_TOE_SWITCH_MODES 6
 
 typedef struct {
    // First 4 bytes must be serialization version ID.  Big-ended order
@@ -45,8 +46,8 @@ typedef struct {
    // The current mode of the toe switches
    toeSwitchMode_t toeSwitchMode;
 
-   // Last selected toe switch in each mode
-   u8 selectedToeIndicator[NUM_TOE_SWITCH_MODES];
+   // Last selected toe switch in each mode except for TOE_SWITCH_ARP_SETTINGS
+   u8 selectedToeIndicator[NUM_TOE_SWITCH_MODES-1];
 
    // presetNumbers for toe switch gen MIDI presets. 0 is unset
    u8 toeSwitchVoicePresetNumbers[NUM_TOE_SWITCHES];

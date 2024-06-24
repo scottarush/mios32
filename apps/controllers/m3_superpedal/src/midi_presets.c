@@ -63,6 +63,54 @@ char* genMIDIVoiceNames[] = { "Acoustic Grand Piano","Bright Acoustic Piano","El
 "Guitar Fret Noise","Breath Noise","Seashore","Bird Tweet","Telephone Ring",
 "Helicopter","Applause","Gunshot"};
 
+
+// Bank number Control Change for JV880 A & B Presets.  See JV880 Manual page 10-32
+#define JV880_AB_PRESET_BANK_SELECT_CC0 80
+char * jv880_ABPresets[] = {"Acoustic Piano 1","Acoustic Piano 2","Mellow Piano","Pop Piano 1","Pop Piano 2",
+"Pop Piano 3","MIDIed Grand","Country Bar","Glist EPiano","MIDI EPiano",
+"SA Rhodes","Dig Rhodes 1","Dig Rhodes 2","Stiky Rhodes","Guitr Rhodes",
+"Nylon Rhodes","Clav 1","Clav 2","Marimba","Marimba SW",
+"Warm Vibe","Vibe","Wave Bells","Vibrobell","Pipe Organ 1",
+"Pipe Organ 2","Pipe Organ 3","Electric Organ 1","Electric Organ 2","Jazz Organ 1",
+"Jazz Organ 2","Metal Organ","Nylon Gtr 1","Flanged Nyln","Steel Guitar",
+"PickedGuitar","12 strings","Velo Harmnix","Nylon+Steel","SwitchOnMute",
+"JC Strat","Stratus","Syn Strat","Pop Strat","Clean Strat",
+"Funk Gtr","Syn Guitar","Overdrive","Fretless","St Fretless",
+"Woody Bass 1","Woody Bass 2","Analog Bs 1","House Bass","Hip Bass",
+"RockOut Bass","Slap Bass","Thumpin Bass","Pick Bass","Wonder Bass",
+"Yowza Bass","Rubber Bass 1","Rubber Bass 2","Stereoww Bs","Pizzicato",
+"Real Pizz","Harp","SoarinString","Warm Strings","Marcato",
+"St Strings","Orch Strings","Slow Strings","Velo Strings","BrightStrngs",
+"TremoloStrng","Orch Stab 1","Brite Stab","JP-8 Strings","String Synth",
+"Wire Strings","New Age Vox","Arasian Morn","Beauty Vox","Vento Voxx",
+"Pvox Oooze","GlassVoices","Space Ahh","Trumpet","Trombone",
+"Harmon Mute1","Harmon Mute2","TeaJay Brass","Brass Sect 1","Brass Sect 2",
+"Brass Swell","Brass Combo","Stab Brass","Soft Brass","Horn Brass",
+"French Horn","AltoLead Sax","Alto Sax","Tenor Sax 1","Tenor Sax 2",
+"Sax Section","Sax Tp Tb","FlutePiccolo","Flute mod","Ocarina",
+"OverblownPan","Air Lead","Steel Drum","Log Drum","Box Lead",
+"Soft Lead","Whistle","Square Lead","Touch Lead","NightShade",
+"Pizza Hutt","EP+Exp Pad","JP-8 Pad","Puff","SpaciosSweep",
+"Big n Beefy","RevCymBend","Analog Seq"};
+
+
+// Bank select Control Change number for JV880 Internal Presets.  See JV880 Manual page 10-32
+#define JV880_INTERNAL_PRESET_BANK_SELECT_CC0 81
+char * jv880_InternalPresets[] = {"770 Grand 1","MIDI 3 Grand","Electric Grand 1","60s Electric Piano","Dyna Rhodes",
+"Pop Rhodes","Beauty Rhodes","Airies Piano","Clav 1 x4","Wah Clav",
+"Housey Clavy","Ballad Org.1","Even Bars 1","Stereo Organ","Jazz Organ 3",
+"8ft. Stop","Brite Organ 1","Soft Organ","60s Organ x4","Pipe Organ 4",
+"Church","Celeste","Toy Piano","Snow Bells","Acoustic Bass 1",
+"Acoustic Bass 2","Acoustic Fretless","Fretless 2","Weather Bass","Jazz Bass",
+"Power Bass","Power Funk V-Sw","Stick","Delicate Stik","Stick V-Sw",
+"Bassic house","Noo Spitbass","Metal Bass","Sync Bass","Bs Slide",
+"Bs Harmonix","Super Nylon","Jazz Guitar","Jazz Cascade","Jazzy Scat",
+"Pedal Steel","Banjo 1","Electric Sitar","Funk Guitar","Heavy Duty",
+"Lead Guitar 1","Lead Guitar 2","Lead Guitar 3","Pocket Rocket","Power Flange",
+"Bowed Guitar","Shakupeace","Cimbalon 1","Sanza 1","Shamisentur",
+"Praying Monk","Electric Koto","Ravi Sitar","Mystic Mount"};
+
+
 void MIDI_PRESETS_Init() {
    // Restore settings from E^2 if they exist.  If not the initialize to defaults
    s32 valid = 0;
