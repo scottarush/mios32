@@ -50,7 +50,7 @@ typedef enum {
    PAGE_EDIT_VOICE_PRESET = 2,
    PAGE_EDIT_PATTERN_PRESET = 3,
    PAGE_MIDI_PROGRAM_SELECT = 4,
-   PAGE_ARP_CONFIG = 5
+   PAGE_EDIT_ARP_PRESET = 5
 } pageID_t;
 
 struct page_s {
@@ -109,18 +109,17 @@ typedef enum {
 // Toe Switch types and non-persisted variables
 /////////////////////////////////////////////////////////////////////////////
 
-// Available functions for ARP_SETTINGS mode.  Enum constant
-// maps to to the TOE number when the funcion is active.
+// Total list of functions availabe in ARP Live mode.  Can be mapped to toe switches
+// in preesets
 typedef enum {
-   ARP_SETTING_TOE_SELECT_KEY = 0,
-   ARP_SETTING_TOE_UP = 1,
-   ARP_SETTING_TOE_DOWN = 2,
-   ARP_SETTING_TOE_RANDOM = 3,
-   ARP_SETTING_TOE_UNUSED = 4,
-   ARP_SETTING_TOE_TEMPO_UP = 5,
-   ARP_SETTING_TOE_TEMPO_DOWN = 7,
-   ARP_SETTING_TOE_STOP_START = 8
-} arp_settinge_toe_functions_t;
+   ARP_LIVE_TOE_MAJOR_KEY = 0,
+   ARP_LIVE_TOE_MINOR_KEY = 1,
+   ARP_LIVE_TOE_ASCENDING = 2,
+   ARP_LIVE_TOE_DESCENDING = 3,
+   ARP_LIVE_TOE_RANDOM = 4,
+   ARP_LIVE_TOE_TEMPO_DECREMENT = 6,
+   ARP_LIVE_TOE_TEMPO_INCREMENT = 7,
+} arp_live_toe_functions_t;
 
 
 // Text for the toe switch
@@ -405,7 +404,7 @@ void HMI_NotifyToeToggle(u8 toeNum, u8 pressed, s32 timestamp) {
 
       // TODO
       break;
-   case TOE_SWITCH_ARP_SETTINGS:
+   case TOE_SWITCH_ARP_LIVE:
 
       // TODO
    break;  default:
@@ -457,7 +456,7 @@ void HMI_NotifyStompToggle(u8 stompNum, u8 pressed, s32 timestamp) {
       hmiSettings.toeSwitchMode = TOE_SWITCH_PATTERN_PRESETS;
       break;
    case STOMP_SWITCH_ARPEGGIATOR:
-      hmiSettings.toeSwitchMode = TOE_SWITCH_ARP_SETTINGS;
+      hmiSettings.toeSwitchMode = TOE_SWITCH_ARP_LIVE;
       // Call dedicated function to set the indicators to the ARP settings since multiple
       // indicators can be set in this mode.
       HMI_SetArpSettingsIndicators();
@@ -1022,7 +1021,7 @@ void HMI_NotifyOctaveChange(u8 octave){
 }
 
 /////////////////////////////////////////////////////////////////////////////
-// Sets/updates the indicators for the current ARP_SETTINGS mode
+// Sets/updates the indicators for the current ARP_LIVE mode
 /////////////////////////////////////////////////////////////////////////////
 void HMI_SetArpSettingsIndicators(){
    IND_ClearAll();

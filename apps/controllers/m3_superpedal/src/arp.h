@@ -22,19 +22,20 @@
 // Global Types
 /////////////////////////////////////////////////////////////////////////////
 typedef enum {
-   ARP_MODE_UP = 0,
-   ARP_MODE_DOWN = 1,
-   ARP_MODE_UPDOWN = 2,
-   ARP_MODE_OCTAVE = 3,
-   ARP_MODE_RANDOM = 4
-} arp_mode_type_t;
+   ARP_GEN_MODE_ASCENDING = 0,
+   ARP_GEN_MODE_DESCENDING = 1,
+   ARP_GEN_MODE_ASC_DESC = 2,
+   ARP_GEN_MODE_OCTAVE = 3,
+   ARP_GEN_MODE_RANDOM = 4
+} arp_gen_mode_type_t;
 
 /////////////////////////////////////////////////////////////////////////////
 // Persisted Arpeggiatordata to E2 .
 /////////////////////////////////////////////////////////////////////////////
 typedef struct {
-   arp_mode_type_t arpMode;
-
+   arp_gen_mode_type_t genMode;
+   int ppqn;
+   double bpm;
 } persisted_arp_data_t;
 
 
@@ -53,7 +54,7 @@ extern s32 ARP_NotifyNewNote(notestack_t *n);
 extern s32 ARP_NotifyNoteOn(u8 note, u8 velocity);
 extern s32 ARP_NotifyNoteOff(u8 note);
 
-extern arp_mode_type_t ARP_GetArpMode();
+extern arp_gen_mode_type_t ARP_GetArpGenMode();
 /////////////////////////////////////////////////////////////////////////////
 // Export global variables
 /////////////////////////////////////////////////////////////////////////////

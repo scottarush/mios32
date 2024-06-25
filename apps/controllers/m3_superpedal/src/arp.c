@@ -1,6 +1,6 @@
 /*
- * Arpeggiator functions for M3 superpedal adapted from 
- * Tutorial 18 originally seq.c/h
+ * Arpeggiator functions for M3 superpedal extended from
+ * Tutorial 18 - originally seq.c/h
  *
  *  Copyright (C) 2008 Thorsten Klose (tk@midibox.org)
  *  Licensed for personal non-commercial use only.
@@ -47,13 +47,13 @@ static s32 ARP_Tick(u32 bpm_tick);
 static u8 arp_counter;
 
 // pause mode (will be controlled from user interface)
-static u8 ARP_pause = 0;
+static u8 arpPause = 0;
 
 // notestack
 static notestack_t notestack;
 static notestack_item_t notestack_items[NOTESTACK_SIZE];
 
-persisted_arp_data_t settings;
+persisted_arp_data_t arpSettings;
 
 /////////////////////////////////////////////////////////////////////////////
 // Initialisation
@@ -61,39 +61,45 @@ persisted_arp_data_t settings;
 s32 ARP_Init(u32 mode)
 {
    // initialize the Notestack
-#if 0
-   NOTESTACK_Init(&notestack, NOTESTACK_MODE_PUSH_TOP, &notestack_items[0], NOTESTACK_SIZE);
-#else
   // for an arpeggiator we prefer sorted mode
   // activate hold mode as well. Stack will be cleared whenever no note is played anymore
    NOTESTACK_Init(&notestack, NOTESTACK_MODE_SORT_HOLD, &notestack_items[0], NOTESTACK_SIZE);
-#endif
 
-   // Initialize the defaults
-   u8 valid = PERSIST_ReadBlock(PERSIST_ARP_BLOCK, (unsigned char*)&settings, sizeof(persisted_arp_data_t));
+   // Restore settings from E^2 if they exist.  If not then initialize to defaults
+   s32 valid = 0;
+   valid = PERSIST_ReadBlock(PERSIST_ARP_BLOCK, (unsigned char*)&arpSettings, sizeof(persisted_arp_data_t));
    if (valid < 0) {
       DEBUG_MSG("ARP_Init:  PERSIST_ReadBlock return invalid. Re-initing persisted settings to defaults");
-      // TODO
+      arpSettings.genMode = ARP_GEN_MODE_ASCENDING;
+      arpSettings.ppqn = 384;
+      arpSettings.bpm = 120.0;
+
+      valid = PERSIST_StoreBlock(PERSIST_ARP_BLOCK, (unsigned char*)&arpSettings, sizeof(persisted_arp_data_t));
+      if (valid < 0) {
+         DEBUG_MSG("ARP_Init:  Error persisting settings to EEPROM");
+      }
+
    }
 
-   // and the arp counter
+   // clear the arp counter
    arp_counter = 0;
 
-   // reset sequencer
+   // reset arpeggiator
    ARP_Reset();
 
-   // init BPM generator
+   // init platform BPM generator
    SEQ_BPM_Init(0);
 
-   SEQ_BPM_PPQN_Set(384);
-   SEQ_BPM_Set(120.0);
+   // Restore the ppqn and bpm
+   SEQ_BPM_PPQN_Set(arpSettings.ppqn);
+   SEQ_BPM_Set(arpSettings.bpm);
 
    return 0; // no error
 }
 
 
 /////////////////////////////////////////////////////////////////////////////
-// this sequencer handler is called periodically to check for new requests
+// this  handler is called periodically to check for new requests
 // from BPM generator
 /////////////////////////////////////////////////////////////////////////////
 s32 ARP_Handler(void)
@@ -113,7 +119,7 @@ s32 ARP_Handler(void)
 
       if (SEQ_BPM_ChkReqCont()) {
          // release pause mode
-         ARP_pause = 0;
+         arpPause = 0;
       }
 
       if (SEQ_BPM_ChkReqStart()) {
@@ -162,7 +168,7 @@ s32 ARP_Reset(void)
    ARP_PlayOffEvents();
 
    // release pause mode
-   ARP_pause = 0;
+   arpPause = 0;
 
    // reset BPM tick
    SEQ_BPM_TickSet(0);
@@ -247,7 +253,7 @@ s32 ARP_NotifyNoteOn(u8 note, u8 velocity)
    }
 
 
-#if 1
+#ifdef DEBUG
    // optional debug messages
    NOTESTACK_SendDebugMessage(&notestack);
 #endif
@@ -266,9 +272,9 @@ s32 ARP_NotifyNoteOff(u8 note)
 }
 
 /**
- * Returns the current Arpeggiator mode.
+ * Returns the current Arpeggiator generation mode.
 */
-arp_mode_type_t ARP_GetArpMode() {
-   return settings.arpMode;
+arp_gen_mode_type_t ARP_GetArpGenMode() {
+   return arpSettings.genMode;
 }
 

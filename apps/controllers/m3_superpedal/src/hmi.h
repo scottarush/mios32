@@ -35,7 +35,7 @@ typedef enum {
    TOE_SWITCH_VOICE_PRESETS = 2,
    TOE_SWITCH_PATTERN_PRESETS = 3,
    TOE_SWITCH_ARP_PRESETS = 4,
-   TOE_SWITCH_ARP_SETTINGS = 5
+   TOE_SWITCH_ARP_LIVE = 5
 } toeSwitchMode_t;
 #define NUM_TOE_SWITCH_MODES 6
 
@@ -78,6 +78,7 @@ extern void HMI_NotifyBackToggle(u8 pressed,s32 timestamp);
 extern void HMI_NotifyEncoderChange(s32 incrementer);
 extern void HMI_NotifyEncoderSwitchToggle(u8 pressed,s32 timestamp);
 extern void HMI_NotifyOctaveChange(u8);
+extern void HMI_SetArpSettingsIndicators();
 
 /////////////////////////////////////////////////////////////////////////////
 // Export global variables
