@@ -39,7 +39,7 @@
 
 #define DISPLAY_CHAR_WIDTH 20
 
-
+#define TEMP_CHANGE_STEP 5
 
 /////////////////////////////////////////////////////////////////////////////
 // Display page variables
@@ -114,13 +114,13 @@ typedef enum render_line_mode_e {
 // Total list of functions availabe in ARP Live mode.  Can be mapped to toe switches
 // in preesets
 typedef enum arp_live_toe_functions_e {
-   ARP_LIVE_TOE_MAJOR_KEY = 0,
-   ARP_LIVE_TOE_MINOR_KEY = 1,
-   ARP_LIVE_TOE_ASCENDING = 2,
-   ARP_LIVE_TOE_DESCENDING = 3,
-   ARP_LIVE_TOE_RANDOM = 4,
-   ARP_LIVE_TOE_TEMPO_DECREMENT = 6,
-   ARP_LIVE_TOE_TEMPO_INCREMENT = 7,
+   ARP_LIVE_TOE_GEN_MODE_UP_DOWN = 1,
+   ARP_LIVE_TOE_GEN_MODE_OCTAVE_RANDOM = 2,
+   ARP_LIVE_TOE_MAJOR_KEY = 3,
+   ARP_LIVE_TOE_MINOR_KEY = 4,
+   // 5 and 6 are unassigned
+   ARP_LIVE_TOE_TEMPO_DECREMENT = 7,
+   ARP_LIVE_TOE_TEMPO_INCREMENT = 8,
 } arp_live_toe_functions_t;
 
 
@@ -178,6 +178,8 @@ void HMI_MIDIProgramSelectPage_RotaryEncoderSelected();
 void HMI_MIDIProgramSelectPage_BackButtonCallback();
 
 void HMI_PersistData();
+
+void HMI_HandleArpLiveToeToggle(u8,u8);
 
 /////////////////////////////////////////////////////////////////////////////
 // called at Init to initialize the HMI
@@ -407,8 +409,8 @@ void HMI_NotifyToeToggle(u8 toeNum, u8 pressed, s32 timestamp) {
       // TODO
       break;
    case TOE_SWITCH_ARP_LIVE:
-
-      // TODO
+      HMI_HandleArpLiveToeToggle(toeNum,pressed);
+      break;
    break;  default:
    }
 }
@@ -706,10 +708,9 @@ void HMI_HomePage_UpdateDisplay() {
 
 
    // Current octave and volume always go on line 3
-   snprintf(lineBuffer, DISPLAY_CHAR_WIDTH, "%s #%d %s %d",
-      pToeSwitchModeTitles[TOE_SWITCH_OCTAVE], PEDALS_GetOctave(),
-      pToeSwitchModeTitles[TOE_SWITCH_VOLUME], PEDALS_GetVolume());
-   HMI_RenderLine(3, lineBuffer, RENDER_LINE_LEFT);
+   u32 percentVolume = (PEDALS_GetVolume()*100)/127;
+   snprintf(lineBuffer, DISPLAY_CHAR_WIDTH, "Octave:%d Vol:%d%",PEDALS_GetOctave(),percentVolume);
+   HMI_RenderLine(3, lineBuffer, RENDER_LINE_CENTER);
 
    // Show the Current Mode on top line.
    // TODO replace the direct array access below with an indirect enum in order
@@ -743,12 +744,14 @@ void HMI_HomePage_UpdateDisplay() {
       break;
    case TOE_SWITCH_ARP_LIVE:
       // Arpeggiator state in Line 2
+      u16 bpm = ARP_GetBPM();
       if (ARP_GetEnabled()) {
-         HMI_RenderLine(2, "Arp Running", RENDER_LINE_CENTER);
+         snprintf(lineBuffer, DISPLAY_CHAR_WIDTH, "Arp: RUN  %d BPM",bpm);
       }
       else {
-         HMI_RenderLine(2, "Arp Disabled", RENDER_LINE_CENTER);
+         snprintf(lineBuffer, DISPLAY_CHAR_WIDTH, "Arp: STOP %d BPM",bpm);
       }
+      HMI_RenderLine(2, lineBuffer, RENDER_LINE_CENTER);
       break;
    default:
 #ifdef DEBUG
@@ -1021,12 +1024,94 @@ void HMI_MIDIProgramSelectPage_BackButtonCallback() {
 void HMI_SetArpSettingsIndicators() {
    IND_ClearAll();
    if (ARP_GetEnabled() == 0) {
-      IND_SetIndicatorState(1, IND_FLASH_INVERSE_BLIP);  // Remove this test code
       return;  // Arp is disabled so leave all the indicators off
    }
    // Else, synch the indicators to the Arp state.
+
+   // First the gen mode indicators
+   switch (ARP_GetArpGenMode()) {
+   case ARP_GEN_MODE_ASCENDING:
+      // shut off octave/random indicator
+      IND_SetIndicatorState(ARP_LIVE_TOE_GEN_MODE_OCTAVE_RANDOM,IND_OFF);
+      IND_SetBlipIndicator(ARP_LIVE_TOE_GEN_MODE_UP_DOWN,0,ARP_GetBPM());
+      break;
+   case ARP_GEN_MODE_DESCENDING:
+      // shut off octave/random indicator
+      IND_SetIndicatorState(ARP_LIVE_TOE_GEN_MODE_OCTAVE_RANDOM,IND_OFF);
+      IND_SetBlipIndicator(ARP_LIVE_TOE_GEN_MODE_UP_DOWN,1,ARP_GetBPM());
+      break;
+   case ARP_GEN_MODE_ASC_DESC:
+      // shut off octave/random indicator
+      IND_SetIndicatorState(ARP_LIVE_TOE_GEN_MODE_OCTAVE_RANDOM,IND_OFF);
+      // Ascending and descending is 50% flash at BPM rate
+      IND_SetFlashIndicator(ARP_LIVE_TOE_GEN_MODE_UP_DOWN, ARP_GetBPM());
+      break;
+   case ARP_GEN_MODE_OCTAVE:
+      // shut off asc/desc indicator
+      IND_SetIndicatorState(ARP_LIVE_TOE_GEN_MODE_UP_DOWN,IND_OFF);   
+      // Octave is 50% flash at BPM rate
+      IND_SetFlashIndicator(ARP_LIVE_TOE_GEN_MODE_OCTAVE_RANDOM, ARP_GetBPM());
+      break;
+   case ARP_GEN_MODE_RANDOM:
+      // shut off asc/desc indicator
+      IND_SetIndicatorState(ARP_LIVE_TOE_GEN_MODE_UP_DOWN,IND_OFF);   
+      // Random is a blip at the ARPM rate
+      IND_SetBlipIndicator(ARP_LIVE_TOE_GEN_MODE_OCTAVE_RANDOM,0, ARP_GetBPM());
+      break;
+   }
    // TODO
    IND_SetIndicatorState(1, IND_FLASH_BLIP);
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// Helper to handle Arp live toe toggle. 
+/////////////////////////////////////////////////////////////////////////////
+void HMI_HandleArpLiveToeToggle(u8 toeNum,u8 pressed){
+   u16 bpm;
+   switch(toeNum){
+      case ARP_LIVE_TOE_GEN_MODE_UP_DOWN:
+         // Wrap the 3 modes on this toe switch
+         switch(ARP_GetArpGenMode()){
+            case ARP_GEN_MODE_ASCENDING:
+               ARP_SetArpGenMode(ARP_GEN_MODE_DESCENDING);
+               break;
+            case ARP_GEN_MODE_DESCENDING:
+              ARP_SetArpGenMode(ARP_GEN_MODE_ASC_DESC);
+               break;
+            case ARP_GEN_MODE_ASC_DESC:
+               ARP_SetArpGenMode(ARP_GEN_MODE_ASCENDING);
+               break;            
+         }
+         break;
+     case ARP_LIVE_TOE_GEN_MODE_OCTAVE_RANDOM:
+         // Wrap the 2 modes on this toe switch
+         switch(ARP_GetArpGenMode()){
+            case ARP_GEN_MODE_OCTAVE:
+               ARP_SetArpGenMode(ARP_GEN_MODE_RANDOM);
+               break;
+            case ARP_GEN_MODE_RANDOM:
+              ARP_SetArpGenMode(ARP_GEN_MODE_OCTAVE);
+               break;       
+         }
+      case ARP_LIVE_TOE_MAJOR_KEY:
+         // TODO
+         break;
+      case ARP_LIVE_TOE_MINOR_KEY:
+         // TODO:
+         break;
+      case ARP_LIVE_TOE_TEMPO_INCREMENT:
+         bpm = ARP_GetBPM();
+         bpm += TEMP_CHANGE_STEP;         
+         ARP_SetBPM(bpm);
+         break;
+      case ARP_LIVE_TOE_TEMPO_DECREMENT:
+         bpm = ARP_GetBPM();
+         bpm -= TEMP_CHANGE_STEP;
+         ARP_SetBPM(bpm);
+         break;      
+   }
+   // Update the current display to reflect any content change
+   currentPage->pUpdateDisplayCallback();
 }
 
 

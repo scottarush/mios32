@@ -58,7 +58,7 @@ typedef struct indicator_fullstate_s {
    /**
     * flash timer freq in Hz
    */
-   u8 flash_timer_freq;
+   float flash_timer_freq;
    /*
    * flash_timer_duty_cycle_percent
    */
@@ -71,6 +71,7 @@ typedef struct indicator_fullstate_s {
 /////////////////////////////////////////////////////////////////////////////
 u8 IND_GetLEDPin(u8 indicatorNum);
 void IND_UpdateFlashTimer(indicator_fullstate_t* ptr);
+void IND_SetFullIndicatorState(u8 indicatorNum, indicator_state_t state, float freq, u8 dutyCycle);
 
 /////////////////////////////////////////////////////////////////////////////
 // Local variables
@@ -199,15 +200,66 @@ void IND_FlashAll(u8 flashFast) {
    }
    MIOS32_BOARD_J10_Set(0);
 }
+///////////////////////////////////////////////////////////////////////////
+// Public function sets a blip indicator with explicit frequency
+// indicatorNum:  Number of led starting from left with indicator 1.
+//
+/////////////////////////////////////////////////////////////////////////////
+void IND_SetBlipIndicator(u8 indicatorNum,u8 inverse,float frequency) {
+   if (inverse){
+      IND_SetFullIndicatorState(indicatorNum,IND_FLASH_INVERSE_BLIP,frequency,100-FLASH_BLIP_PERCENT_DUTY_CYCLE);
+   }
+   else{
+      IND_SetFullIndicatorState(indicatorNum,IND_FLASH_BLIP,frequency,FLASH_BLIP_PERCENT_DUTY_CYCLE);
+   }
+}
 
 ///////////////////////////////////////////////////////////////////////////
-// function to change the indicator state with persistence.
+// Public function sets a 50% duty cycle flash indicator with explicit frequency
+// indicatorNum:  Number of led starting from left with indicator 1.
+//
+/////////////////////////////////////////////////////////////////////////////
+void IND_SetFlashIndicator(u8 indicatorNum,float frequency) {
+      IND_SetFullIndicatorState(indicatorNum,0,frequency,50);
+}
+
+///////////////////////////////////////////////////////////////////////////
+// Public function sets the indicator state.
 // indicatorNum:  Number of led starting from left with indicator 1.
 // state to set the indicator to.
 //
-//
 /////////////////////////////////////////////////////////////////////////////
 void IND_SetIndicatorState(u8 indicatorNum, indicator_state_t state) {
+   // set the output pin and init the flash timer
+   switch (state) {
+   case IND_FLASH_FAST:
+      IND_SetFullIndicatorState(indicatorNum,IND_FLASH_FAST,FLASH_FAST_FREQ,50);
+      break;
+   case IND_FLASH_SLOW:
+      IND_SetFullIndicatorState(indicatorNum,IND_FLASH_SLOW,FLASH_SLOW_FREQ,50);
+      break;
+   case IND_ON:
+      IND_SetFullIndicatorState(indicatorNum,IND_ON,1,100);;
+      break;
+   case IND_FLASH_BLIP:
+      IND_SetFullIndicatorState(indicatorNum,IND_FLASH_BLIP,DEFAULT_FLASH_BLIP_FREQ,FLASH_BLIP_PERCENT_DUTY_CYCLE);
+      break;
+   case IND_FLASH_INVERSE_BLIP:
+      IND_SetFullIndicatorState(indicatorNum,IND_FLASH_INVERSE_BLIP,DEFAULT_FLASH_BLIP_FREQ,100-FLASH_BLIP_PERCENT_DUTY_CYCLE);
+      break;
+   case IND_OFF:
+      IND_SetFullIndicatorState(indicatorNum,IND_OFF,1,100);;
+      break;
+   }
+}
+
+///////////////////////////////////////////////////////////////////////////
+// Internal helper function sets the indicator state.
+// indicatorNum:  Number of led starting from left with indicator 1.
+// state to set the indicator to.
+//
+/////////////////////////////////////////////////////////////////////////////
+void IND_SetFullIndicatorState(u8 indicatorNum, indicator_state_t state, float freq, u8 dutyCycle) {
    if (indicatorNum > 8) {
       DEBUG_MSG("Invalid indicator number=%d", indicatorNum);
       return;
@@ -217,27 +269,21 @@ void IND_SetIndicatorState(u8 indicatorNum, indicator_state_t state) {
 #endif
    indicator_fullstate_t* ptr = &indicator_states[indicatorNum - 1];
    ptr->state = state;
+
+   ptr->flash_timer_freq = freq;
+   ptr->flash_timer_duty_cycle_percent = dutyCycle;
+
    // set the output pin and init the flash timer
    switch (ptr->state) {
    case IND_FLASH_FAST:
-      ptr->flash_timer_freq = FLASH_FAST_FREQ;
-      ptr->flash_timer_duty_cycle_percent = 50;
-      ptr->outputState = 0;  
-      break;
    case IND_FLASH_SLOW:
-      ptr->flash_timer_freq = FLASH_SLOW_FREQ;
-      ptr->flash_timer_duty_cycle_percent = 50;
+   case IND_FLASH_BLIP:
+   case IND_FLASH_INVERSE_BLIP:
+      // Need to clear the outputState to force the updateFlashTimer calculation below
+      ptr->outputState = 0;
       break;
    case IND_ON:
       ptr->outputState = 1;
-      break;
-   case IND_FLASH_BLIP:
-      ptr->flash_timer_freq = DEFAULT_FLASH_BLIP_FREQ;
-      ptr->flash_timer_duty_cycle_percent = FLASH_BLIP_PERCENT_DUTY_CYCLE;
-      break;
-   case IND_FLASH_INVERSE_BLIP:
-      ptr->flash_timer_freq = DEFAULT_FLASH_BLIP_FREQ;
-      ptr->flash_timer_duty_cycle_percent = 100 - FLASH_BLIP_PERCENT_DUTY_CYCLE;
       break;
    case IND_OFF:
       ptr->outputState = 0;

@@ -39,6 +39,8 @@ extern void IND_Init(void);
 extern void IND_1msTick();
 
 extern void IND_SetIndicatorState(u8 indicatorNum,indicator_state_t state);
+extern void IND_SetBlipIndicator(u8 indicatorNum,u8 inverse,float frequency);
+extern void IND_SetFlashIndicator(u8 indicatorNum,float frequency);
 
 extern void IND_SetTempIndicatorState(u8 indicatorNum,indicator_state_t tempState,u16 duration_ms,indicator_state_t targetState);
 

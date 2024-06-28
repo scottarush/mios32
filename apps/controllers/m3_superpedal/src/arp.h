@@ -56,8 +56,14 @@ extern s32 ARP_NotifyNoteOn(u8 note, u8 velocity);
 extern s32 ARP_NotifyNoteOff(u8 note);
 
 extern arp_gen_mode_type_t ARP_GetArpGenMode();
+extern u8 ARP_SetArpGenMode(arp_gen_mode_type_t mode);
+
 extern void ARP_SetEnabled(u8 enabled);
 extern u8 ARP_GetEnabled();
+
+float ARP_GetBPM();
+void ARP_SetBPM(u16 bpm);
+
 /////////////////////////////////////////////////////////////////////////////
 // Export global variables
 /////////////////////////////////////////////////////////////////////////////
