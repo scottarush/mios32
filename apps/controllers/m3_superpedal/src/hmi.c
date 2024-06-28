@@ -203,7 +203,7 @@ void HMI_Init(void) {
    lastSelectedMainPageEntry = MAIN_PAGE_ENTRY_EDIT_TOE_MIDI_PRESET;
 
    currentPage = &homePage;
-   lastPage = currentPage;
+   lastPage = NULL;
 
    // Restore settings from E^2 if they exist.  If not then initialize to defaults
    s32 valid = 0;
@@ -221,17 +221,16 @@ void HMI_Init(void) {
       hmiSettings.stompSwitchSetting[2] = STOMP_SWITCH_VOICE_PRESETS;
       hmiSettings.stompSwitchSetting[1] = STOMP_SWITCH_PATTERN_PRESETS;
       hmiSettings.stompSwitchSetting[0] = STOMP_SWITCH_ARPEGGIATOR;
-      hmiSettings.toeSwitchMode = TOE_SWITCH_OCTAVE;
 
       // Toe switch settings for all but arpeggiator mode which uses bit fieldsinstead
       hmiSettings.selectedToeIndicator[TOE_SWITCH_OCTAVE] = PEDALS_DEFAULT_OCTAVE_NUMBER;
       hmiSettings.selectedToeIndicator[TOE_SWITCH_VOLUME] = 8;     // Corresponds to maximum volume
       hmiSettings.selectedToeIndicator[TOE_SWITCH_VOICE_PRESETS] = 1;
       hmiSettings.selectedToeIndicator[TOE_SWITCH_PATTERN_PRESETS] = 1;
-      hmiSettings.selectedToeIndicator[TOE_SWITCH_ARP_PRESETS] = 1;
 
+      // Set deefault TOE mode
+      hmiSettings.toeSwitchMode = TOE_SWITCH_OCTAVE;
 
-      
       for (int i = 0;i < NUM_TOE_SWITCHES;i++) {
          hmiSettings.toeSwitchVoicePresetNumbers[i] = i + 1;
       }
@@ -247,7 +246,7 @@ void HMI_Init(void) {
       }
    }
    // Now that settings are init'ed/restored, then synch the HMI
-
+   
    // Init the display pages now that settings are restored
    HMI_InitPages();
 
@@ -474,12 +473,11 @@ void HMI_NotifyStompToggle(u8 stompNum, u8 pressed, s32 timestamp) {
          // This is a first press, so just got to the page
          hmiSettings.toeSwitchMode = TOE_SWITCH_ARP_LIVE;
       }
-      // Call dedicated function to set the indicators to the ARP settings since multiple
-      // indicators can be set in this mode.
-      HMI_SetArpSettingsIndicators();
-      // And update the current page display
-      currentPage->pUpdateDisplayCallback();
-      return;
+
+      // Set to home page and clear last page
+      currentPage = &homePage;
+      lastPage = NULL;
+      break;
    case STOMP_SWITCH_VOLUME:
       hmiSettings.toeSwitchMode = TOE_SWITCH_VOLUME;
       break;
@@ -491,8 +489,15 @@ void HMI_NotifyStompToggle(u8 stompNum, u8 pressed, s32 timestamp) {
    // Update the toe switch indicators and the display in case the mode changed.
    IND_ClearAll();
    DEBUG_MSG("mode=%d",hmiSettings.selectedToeIndicator[hmiSettings.toeSwitchMode]);
-   IND_SetIndicatorState(hmiSettings.selectedToeIndicator[hmiSettings.toeSwitchMode], IND_ON);
-   // And update the current page display
+   if (hmiSettings.toeSwitchMode == TOE_SWITCH_ARP_LIVE){
+      // Call dedicated function to set the indicators to the ARP settings since multiple
+      // indicators can be set in this mode.
+      HMI_SetArpSettingsIndicators();      
+   }
+   else{
+      IND_SetIndicatorState(hmiSettings.selectedToeIndicator[hmiSettings.toeSwitchMode], IND_ON);
+   }
+   // update the current page display
    currentPage->pUpdateDisplayCallback();
 }
 
@@ -540,7 +545,7 @@ void HMI_NotifyEncoderSwitchToggle(u8 pressed, s32 timestamp) {
 
    switch (currentPage->pageID) {
    case PAGE_HOME:
-      // On encoder switch initial press go to main page
+      // On encoder switch initial press go to main page and save home page for Back button functionalyt
       lastPage = currentPage;
       currentPage = &mainPage;
       // And force an update to the current page display
@@ -593,8 +598,8 @@ void HMI_NotifyBackToggle(u8 pressed, s32 timestamp) {
    }
 
    if (longPress && !backSwitchState.handled) {
-      // Go back to home page 
-      lastPage = currentPage;
+      // Go back to home page and null last Page
+      lastPage = NULL;
       currentPage = &homePage;
       // And force an update to the current page display
       currentPage->pUpdateDisplayCallback();
@@ -700,27 +705,29 @@ void HMI_HomePage_UpdateDisplay() {
 
    char lineBuffer[DISPLAY_CHAR_WIDTH];
 
+
    // Current octave and volume always go on line 3
    snprintf(lineBuffer, DISPLAY_CHAR_WIDTH, "%s #%d %s %d",
       pToeSwitchModeTitles[TOE_SWITCH_OCTAVE], PEDALS_GetOctave(),
       pToeSwitchModeTitles[TOE_SWITCH_VOLUME], PEDALS_GetVolume());
    HMI_RenderLine(3, lineBuffer, RENDER_LINE_LEFT);
 
-   // Now render reset of lines according to according to the mode
-   u8 selectedToeSwitch = hmiSettings.selectedToeIndicator[hmiSettings.toeSwitchMode];
    // Show the Current Mode on top line.
+   // TODO replace the direct array access below with an indirect enum in order
+   // to enable customization of the stomp switches.
    snprintf(lineBuffer, DISPLAY_CHAR_WIDTH, "%s Mode",
       pToeSwitchModeTitles[hmiSettings.toeSwitchMode]);
    HMI_RenderLine(0, lineBuffer, RENDER_LINE_CENTER);
    HMI_RenderLine(1, "--------------------", RENDER_LINE_LEFT);
 
-   // Render lines 2 and 3 based on the current mode
+   // Render lines 2 and 3 based on the current toe switch mode
    switch (hmiSettings.toeSwitchMode) {
    case TOE_SWITCH_OCTAVE:
    case TOE_SWITCH_VOLUME:
       HMI_ClearLine(2);
       break;
    case TOE_SWITCH_VOICE_PRESETS:
+      u8 selectedToeSwitch = hmiSettings.selectedToeIndicator[hmiSettings.toeSwitchMode];
       u8 presetNum = hmiSettings.toeSwitchVoicePresetNumbers[selectedToeSwitch - 1];
       const midi_preset_t* preset = MIDI_PRESETS_GetMidiPreset(presetNum);
       if (preset == NULL) {
@@ -990,8 +997,8 @@ void HMI_MIDIProgramSelectPage_RotaryEncoderSelected() {
       IND_SetTempIndicatorState(selectedToeSwitch, IND_FLASH_FAST, IND_TEMP_FLASH_STATE_DEFAULT_DURATION, IND_ON);
    }
 
-   // Go back to the home page
-   lastPage = currentPage;
+   // Go back to the home page and null lastPage
+   lastPage = NULL;
    currentPage = &homePage;
    // And force an update to the current page display
    currentPage->pUpdateDisplayCallback();

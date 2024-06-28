@@ -31,6 +31,8 @@
 
 #define DEBUG_MSG MIOS32_MIDI_SendDebugMessage
 
+#define PEDALS_NOTE_ON_LIST_MAX 12
+
 /////////////////////////////////////////////////////////////////////////////
 // Global Variables
 /////////////////////////////////////////////////////////////////////////////
@@ -55,6 +57,10 @@ u8 lastPressVelocity;
 // timestamp of make release used to compute release velocity
 s32 makeReleaseTimestamp;
 
+// list of note_numbers for each pedal for which an On has been sent but no Off
+// Used to implement the AllNotesOff function needed to clear all active notes
+// when changing Octaves.
+u8 noteOnNumbersList[PEDALS_NOTE_ON_LIST_MAX];
 
 /////////////////////////////////////////////////////////////////////////////
 // Local Prototypes
@@ -63,6 +69,7 @@ int PEDALS_GetVelocity(u16 delay, u16 delay_slowest, u16 delay_fastest);
 s32 PEDALS_SendNote(u8 note_number, u8 velocity, u8 released);
 u8 PEDALS_ComputeNoteNumber(u8 pedalNum);
 void PEDALS_PersistData();
+void PEDALS_SendAllNotesOff();
 
 /////////////////////////////////////////////////////////////////////////////
 // Initialize the pedal handler
@@ -115,6 +122,10 @@ void PEDALS_Init() {
       if (valid < 0) {
          DEBUG_MSG("PEDALS_Init:  Error persisting setting to EEPROM");
       }
+   }
+   // Clear all note ons to off with a 0 note number
+   for (int i = 0;i < PEDALS_NOTE_ON_LIST_MAX;i++) {
+      noteOnNumbersList[i] = 0;
    }
 }
 
@@ -250,6 +261,13 @@ s32 PEDALS_SendNote(u8 note_number, u8 velocity, u8 pressed) {
             MIOS32_MIDI_SendNoteOff(port, pc->midi_chn - 1, sent_note, velocity);
             // and directly to arpeggiator
             ARP_NotifyNoteOff(note_number);
+            // Clear from the internal noteOnNumbers list
+            for (int i = 0;i < PEDALS_NOTE_ON_LIST_MAX;i++) {
+               if (noteOnNumbersList[i] == sent_note) {
+                  noteOnNumbersList[i] = 0;
+                  break;
+               }
+            }
          }
          else {
             u8 scaledVelocity = PEDALS_ScaleVelocity(velocity, PEDALS_GetVolume());
@@ -260,11 +278,29 @@ s32 PEDALS_SendNote(u8 note_number, u8 velocity, u8 pressed) {
             MIOS32_MIDI_SendNoteOn(port, pc->midi_chn - 1, sent_note, scaledVelocity);
             // and directly to arpeggiator
             ARP_NotifyNoteOn(note_number, velocity);
+            // Add to the internal noteOnNumbers list
+            for (int i = 0;i < PEDALS_NOTE_ON_LIST_MAX;i++) {
+               if (noteOnNumbersList[i] == 0) {
+                  noteOnNumbersList[i] = sent_note;
+                  break;
+               }
+            }
          }
       }
    }
 
    return 0; // no error
+}
+/////////////////////////////////////////////////////////////////////////////
+// Help function to send NoteOff for each action NoteOn.  
+// Used to send Offs when changing Octaves
+/////////////////////////////////////////////////////////////////////////////
+void PEDALS_SendAllNotesOff() {
+   for (int i = 0;i < PEDALS_NOTE_ON_LIST_MAX;i++) {
+      if (noteOnNumbersList[i] != 0) {
+         PEDALS_SendNote(noteOnNumbersList[i],pedal_config.minimum_release_velocity,0);
+      }
+   }
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -298,6 +334,9 @@ void PEDALS_SetOctave(u8 octave) {
       return;
    }
    if (pedal_config.octave != octave) {
+      // Shut off any On notes or they will hange
+      PEDALS_SendAllNotesOff();
+      
       pedal_config.octave = octave;
       PEDALS_PersistData();
       // Notify HMI of the change

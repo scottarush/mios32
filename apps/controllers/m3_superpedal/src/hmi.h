@@ -34,10 +34,9 @@ typedef enum {
    TOE_SWITCH_VOLUME = 1,
    TOE_SWITCH_VOICE_PRESETS = 2,
    TOE_SWITCH_PATTERN_PRESETS = 3,
-   TOE_SWITCH_ARP_PRESETS = 4,
-   TOE_SWITCH_ARP_LIVE = 5
+   TOE_SWITCH_ARP_LIVE = 4
 } toeSwitchMode_t;
-#define NUM_TOE_SWITCH_MODES 6
+#define NUM_TOE_SWITCH_MODES 5
 
 typedef struct {
    // First 4 bytes must be serialization version ID.  Big-ended order
