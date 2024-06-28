@@ -49,6 +49,9 @@ static u8 arp_counter;
 // pause mode (will be controlled from user interface)
 static u8 arpPause = 0;
 
+// Enables/disables arpeggiator.
+static u8 arpEnabled = 0;
+
 // notestack
 static notestack_t notestack;
 static notestack_item_t notestack_items[NOTESTACK_SIZE];
@@ -94,16 +97,22 @@ s32 ARP_Init(u32 mode)
    SEQ_BPM_PPQN_Set(arpSettings.ppqn);
    SEQ_BPM_Set(arpSettings.bpm);
 
+   // Disabled by default. HMI must turn it on.
+   arpEnabled = 0;
+
    return 0; // no error
 }
 
 
 /////////////////////////////////////////////////////////////////////////////
-// this  handler is called periodically to check for new requests
-// from BPM generator
+// this  handler is called periodically from the TASK_ARP in app.c
+// to check for new requests from BPM generator.
 /////////////////////////////////////////////////////////////////////////////
 s32 ARP_Handler(void)
 {
+   if (arpEnabled == 0){
+      return 0;
+   }
    // handle requests
 
    u8 num_loops = 0;
@@ -278,3 +287,26 @@ arp_gen_mode_type_t ARP_GetArpGenMode() {
    return arpSettings.genMode;
 }
 
+/////////////////////////////////////////////////////////////////////////////
+// Enables/Disables Arpeggiator.
+/////////////////////////////////////////////////////////////////////////////
+void ARP_SetEnabled(u8 enabled){
+   if (arpEnabled == 0){
+      if (enabled){
+         arpEnabled = 1;
+         ARP_Reset();
+      }
+   }
+   else{
+      // Disable Arp
+      arpEnabled = 0;
+      // Play Off Events to release all the notes
+      ARP_PlayOffEvents();
+   }
+}
+/////////////////////////////////////////////////////////////////////////////
+// Returrns enabled/disable state of Arpeggiator
+/////////////////////////////////////////////////////////////////////////////
+u8 ARP_GetEnabled(){
+   return arpEnabled;
+}

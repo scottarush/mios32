@@ -33,6 +33,18 @@
 extern "C" {
 #endif
 
+// this mutex should be used by all tasks which are accessing the SD Card
+#ifdef MIOS32_FAMILY_EMULATION
+  extern void TASKS_SDCardSemaphoreTake(void);
+  extern void TASKS_SDCardSemaphoreGive(void);
+# define MUTEX_SDCARD_TAKE { TASKS_SDCardSemaphoreTake(); }
+# define MUTEX_SDCARD_GIVE { TASKS_SDCardSemaphoreGive(); }
+#else
+  extern xSemaphoreHandle xSDCardSemaphore;
+# define MUTEX_SDCARD_TAKE { while( xSemaphoreTakeRecursive(xSDCardSemaphore, (portTickType)1) != pdTRUE ); }
+# define MUTEX_SDCARD_GIVE { xSemaphoreGiveRecursive(xSDCardSemaphore); }
+#endif
+
 // MIDI IN handler
 #ifdef MIOS32_FAMILY_EMULATION
   extern void TASKS_MIDIINSemaphoreTake(void);

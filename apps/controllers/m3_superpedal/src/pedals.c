@@ -1,10 +1,10 @@
 /*
  * ==========================================================================
  *  M3 Pedal handler.
- *   
+ *
  *  Implements the MIDI pedal functionality.
  *  Abstracted pedal and make switch inputs are received from app.c.
- * 
+ *
  *  Copyright (C) 2024 Scott Rush
  *  Licensed for personal non-commercial use only.
  *  All other rights reserved.
@@ -17,9 +17,11 @@
  /////////////////////////////////////////////////////////////////////////////
 #include <mios32.h>
 #include <string.h>
-#include "pedals.h"
 
+#include "arp.h"
+#include "pedals.h"
 #include "persist.h"
+
 
 /////////////////////////////////////////////////////////////////////////////
 // Local defines
@@ -110,7 +112,7 @@ void PEDALS_Init() {
       lastPressVelocity = 127;
 
       valid = PERSIST_StoreBlock(PERSIST_PEDALS_BLOCK, (unsigned char*)&pedal_config, sizeof(pedal_config));
-      if (valid < 0){
+      if (valid < 0) {
          DEBUG_MSG("PEDALS_Init:  Error persisting setting to EEPROM");
       }
    }
@@ -146,17 +148,17 @@ void PEDALS_NotifyMakeChange(u8 pressed, u32 timestamp) {
       // A press was active compute velocity
       u32 delta = timestamp - pendingPedalTimestamp;
       u16 delay = (u16)delta;
-      
+
       // compute velocity for press
       u16 delayFastest = pc->delay_fastest;
       u16 delaySlowest = pc->delay_slowest;
-      if ((pendingPedalNum == 2) || (pendingPedalNum ==4) || (pendingPedalNum == 7) || (pendingPedalNum ==9) || (pendingPedalNum == 11)){
+      if ((pendingPedalNum == 2) || (pendingPedalNum == 4) || (pendingPedalNum == 7) || (pendingPedalNum == 9) || (pendingPedalNum == 11)) {
          delayFastest = pc->delay_fastest_black_pedals;
          delaySlowest = pc->delay_slowest_black_pedals;
       }
-      
+
       lastPressVelocity = PEDALS_GetVelocity(delay, delaySlowest, delayFastest);
-      if (lastPressVelocity < pc->minimum_press_velocity){
+      if (lastPressVelocity < pc->minimum_press_velocity) {
          lastPressVelocity = pc->minimum_press_velocity;
       }
       //DEBUG_MSG("press delay=%d velocity=%d",delay,lastPressVelocity);
@@ -191,9 +193,9 @@ void PEDALS_NotifyChange(u8 pedalNum, u8 pressed, u32 timestamp) {
       // This is a release.  compute release velocity using make release timestamp;
       u32 delta = timestamp - makeReleaseTimestamp;
       u16 delay = (u16)delta;
-      
+
       u8 velocity = PEDALS_GetVelocity(delay, pc->delay_release_slowest, pc->delay_release_fastest);
-      if (velocity < pc->minimum_release_velocity){
+      if (velocity < pc->minimum_release_velocity) {
          velocity = pc->minimum_release_velocity;
       }
       //DEBUG_MSG("release delay=%d velocity=%d",delay,velocity);
@@ -243,14 +245,21 @@ s32 PEDALS_SendNote(u8 note_number, u8 velocity, u8 pressed) {
          mios32_midi_port_t port = 0x10 + ((i & 0xc) << 2) + (i & 3);
 
          //DEBUG_MSG("midi tx:  port=0x%x",port);
-         if (!pressed)
+         if (!pressed) {
+            // Send to OS
             MIOS32_MIDI_SendNoteOff(port, pc->midi_chn - 1, sent_note, velocity);
-         else{
-            u8 scaledVelocity = PEDALS_ScaleVelocity(velocity,PEDALS_GetVolume());
+            // and directly to arpeggiator
+            ARP_NotifyNoteOff(note_number);
+         }
+         else {
+            u8 scaledVelocity = PEDALS_ScaleVelocity(velocity, PEDALS_GetVolume());
 #ifdef DEBUG_ENABLED
-            DEBUG_MSG("PEDALS_SendNote: velocity=%d scaledVelocity=%d",velocity,scaledVelocity);
+            DEBUG_MSG("PEDALS_SendNote: velocity=%d scaledVelocity=%d", velocity, scaledVelocity);
 #endif      
+            // Send to OS
             MIOS32_MIDI_SendNoteOn(port, pc->midi_chn - 1, sent_note, scaledVelocity);
+            // and directly to arpeggiator
+            ARP_NotifyNoteOn(note_number, velocity);
          }
       }
    }
@@ -283,12 +292,12 @@ int PEDALS_GetVelocity(u16 delay, u16 delay_slowest, u16 delay_fastest) {
 // octave:  MIDI octave from 0 to 7.
 // On change the persisted data will automatically be updated.
 /////////////////////////////////////////////////////////////////////////////
-void PEDALS_SetOctave(u8 octave){
-   if (octave > 7){
-      DEBUG_MSG("Invalid octave number=%d",octave);
+void PEDALS_SetOctave(u8 octave) {
+   if (octave > 7) {
+      DEBUG_MSG("Invalid octave number=%d", octave);
       return;
    }
-   if (pedal_config.octave != octave){
+   if (pedal_config.octave != octave) {
       pedal_config.octave = octave;
       PEDALS_PersistData();
       // Notify HMI of the change
@@ -300,7 +309,7 @@ void PEDALS_SetOctave(u8 octave){
 // API to get the current octave
 // returns octave from 0 to 7
 /////////////////////////////////////////////////////////////////////////////
-u8 PEDALS_GetOctave(){
+u8 PEDALS_GetOctave() {
    return pedal_config.octave;
 }
 
@@ -309,8 +318,8 @@ u8 PEDALS_GetOctave(){
 // The E2 block will be updated automatically on change.
 // volumeLevel:  from 1 to PEDALS_MAX_VOLUME
 /////////////////////////////////////////////////////////////////////////////
-void PEDALS_SetVolume(u8 volumeLevel){
-   if (pedal_config.volumeLevel != volumeLevel){
+void PEDALS_SetVolume(u8 volumeLevel) {
+   if (pedal_config.volumeLevel != volumeLevel) {
       pedal_config.volumeLevel = volumeLevel;
       PEDALS_PersistData();
    }
@@ -320,7 +329,7 @@ void PEDALS_SetVolume(u8 volumeLevel){
 // API to get the current volume level
 // volume:  volume scaling level from 1 to PEDALS_MAX_VOLUME
 /////////////////////////////////////////////////////////////////////////////
-u8 PEDALS_GetVolume(){
+u8 PEDALS_GetVolume() {
    return pedal_config.volumeLevel;
 }
 
@@ -328,14 +337,14 @@ u8 PEDALS_GetVolume(){
 /////////////////////////////////////////////////////////////////////////////
 // Global function to store persisted pedal data 
 /////////////////////////////////////////////////////////////////////////////
-void PEDALS_PersistData(){
-   #ifdef DEBUG_ENABLED
-      DEBUG_MSG("MIDI_PRESETS_PersistData: Writing persisted data:  sizeof(presets)=%d bytes",sizeof(persisted_pedal_confg_t));
-   #endif
-   s32 valid =PERSIST_StoreBlock(PERSIST_PEDALS_BLOCK, (unsigned char*)&pedal_config, sizeof(pedal_config));
-      if (valid < 0){
-         DEBUG_MSG("PEDALS_PersistData:  Error persisting setting to EEPROM");
-      }
+void PEDALS_PersistData() {
+#ifdef DEBUG_ENABLED
+   DEBUG_MSG("MIDI_PRESETS_PersistData: Writing persisted data:  sizeof(presets)=%d bytes", sizeof(persisted_pedal_confg_t));
+#endif
+   s32 valid = PERSIST_StoreBlock(PERSIST_PEDALS_BLOCK, (unsigned char*)&pedal_config, sizeof(pedal_config));
+   if (valid < 0) {
+      DEBUG_MSG("PEDALS_PersistData:  Error persisting setting to EEPROM");
+   }
    return;
 }
 
@@ -344,13 +353,13 @@ void PEDALS_PersistData(){
 // volumeLevel:  level from 1 to PEDALS_MAX_VOLUME
 // returns:  scaled velocity
 /////////////////////////////////////////////////////////////////////////////
-u8 PEDALS_ScaleVelocity(u8 velocity,u8 volumeLevel){
+u8 PEDALS_ScaleVelocity(u8 velocity, u8 volumeLevel) {
 
-   u32 scaledVelocity = (volumeLevel * velocity)/PEDALS_MAX_VOLUME;
-   if (scaledVelocity < 1){
+   u32 scaledVelocity = (volumeLevel * velocity) / PEDALS_MAX_VOLUME;
+   if (scaledVelocity < 1) {
       scaledVelocity = 1;
    }
-   else if (scaledVelocity > 127){
+   else if (scaledVelocity > 127) {
       scaledVelocity = 127;
    }
    return (u8)scaledVelocity;

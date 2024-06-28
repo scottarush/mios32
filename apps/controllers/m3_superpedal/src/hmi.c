@@ -20,6 +20,7 @@
 #include <stdio.h>
 
 #include "hmi.h"
+#include "arp.h"
 #include "pedals.h"
 #include "midi_presets.h"
 #include "indicators.h"
@@ -44,7 +45,7 @@
 // Display page variables
 /////////////////////////////////////////////////////////////////////////////
 
-typedef enum {
+typedef enum pageID_e {
    PAGE_HOME = 0,
    PAGE_MAIN_MENU = 1,
    PAGE_EDIT_VOICE_PRESET = 2,
@@ -66,13 +67,14 @@ struct page_s {
 
 struct page_s homePage;
 struct page_s midiProgramSelectPage;
+struct page_s arpLivePage;
 
 struct page_s* currentPage;
 struct page_s* lastPage;
 
 // Main Page variables
 struct page_s mainPage;
-typedef enum {
+typedef enum main_page_entries_e {
    MAIN_PAGE_ENTRY_EDIT_TOE_MIDI_PRESET = 0,
    MAIN_PAGE_ENTRY_EDIT_TOE_PATTERN_PRESET = 1,
    MAIN_PAGE_ENTRY_EDIT_STOMP_SWITCH = 2
@@ -84,7 +86,7 @@ u8 lastSelectedMainPageEntry;
 
 // Edit Voice Preset page variables
 struct page_s editVoicePresetPage;
-typedef enum {
+typedef enum edit_voice_preset_page_entries_e {
    EDIT_VOICE_PRESET_PAGE_ENTRY_PROGRAM_NUMBER = 0,
    EDIT_VOICE_PRESET_PAGE_ENTRY_OCTAVE = 1,
    EDIT_VOICE_PRESET_PAGE_ENTRY_MIDI_OUTPUT = 2,
@@ -98,7 +100,7 @@ u8 lastSelectedEditVoicePresetPageEntry;
 // Edit Pattern Preset page variables
 struct page_s editPatternPresetPage;
 
-typedef enum {
+typedef enum render_line_mode_e {
    RENDER_LINE_LEFT = 0,
    RENDER_LINE_CENTER = 1,
    RENDER_LINE_SELECT = 2,
@@ -111,7 +113,7 @@ typedef enum {
 
 // Total list of functions availabe in ARP Live mode.  Can be mapped to toe switches
 // in preesets
-typedef enum {
+typedef enum arp_live_toe_functions_e {
    ARP_LIVE_TOE_MAJOR_KEY = 0,
    ARP_LIVE_TOE_MINOR_KEY = 1,
    ARP_LIVE_TOE_ASCENDING = 2,
@@ -319,6 +321,7 @@ void HMI_InitPages() {
    midiProgramSelectPage.pPedalSelectedCallback = NULL;
    midiProgramSelectPage.pBackButtonCallback = HMI_MIDIProgramSelectPage_BackButtonCallback;
    midiProgramSelectPage.pBackPage = &editVoicePresetPage;
+
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -368,8 +371,8 @@ void HMI_NotifyToeToggle(u8 toeNum, u8 pressed, s32 timestamp) {
       u8 volumeLevel = toeVolumeLevels[toeNum - 1];
       // Set the volume in PEDALS
       PEDALS_SetVolume(volumeLevel);
-      // Save the selected change using GetVolume to close loop
-      hmiSettings.selectedToeIndicator[TOE_SWITCH_VOLUME] = PEDALS_GetVolume() + 1;
+      // Save the selected to indicator change
+      hmiSettings.selectedToeIndicator[TOE_SWITCH_VOLUME] = toeNum;
       // Persist the updated volume indicator setting
       HMI_PersistData();
       // Clear the indicators to turn off the current one (if any)
@@ -456,11 +459,27 @@ void HMI_NotifyStompToggle(u8 stompNum, u8 pressed, s32 timestamp) {
       hmiSettings.toeSwitchMode = TOE_SWITCH_PATTERN_PRESETS;
       break;
    case STOMP_SWITCH_ARPEGGIATOR:
-      hmiSettings.toeSwitchMode = TOE_SWITCH_ARP_LIVE;
+      if (hmiSettings.toeSwitchMode == TOE_SWITCH_ARP_LIVE){
+         // This is a second press so toggle the state of the Arpeggiator
+         if (ARP_GetEnabled() == 0){
+            // Turn on the Arpeggiator
+            ARP_SetEnabled(1);
+         }
+         else {
+            // Turn it off
+            ARP_SetEnabled(0);
+         }
+      }
+      else{
+         // This is a first press, so just got to the page
+         hmiSettings.toeSwitchMode = TOE_SWITCH_ARP_LIVE;
+      }
       // Call dedicated function to set the indicators to the ARP settings since multiple
       // indicators can be set in this mode.
       HMI_SetArpSettingsIndicators();
-      break;
+      // And update the current page display
+      currentPage->pUpdateDisplayCallback();
+      return;
    case STOMP_SWITCH_VOLUME:
       hmiSettings.toeSwitchMode = TOE_SWITCH_VOLUME;
       break;
@@ -471,6 +490,7 @@ void HMI_NotifyStompToggle(u8 stompNum, u8 pressed, s32 timestamp) {
    }
    // Update the toe switch indicators and the display in case the mode changed.
    IND_ClearAll();
+   DEBUG_MSG("mode=%d",hmiSettings.selectedToeIndicator[hmiSettings.toeSwitchMode]);
    IND_SetIndicatorState(hmiSettings.selectedToeIndicator[hmiSettings.toeSwitchMode], IND_ON);
    // And update the current page display
    currentPage->pUpdateDisplayCallback();
@@ -713,8 +733,16 @@ void HMI_HomePage_UpdateDisplay() {
       }
       break;
    case TOE_SWITCH_PATTERN_PRESETS:
-      // TODO
       HMI_ClearLine(2);
+      break;
+   case TOE_SWITCH_ARP_LIVE:
+      // Arpeggiator state in Line 2
+      if (ARP_GetEnabled()){
+         HMI_RenderLine(2,"Arp Running",RENDER_LINE_CENTER);
+      }
+      else{
+         HMI_RenderLine(2,"Arp Disabled",RENDER_LINE_CENTER);         
+      }
       break;
    default:
 #ifdef DEBUG
@@ -982,6 +1010,19 @@ void HMI_MIDIProgramSelectPage_BackButtonCallback(){
 
 
 /////////////////////////////////////////////////////////////////////////////
+// Sets/updates the indicators for the current ARP_LIVE mode
+/////////////////////////////////////////////////////////////////////////////
+void HMI_SetArpSettingsIndicators(){
+   IND_ClearAll();
+   if (ARP_GetEnabled() == 0){
+      return;  // Arp is disabled so leave all the indicators off
+   }
+   // Else, synch the indicators to the Arch state.
+   // TODO
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
 // Helper to store persisted data 
 /////////////////////////////////////////////////////////////////////////////
 void HMI_PersistData() {
@@ -1020,10 +1061,4 @@ void HMI_NotifyOctaveChange(u8 octave){
 
 }
 
-/////////////////////////////////////////////////////////////////////////////
-// Sets/updates the indicators for the current ARP_LIVE mode
-/////////////////////////////////////////////////////////////////////////////
-void HMI_SetArpSettingsIndicators(){
-   IND_ClearAll();
 
-}

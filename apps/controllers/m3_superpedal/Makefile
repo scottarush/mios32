@@ -21,9 +21,13 @@ THUMB_SOURCE    = src/app.c \
 		  src/indicators.c \
 		  src/hmi.c \
 		  src/midi_presets.c\
-                  src/persist.c\
+        src/persist.c\
 		  src/terminal.c\
-		  src/shell.c 
+		  src/shell.c \
+		  src/arp.c \
+		  src/mid_file.c \
+		  src/midio_file.c \
+		  src/seq.c
 
 #  (following source stubs not relevant for Cortex M3 derivatives)
 THUMB_AS_SOURCE =
@@ -73,6 +77,27 @@ include $(MIOS32_PATH)/modules/uip_task_standard/uip_task_standard.mk
 
 # EEPROM emulation
 include $(MIOS32_PATH)/modules/eeprom/eeprom.mk
+
+# Notestack functions for arpeggiator/sequencer
+include $(MIOS32_PATH)/modules/notestack/notestack.mk
+
+# generic sequencer modules for arpeggiator
+include $(MIOS32_PATH)/modules/sequencer/sequencer.mk
+
+# MIDI file Player
+include $(MIOS32_PATH)/modules/midifile/midifile.mk
+
+# FATFS Driver
+include $(MIOS32_PATH)/modules/fatfs/fatfs.mk
+
+# FILE Access Layer
+include $(MIOS32_PATH)/modules/file/file.mk
+
+# Portable randomize module
+include $(MIOS32_PATH)/modules/random/random.mk
+
+# USB Mass Storage Device Driver
+include $(MIOS32_PATH)/modules/msd/msd.mk
 
 # common make rules
 # Please keep this include statement at the end of this Makefile. Add new modules above.

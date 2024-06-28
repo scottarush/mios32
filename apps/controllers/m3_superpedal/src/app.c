@@ -14,12 +14,11 @@
  /////////////////////////////////////////////////////////////////////////////
 
 #include <mios32.h>
-
 #include <eeprom.h>
-
 #include <FreeRTOS.h>
 #include <task.h>
 #include <queue.h>
+#include <msd.h>
 
 #include <midi_port.h>
 #include <midi_router.h>
@@ -28,7 +27,11 @@
 #include <seq_bpm.h>
 #include <seq_midi_out.h>
 
+#include <mid_parser.h>
 
+#include "mid_file.h"
+#include "midio_file.h"
+#include "file.h"
 #include "arp.h"
 #include "app.h"
 #include "hmi.h"
@@ -37,14 +40,15 @@
 #include "midi_presets.h"
 #include "persist.h"
 
+#include "seq.h"
+
 #include "terminal.h"
 #include "tasks.h"
-#include "uip_task.h"
 #include "osc_client.h"
 
 
 /////////////////////////////////////////////////////////////////////////////
-// Local defines
+// Local defines and types
 /////////////////////////////////////////////////////////////////////////////
 
 #define DEBUG_MSG MIOS32_MIDI_SendDebugMessage
@@ -52,28 +56,52 @@
 
 // define priority level for sequencer
 // use same priority as MIOS32 specific tasks
-#define PRIORITY_TASK_PERIOD_1mS ( tskIDLE_PRIORITY + 3 )
+#define PRIORITY_TASK_Period_1ms ( tskIDLE_PRIORITY + 3 )
 
 // Sequencer processing task.  Note that is even higher priority than MIDI receive task
-#define PRIORITY_TASK_SEQ		( tskIDLE_PRIORITY + 4 )
+#define PRIORITY_TASK_ARP		( tskIDLE_PRIORITY + 4 )
+
+// SD Card with lower priority
+#define PRIORITY_TASK_PERIOD_1mS_SD ( tskIDLE_PRIORITY + 2 )
+
+
+typedef enum {
+   MSD_DISABLED,
+   MSD_INIT,
+   MSD_READY,
+   MSD_SHUTDOWN
+} msd_state_t;
 
 /////////////////////////////////////////////////////////////////////////////
 // Global variables
 /////////////////////////////////////////////////////////////////////////////
 
+// This is taken from the MIDIO128 SDCard implementation.  May not be used/neeeded here
+u8 hw_enabled;
+/////////////////////////////////////////////////////////////////////////////
+// Local variables 
+/////////////////////////////////////////////////////////////////////////////
+
+// for mutual exclusive SD Card access between different tasks
+// The mutex is handled with MUTEX_SDCARD_TAKE and MUTEX_SDCARD_GIVE
+// macros inside the application, which contain a different implementation 
+// for emulation
+xSemaphoreHandle xSDCardSemaphore;
+
 // Mutex for MIDI IN/OUT handler in modules/midi_router/midi_router.c
 xSemaphoreHandle xMIDIINSemaphore;
 xSemaphoreHandle xMIDIOUTSemaphore;
+static volatile msd_state_t msd_state;
 
 /////////////////////////////////////////////////////////////////////////////
 // Local prototypes
 /////////////////////////////////////////////////////////////////////////////
 
 // local prototype of the 1ms task function
-static void TASK_Period_1mS(void* pvParameters);
+static void TASK_Period_1ms(void* pvParameters);
 
-static void TASK_SEQ(void *pvParameters);
-
+static void TASK_ARP(void* pvParameters);
+static void TASK_Period_1mS_SD(void* pvParameters);
 
 static s32 NOTIFY_MIDI_Rx(mios32_midi_port_t port, u8 byte);
 static s32 NOTIFY_MIDI_Tx(mios32_midi_port_t port, mios32_midi_package_t package);
@@ -83,7 +111,12 @@ static s32 NOTIFY_MIDI_TimeOut(mios32_midi_port_t port);
 // This hook is called after startup to initialize the application
 /////////////////////////////////////////////////////////////////////////////
 void APP_Init(void) {
+   // hardware will be enabled once configuration has been loaded from SD Card
+   // (resp. no SD Card is available)
+   hw_enabled = 0;
+
    // create semaphores
+   xSDCardSemaphore = xSemaphoreCreateRecursiveMutex();
    xMIDIINSemaphore = xSemaphoreCreateRecursiveMutex();
    xMIDIOUTSemaphore = xSemaphoreCreateRecursiveMutex();
 
@@ -112,6 +145,16 @@ void APP_Init(void) {
    MIDI_ROUTER_Init(0);
 
 
+   // init MIDI file handler
+   MID_FILE_Init(0);
+   // init MIDI parser module
+   MID_PARSER_Init(0);
+
+   // install callback functions
+   MID_PARSER_InstallFileCallbacks(&MID_FILE_read, &MID_FILE_eof, &MID_FILE_seek);
+   // TODO:  Use the MID_PARSER to play sequences from MID files on preset
+  // MID_PARSER_InstallEventCallbacks(&SEQ_PlayEvent, &SEQ_PlayMeta);
+
    // initialize MIDI handler for Sequencer used by Arpeggiator
    SEQ_MIDI_OUT_Init(0);
 
@@ -123,9 +166,6 @@ void APP_Init(void) {
 
    // init MIDImon
    MIDIMON_Init(0);
-
-   // start uIP task
-   UIP_TASK_Init(0);
 
    // print welcome message on MIOS terminal
    MIOS32_MIDI_SendDebugMessage("\n");
@@ -151,11 +191,21 @@ void APP_Init(void) {
    // init the HMI last as it depends on above.
    HMI_Init();
 
+   // initial load of filesystem
+   s32 status = FILE_Init(0);
+   if (status != 0) {
+      DEBUG_MSG("APP_Init: FILE_Init failed with status=%d");
+   }
+
    // start 1ms task
-   xTaskCreate(TASK_Period_1mS, "1mS", configMINIMAL_STACK_SIZE, NULL, PRIORITY_TASK_PERIOD_1mS, NULL);
+   xTaskCreate(TASK_Period_1ms, "1mS", configMINIMAL_STACK_SIZE, NULL, PRIORITY_TASK_Period_1ms, NULL);
 
    // install sequencer task
-   xTaskCreate(TASK_SEQ, "SEQ", configMINIMAL_STACK_SIZE, NULL, PRIORITY_TASK_SEQ, NULL);
+   xTaskCreate(TASK_ARP, "SEQ", configMINIMAL_STACK_SIZE, NULL, PRIORITY_TASK_ARP, NULL);
+
+   // SDCard task
+   xTaskCreate(TASK_Period_1mS_SD, "1mS_SD", 2 * configMINIMAL_STACK_SIZE, NULL, PRIORITY_TASK_PERIOD_1mS_SD, NULL);
+
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -204,6 +254,9 @@ void APP_MIDI_NotifyPackage(mios32_midi_port_t port, mios32_midi_package_t midi_
    // (the SysEx stream would interfere with monitor messages)
    u8 filter_sysex_message = (port == USB0) || (port == UART0);
    MIDIMON_Receive(port, midi_package, filter_sysex_message);
+
+   // -> MIDI file recorder
+   MID_FILE_Receive(port, midi_package);
 
    //////////////////////////////////////////////////////
    // Notifications to Sequencer
@@ -387,7 +440,7 @@ void APP_ENC_NotifyChange(u32 encoder, s32 incrementer) {
 /////////////////////////////////////////////////////////////////////////////
 // This task is called periodically every 1 ms to update the HMI state
 /////////////////////////////////////////////////////////////////////////////
-static void TASK_Period_1mS(void* pvParameters) {
+static void TASK_Period_1ms(void* pvParameters) {
    portTickType xLastExecutionTime;
 
    // Initialise the xLastExecutionTime variable on task entry
@@ -410,7 +463,7 @@ static void TASK_Period_1mS(void* pvParameters) {
 /////////////////////////////////////////////////////////////////////////////
 // This task is called periodically each mS to handle arpeggiator requests
 /////////////////////////////////////////////////////////////////////////////
-static void TASK_SEQ(void* pvParameters)
+static void TASK_ARP(void* pvParameters)
 {
    portTickType xLastExecutionTime;
 
@@ -426,6 +479,115 @@ static void TASK_SEQ(void* pvParameters)
       // send timestamped MIDI events
       SEQ_MIDI_OUT_Handler();
    }
+}
+/////////////////////////////////////////////////////////////////////////////
+// This task handles the SD Card
+/////////////////////////////////////////////////////////////////////////////
+static void TASK_Period_1mS_SD(void* pvParameters)
+{
+   const u16 sdcard_check_delay = 1000;
+   u16 sdcard_check_ctr = 0;
+   u8 lun_available = 0;
+
+   while (1) {
+      vTaskDelay(1 / portTICK_RATE_MS);
+
+      // each second: check if SD Card (still) available
+      if (msd_state == MSD_DISABLED && ++sdcard_check_ctr >= sdcard_check_delay) {
+         sdcard_check_ctr = 0;
+
+         MUTEX_SDCARD_TAKE;
+         s32 status = FILE_CheckSDCard();
+
+         if (status == 1) {
+            DEBUG_MSG("SD Card connected: %s\n", FILE_VolumeLabel());
+
+            // stop sequencer
+            SEQ_BPM_Stop();
+
+            // load all file infos
+            MIDIO_FILE_LoadAllFiles(1); // including HW info
+
+            // immediately go to next step
+            sdcard_check_ctr = sdcard_check_delay;
+         }
+         else if (status == 2) {
+            DEBUG_MSG("SD Card disconnected\n");
+            // invalidate all file infos
+            MIDIO_FILE_UnloadAllFiles();
+
+            // stop sequencer
+            SEQ_BPM_Stop();
+
+            // change status
+            MIDIO_FILE_StatusMsgSet("No SD Card");
+         }
+         else if (status == 3) {
+            if (!FILE_SDCardAvailable()) {
+               DEBUG_MSG("SD Card not found\n");
+               MIDIO_FILE_StatusMsgSet("No SD Card");
+            }
+            else if (!FILE_VolumeAvailable()) {
+               DEBUG_MSG("ERROR: SD Card contains invalid FAT!\n");
+               MIDIO_FILE_StatusMsgSet("No FAT");
+            }
+            else {
+               // create the default files if they don't exist on SD Card
+               MIDIO_FILE_CreateDefaultFiles();
+
+               // load first MIDI file
+               MID_FILE_UI_NameClear();
+               SEQ_SetPauseMode(1);
+               // TODO:  Need to pull in the sequence play function
+               SEQ_PlayFileReq(0, 1);
+            }
+
+            hw_enabled = 1; // enable hardware after first read...
+         }
+
+         MUTEX_SDCARD_GIVE;
+      }
+
+      // MSD driver
+      if (msd_state != MSD_DISABLED) {
+         MUTEX_SDCARD_TAKE;
+
+         switch (msd_state) {
+         case MSD_SHUTDOWN:
+            // switch back to USB MIDI
+            MIOS32_USB_Init(1);
+            msd_state = MSD_DISABLED;
+            break;
+
+         case MSD_INIT:
+            // LUN not mounted yet
+            lun_available = 0;
+
+            // enable MSD USB driver
+            //MUTEX_J16_TAKE;
+            if (MSD_Init(0) >= 0)
+               msd_state = MSD_READY;
+            else
+               msd_state = MSD_SHUTDOWN;
+            //MUTEX_J16_GIVE;
+            break;
+
+         case MSD_READY:
+            // service MSD USB driver
+            MSD_Periodic_mS();
+
+            // this mechanism shuts down the MSD driver if SD card has been unmounted by OS
+            if (lun_available && !MSD_LUN_AvailableGet(0))
+               msd_state = MSD_SHUTDOWN;
+            else if (!lun_available && MSD_LUN_AvailableGet(0))
+               lun_available = 1;
+            break;
+         }
+
+         MUTEX_SDCARD_GIVE;
+      }
+   }
+
 }
 
 /////////////////////////////////////////////////////////////////////////////
