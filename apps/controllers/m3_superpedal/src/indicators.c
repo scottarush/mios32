@@ -22,15 +22,11 @@
 
 #define NUM_LED_INDICATORS 8
 
-#define FLASH_FAST_TIME_MS 75;
-#define FLASH_SLOW_TIME_MS 500;
+#define FLASH_FAST_FREQ 5
+#define FLASH_SLOW_FREQ 2
 
-
-/////////////////////////////////////////////////////////////////////////////
-// Local prototypes
-/////////////////////////////////////////////////////////////////////////////
-u8 IND_GetLEDPin(u8 indicatorNum);
-
+#define DEFAULT_FLASH_BLIP_FREQ 2
+#define FLASH_BLIP_PERCENT_DUTY_CYCLE 10
 
 /////////////////////////////////////////////////////////////////////////////
 // Local types
@@ -39,7 +35,7 @@ u8 IND_GetLEDPin(u8 indicatorNum);
 /**
  * Total indicator state is represented by the following struct.
 */
-typedef struct {
+typedef struct indicator_fullstate_s {
    indicator_state_t state;
    /*
    * state transitions to target_state after timer_ms expires
@@ -55,10 +51,26 @@ typedef struct {
    */
    u8 outputState;
    /**
-    * flash timer in ms.  Upon expiration, switch to opposite state and reset.
+    * current flash timer.  Set to 0 if not enabled.
+    * 32 bits for intermediate precision needed in update function.
    */
-   u16 flash_timer_ms;
+   u32 flash_timer_ms;
+   /**
+    * flash timer freq in Hz
+   */
+   u8 flash_timer_freq;
+   /*
+   * flash_timer_duty_cycle_percent
+   */
+   u8 flash_timer_duty_cycle_percent;
 } indicator_fullstate_t;
+
+
+/////////////////////////////////////////////////////////////////////////////
+// Local prototypes
+/////////////////////////////////////////////////////////////////////////////
+u8 IND_GetLEDPin(u8 indicatorNum);
+void IND_UpdateFlashTimer(indicator_fullstate_t* ptr);
 
 /////////////////////////////////////////////////////////////////////////////
 // Local variables
@@ -80,6 +92,9 @@ void IND_Init() {
       ptr->target_state = IND_OFF;
       ptr->outputState = 0;
       ptr->flash_timer_ms = 0;
+      ptr->flash_timer_freq = 1;  // dummy.  Just don't set to zero
+      ptr->flash_timer_duty_cycle_percent = 100;
+
    }
    // Set all LEDs to off in the upper 8 bits of J10.
    MIOS32_BOARD_J10_Set(0);
@@ -91,27 +106,10 @@ void IND_Init() {
 void IND_1msTick() {
    for (int i = 0;i < NUM_LED_INDICATORS;i++) {
       indicator_fullstate_t* ptr = &indicator_states[i];
-      // For flashing states, process the flash      
-      if (ptr->state == IND_FLASH_FAST) {
-         if (ptr->flash_timer_ms == 1) {
-            ptr->flash_timer_ms = FLASH_FAST_TIME_MS;
-            ptr->outputState = (ptr->outputState == 0) ? 1 : 0;
-         }
-         else {
-            ptr->flash_timer_ms--;
-         }
-      }
-      // For flashing states, process the flash      
-      else if (ptr->state == IND_FLASH_SLOW) {
-         if (ptr->flash_timer_ms == 1) {
-            ptr->flash_timer_ms = FLASH_SLOW_TIME_MS;
-            ptr->outputState = (ptr->outputState == 0) ? 1 : 0;
-         }
-         else {
-            ptr->flash_timer_ms--;
-         }
-      }
-      // Now process the temporary timer.
+
+      IND_UpdateFlashTimer(ptr);
+
+      // Now process the temporary state timer.
       if (ptr->timer_ms == 1) {
          // This is a temp state and the timer just expired.
          ptr->timer_ms = 0;
@@ -129,6 +127,33 @@ void IND_1msTick() {
 }
 
 ///////////////////////////////////////////////////////////////////////////
+// Helper to set the flash timer
+///////////////////////////////////////////////////////////////////////////
+void IND_UpdateFlashTimer(indicator_fullstate_t* ptr) {
+   if ((ptr->state == IND_ON) || (ptr->state = IND_OFF)) {
+      return;
+   }
+   // Otherwise it's a flashing state
+   if (ptr->flash_timer_ms == 1) {
+      // Timer expired.  Reset to new value base on outputState
+      if (ptr->outputState == 0) {
+         // Transition to the on state
+         ptr->outputState = 1;
+         ptr->flash_timer_ms = (1000 * ptr->flash_timer_duty_cycle_percent) / ptr->flash_timer_freq / 100;
+
+      }
+      else {
+         // Transition to the off state
+         ptr->outputState = 0;
+         ptr->flash_timer_ms = (1000 * (100 - ptr->flash_timer_duty_cycle_percent)) / ptr->flash_timer_freq / 100;;
+      }
+   }
+   else {
+      // Otherwise timer not expired so just update it
+      ptr->flash_timer_ms--;
+   }
+}
+///////////////////////////////////////////////////////////////////////////
 // Sets all Indicators to Off.
 ///////////////////////////////////////////////////////////////////////////
 void IND_ClearAll() {
@@ -139,6 +164,8 @@ void IND_ClearAll() {
       ptr->target_state = IND_OFF;
       ptr->outputState = 0;
       ptr->flash_timer_ms = 0;
+      ptr->flash_timer_freq = 1;
+      ptr->flash_timer_duty_cycle_percent = 100;
    }
    MIOS32_BOARD_J10_Set(0);
 }
@@ -150,14 +177,22 @@ void IND_ClearAll() {
 void IND_FlashAll(u8 flashFast) {
    for (int i = 0;i < NUM_LED_INDICATORS;i++) {
       indicator_fullstate_t* ptr = &indicator_states[i];
+      ptr->flash_timer_duty_cycle_percent = 50;
+
       if (flashFast) {
          ptr->state = IND_FLASH_FAST;
-         ptr->flash_timer_ms = FLASH_FAST_TIME_MS;
+         ptr->flash_timer_freq = FLASH_FAST_FREQ;
       }
       else {
          ptr->state = IND_FLASH_SLOW;
-         ptr->flash_timer_ms = FLASH_SLOW_TIME_MS;
+         ptr->flash_timer_freq = FLASH_SLOW_FREQ;
       }
+      // Set output state to off and expire flash timer, then use IND_UpdateFlashTimer to
+      // set the actual flash timer
+      ptr->outputState = 0;
+      ptr->flash_timer_ms = 1;
+      IND_UpdateFlashTimer(ptr);
+      // Clear the temporary timer
       ptr->timer_ms = 0;
       ptr->target_state = IND_OFF;
       ptr->outputState = 1;
@@ -185,20 +220,33 @@ void IND_SetIndicatorState(u8 indicatorNum, indicator_state_t state) {
    // set the output pin and init the flash timer
    switch (ptr->state) {
    case IND_FLASH_FAST:
-      ptr->flash_timer_ms = FLASH_FAST_TIME_MS;
-      ptr->outputState = 1;
+      ptr->flash_timer_freq = FLASH_FAST_FREQ;
+      ptr->flash_timer_duty_cycle_percent = 50;
+      ptr->outputState = 0;  
       break;
    case IND_FLASH_SLOW:
-      ptr->flash_timer_ms = FLASH_SLOW_TIME_MS;
-      ptr->outputState = 1;
+      ptr->flash_timer_freq = FLASH_SLOW_FREQ;
+      ptr->flash_timer_duty_cycle_percent = 50;
       break;
    case IND_ON:
       ptr->outputState = 1;
+      break;
+   case IND_FLASH_BLIP:
+      ptr->flash_timer_freq = DEFAULT_FLASH_BLIP_FREQ;
+      ptr->flash_timer_duty_cycle_percent = FLASH_BLIP_PERCENT_DUTY_CYCLE;
+      break;
+   case IND_FLASH_INVERSE_BLIP:
+      ptr->flash_timer_freq = DEFAULT_FLASH_BLIP_FREQ;
+      ptr->flash_timer_duty_cycle_percent = 100 - FLASH_BLIP_PERCENT_DUTY_CYCLE;
       break;
    case IND_OFF:
       ptr->outputState = 0;
       break;
    }
+   // For flash modes, the outputState is set to 0.  Now expire flash timer, then use IND_UpdateFlashTimer to
+   // update the actual flash timer value.
+   ptr->flash_timer_ms = 1;
+   IND_UpdateFlashTimer(ptr);
    u8 pinNum = IND_GetLEDPin(indicatorNum);
    MIOS32_BOARD_J10_PinSet(pinNum, ptr->outputState);
 }

@@ -24,8 +24,11 @@
 typedef enum {
    IND_OFF = 0,
    IND_ON = 1,
-   IND_FLASH_SLOW = 2,
-   IND_FLASH_FAST = 3
+   IND_ON_LOW = 2,
+   IND_FLASH_SLOW = 3,
+   IND_FLASH_BLIP = 4,
+   IND_FLASH_INVERSE_BLIP = 5,
+   IND_FLASH_FAST = 6,
 } indicator_state_t;
 
 /////////////////////////////////////////////////////////////////////////////

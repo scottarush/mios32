@@ -246,7 +246,7 @@ void HMI_Init(void) {
       }
    }
    // Now that settings are init'ed/restored, then synch the HMI
-   
+
    // Init the display pages now that settings are restored
    HMI_InitPages();
 
@@ -458,9 +458,9 @@ void HMI_NotifyStompToggle(u8 stompNum, u8 pressed, s32 timestamp) {
       hmiSettings.toeSwitchMode = TOE_SWITCH_PATTERN_PRESETS;
       break;
    case STOMP_SWITCH_ARPEGGIATOR:
-      if (hmiSettings.toeSwitchMode == TOE_SWITCH_ARP_LIVE){
+      if (hmiSettings.toeSwitchMode == TOE_SWITCH_ARP_LIVE) {
          // This is a second press so toggle the state of the Arpeggiator
-         if (ARP_GetEnabled() == 0){
+         if (ARP_GetEnabled() == 0) {
             // Turn on the Arpeggiator
             ARP_SetEnabled(1);
          }
@@ -469,11 +469,10 @@ void HMI_NotifyStompToggle(u8 stompNum, u8 pressed, s32 timestamp) {
             ARP_SetEnabled(0);
          }
       }
-      else{
+      else {
          // This is a first press, so just got to the page
          hmiSettings.toeSwitchMode = TOE_SWITCH_ARP_LIVE;
       }
-
       // Set to home page and clear last page
       currentPage = &homePage;
       lastPage = NULL;
@@ -488,13 +487,13 @@ void HMI_NotifyStompToggle(u8 stompNum, u8 pressed, s32 timestamp) {
    }
    // Update the toe switch indicators and the display in case the mode changed.
    IND_ClearAll();
-   DEBUG_MSG("mode=%d",hmiSettings.selectedToeIndicator[hmiSettings.toeSwitchMode]);
-   if (hmiSettings.toeSwitchMode == TOE_SWITCH_ARP_LIVE){
+   DEBUG_MSG("mode=%d", hmiSettings.selectedToeIndicator[hmiSettings.toeSwitchMode]);
+   if (hmiSettings.toeSwitchMode == TOE_SWITCH_ARP_LIVE) {
       // Call dedicated function to set the indicators to the ARP settings since multiple
       // indicators can be set in this mode.
-      HMI_SetArpSettingsIndicators();      
+      HMI_SetArpSettingsIndicators();
    }
-   else{
+   else {
       IND_SetIndicatorState(hmiSettings.selectedToeIndicator[hmiSettings.toeSwitchMode], IND_ON);
    }
    // update the current page display
@@ -609,7 +608,7 @@ void HMI_NotifyBackToggle(u8 pressed, s32 timestamp) {
    }
 
    // Otherwise, on a release, check if there is a registered handler.  If so call it 
-   if (currentPage->pBackButtonCallback != NULL){
+   if (currentPage->pBackButtonCallback != NULL) {
       currentPage->pBackButtonCallback();
    }
    // If the back page is non-null then transition to that page.
@@ -660,21 +659,21 @@ void HMI_RenderLine(u8 lineNum, const char* pLineText, render_line_mode_t render
       // Compute the number of spaces in addition to the selection marker on each end
       u8 spaceCount = 0;
       u8 leftIndent = 0;
-      if (strlen(pLineText) < (DISPLAY_CHAR_WIDTH-2)){
+      if (strlen(pLineText) < (DISPLAY_CHAR_WIDTH - 2)) {
          // At least one space to add
-         spaceCount = DISPLAY_CHAR_WIDTH-strlen(pLineText)-2;
-         leftIndent = spaceCount/2;
+         spaceCount = DISPLAY_CHAR_WIDTH - strlen(pLineText) - 2;
+         leftIndent = spaceCount / 2;
       }
       strcpy(lineBuffer, "<");
-      for(int i=0;i < leftIndent;i++){
-         strcat(lineBuffer," ");       
+      for (int i = 0;i < leftIndent;i++) {
+         strcat(lineBuffer, " ");
       }
       strncat(lineBuffer, pLineText, DISPLAY_CHAR_WIDTH - 2);
       // Compute right side spaces
       spaceCount -= leftIndent;
-      for(int i=0;i < spaceCount;i++){
-         strcat(lineBuffer," ");       
-      }      
+      for (int i = 0;i < spaceCount;i++) {
+         strcat(lineBuffer, " ");
+      }
       strcat(lineBuffer, ">");
       break;
    }
@@ -744,11 +743,11 @@ void HMI_HomePage_UpdateDisplay() {
       break;
    case TOE_SWITCH_ARP_LIVE:
       // Arpeggiator state in Line 2
-      if (ARP_GetEnabled()){
-         HMI_RenderLine(2,"Arp Running",RENDER_LINE_CENTER);
+      if (ARP_GetEnabled()) {
+         HMI_RenderLine(2, "Arp Running", RENDER_LINE_CENTER);
       }
-      else{
-         HMI_RenderLine(2,"Arp Disabled",RENDER_LINE_CENTER);         
+      else {
+         HMI_RenderLine(2, "Arp Disabled", RENDER_LINE_CENTER);
       }
       break;
    default:
@@ -788,7 +787,7 @@ void HMI_MainPage_UpdateDisplay() {
    }
    MIOS32_LCD_CursorSet(0, 0);
    MIOS32_LCD_PrintString(currentPage->pPageTitle);
-   
+
    // Selected entry on line 2
    HMI_RenderLine(2, mainPageEntries[lastSelectedMainPageEntry], RENDER_LINE_SELECT);
    if (lastSelectedMainPageEntry == 0) {
@@ -964,12 +963,12 @@ void HMI_MIDIProgramSelectPage_RotaryEncoderChanged(s8 increment) {
    if (progNumber > MIDI_PRESETS_GetNumGenMIDIVoices()) {
       progNumber = MIDI_PRESETS_GetNumGenMIDIVoices();
    }
-   if (hmiSettings.lastSelectedMIDIProgNumber != progNumber){
+   if (hmiSettings.lastSelectedMIDIProgNumber != progNumber) {
       hmiSettings.lastSelectedMIDIProgNumber = progNumber;
       // Activate the MIDI voice temporarily using midi config from current preset
       const midi_preset_t* preset = MIDI_PRESETS_GetLastActivatedPreset();
       // TODO handle bankNumber too
-      MIDI_PRESETS_ActivateMIDIVoice(progNumber,0,preset->midiPorts,preset->midiChannel);
+      MIDI_PRESETS_ActivateMIDIVoice(progNumber, 0, preset->midiPorts, preset->midiChannel);
       // And force an update to the current page display
       currentPage->pUpdateDisplayCallback();
    }
@@ -1008,10 +1007,10 @@ void HMI_MIDIProgramSelectPage_RotaryEncoderSelected() {
 /////////////////////////////////////////////////////////////////////////////
 // Callback for back button pressed on gen MIDI select page
 /////////////////////////////////////////////////////////////////////////////
-void HMI_MIDIProgramSelectPage_BackButtonCallback(){
+void HMI_MIDIProgramSelectPage_BackButtonCallback() {
    // On a back button press, user did not select a new preset so re-activate the
    // last one.
-   const midi_preset_t * preset = MIDI_PRESETS_GetLastActivatedPreset();
+   const midi_preset_t* preset = MIDI_PRESETS_GetLastActivatedPreset();
    MIDI_PRESETS_ActivateMIDIPreset(preset->presetNumber);
 }
 
@@ -1019,13 +1018,15 @@ void HMI_MIDIProgramSelectPage_BackButtonCallback(){
 /////////////////////////////////////////////////////////////////////////////
 // Sets/updates the indicators for the current ARP_LIVE mode
 /////////////////////////////////////////////////////////////////////////////
-void HMI_SetArpSettingsIndicators(){
+void HMI_SetArpSettingsIndicators() {
    IND_ClearAll();
-   if (ARP_GetEnabled() == 0){
+   if (ARP_GetEnabled() == 0) {
+      IND_SetIndicatorState(1, IND_FLASH_INVERSE_BLIP);  // Remove this test code
       return;  // Arp is disabled so leave all the indicators off
    }
-   // Else, synch the indicators to the Arch state.
+   // Else, synch the indicators to the Arp state.
    // TODO
+   IND_SetIndicatorState(1, IND_FLASH_BLIP);
 }
 
 
@@ -1048,9 +1049,9 @@ void HMI_PersistData() {
 // Called by PEDALS_SetOctave whenever the octave is changed.
 // Used to automatically synch the Indicators
 /////////////////////////////////////////////////////////////////////////////
-void HMI_NotifyOctaveChange(u8 octave){
-   u8 indicator = octave+1;
-   if (hmiSettings.selectedToeIndicator[TOE_SWITCH_OCTAVE] != indicator){
+void HMI_NotifyOctaveChange(u8 octave) {
+   u8 indicator = octave + 1;
+   if (hmiSettings.selectedToeIndicator[TOE_SWITCH_OCTAVE] != indicator) {
       // Indicator has change. 
       hmiSettings.selectedToeIndicator[TOE_SWITCH_OCTAVE] = indicator;
       // Save the new indicator position
@@ -1058,9 +1059,9 @@ void HMI_NotifyOctaveChange(u8 octave){
 
       // If TOE_SWITCH_OCTAVE also currently active, then update the 
       // indicator
-      if (hmiSettings.toeSwitchMode == TOE_SWITCH_OCTAVE){
+      if (hmiSettings.toeSwitchMode == TOE_SWITCH_OCTAVE) {
          IND_ClearAll();
-         IND_SetIndicatorState(indicator,IND_ON);
+         IND_SetIndicatorState(indicator, IND_ON);
       }
       // And update the current display in case it is showing Octave
       currentPage->pUpdateDisplayCallback();
