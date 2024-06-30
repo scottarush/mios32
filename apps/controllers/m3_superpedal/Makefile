@@ -25,9 +25,11 @@ THUMB_SOURCE    = src/app.c \
 		  src/terminal.c\
 		  src/shell.c \
 		  src/arp.c \
-		  src/mid_file.c \
-		  src/midio_file.c \
-		  src/seq.c
+		  src/seq/mid_file.c \
+		  src/seq/midio_file.c \
+		  src/seq/seq.c \
+		  src/seq/seq_chord.c \
+		  src/seq/seq_core.c
 
 #  (following source stubs not relevant for Cortex M3 derivatives)
 THUMB_AS_SOURCE =
@@ -35,6 +37,8 @@ ARM_SOURCE      =
 ARM_AS_SOURCE   =
 
 C_INCLUDE =     -I src
+C_INCLUDE +=    -I src/seq
+
 A_INCLUDE =     -I src
 
 LIBS = 		
@@ -81,7 +85,7 @@ include $(MIOS32_PATH)/modules/eeprom/eeprom.mk
 # Notestack functions for arpeggiator/sequencer
 include $(MIOS32_PATH)/modules/notestack/notestack.mk
 
-# generic sequencer modules for arpeggiator
+# Use platform sequence BPM and MidiOut functions
 include $(MIOS32_PATH)/modules/sequencer/sequencer.mk
 
 # MIDI file Player

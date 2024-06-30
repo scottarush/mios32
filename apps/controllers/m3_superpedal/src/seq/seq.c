@@ -1,6 +1,8 @@
 // $Id$
 /*
- * Sequencer Routines
+ * Sequencer Routines.
+ *
+ * copied from Example 17 Sequencer
  *
  * ==========================================================================
  *

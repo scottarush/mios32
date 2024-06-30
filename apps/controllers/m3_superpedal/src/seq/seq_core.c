@@ -1,3 +1,16 @@
+/*
+ * Contains required dependencies from the MidiboxNG_SeqV4 copied from the 
+ * seq_core.c file.   
+ *
+ *
+ * ==========================================================================
+ *
+ *  Copyright (C) 2008 Thorsten Klose (tk@midibox.org)
+ *  Licensed for personal non-commercial use only.
+ *  All other rights reserved.
+ * 
+ * ==========================================================================
+ */
 #include "seq_core.h"
 
 /////////////////////////////////////////////////////////////////////////////
