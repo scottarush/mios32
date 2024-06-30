@@ -19,7 +19,7 @@
 #include <notestack.h>
 
 #include "arp.h"
-
+#include "arp_modes.h"
 #include "persist.h"
 
 /////////////////////////////////////////////////////////////////////////////
@@ -38,6 +38,8 @@
 static s32 ARP_PlayOffEvents(void);
 static s32 ARP_Tick(u32 bpm_tick);
 
+static s32 ARP_PersistData();
+static s32 ARP_FillNoteStack();
 
 /////////////////////////////////////////////////////////////////////////////
 // Local variables
@@ -45,6 +47,12 @@ static s32 ARP_Tick(u32 bpm_tick);
 
 // the arpeggiator position
 static u8 arp_counter;
+
+// current root note for ARP_ROOT_MODE or 0 if invalid/not active
+static u8 rootNote;
+
+// velocity for root note
+static u8 rootNoteVelocity;
 
 // pause mode (will be controlled from user interface)
 static u8 arpPause = 0;
@@ -61,7 +69,7 @@ persisted_arp_data_t arpSettings;
 /////////////////////////////////////////////////////////////////////////////
 // Initialisation
 /////////////////////////////////////////////////////////////////////////////
-s32 ARP_Init(u32 mode)
+s32 ARP_Init()
 {
    // initialize the Notestack
   // for an arpeggiator we prefer sorted mode
@@ -73,15 +81,18 @@ s32 ARP_Init(u32 mode)
    valid = PERSIST_ReadBlock(PERSIST_ARP_BLOCK, (unsigned char*)&arpSettings, sizeof(persisted_arp_data_t));
    if (valid < 0) {
       DEBUG_MSG("ARP_Init:  PERSIST_ReadBlock return invalid. Re-initing persisted settings to defaults");
-      arpSettings.genMode = ARP_GEN_MODE_ASCENDING;
+      arpSettings.genOrder = ARP_GEN_ORDER_ASCENDING;
+      arpSettings.arpMode = ARP_MODE_KEYS;
       arpSettings.ppqn = 384;
       arpSettings.bpm = 120.0;
 
-      valid = PERSIST_StoreBlock(PERSIST_ARP_BLOCK, (unsigned char*)&arpSettings, sizeof(persisted_arp_data_t));
+      valid = ARP_PersistData();
       if (valid < 0) {
          DEBUG_MSG("ARP_Init:  Error persisting settings to EEPROM");
       }
 
+      rootNote = 0;  // invalid, inactive
+      rootNoteVelocity = 0;
    }
 
    // clear the arp counter
@@ -102,6 +113,19 @@ s32 ARP_Init(u32 mode)
 
    return 0; // no error
 }
+/////////////////////////////////////////////////////////////////////////////
+// Global function to store persisted arpeggiator data
+/////////////////////////////////////////////////////////////////////////////
+s32 ARP_PersistData() {
+#ifdef DEBUG_ENABLED
+   DEBUG_MSG("ARP_PersistData: Writing persisted data:  sizeof(presets)=%d bytes", sizeof(persisted_pedal_confg_t));
+#endif
+   s32 valid = PERSIST_StoreBlock(PERSIST_ARP_BLOCK, (unsigned char*)&arpSettings, sizeof(persisted_arp_data_t));
+   if (valid < 0) {
+      DEBUG_MSG("ARP_PersistData:  Error persisting setting to EEPROM");
+   }
+   return valid;
+}
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -110,7 +134,7 @@ s32 ARP_Init(u32 mode)
 /////////////////////////////////////////////////////////////////////////////
 s32 ARP_Handler(void)
 {
-   if (arpEnabled == 0){
+   if (arpEnabled == 0) {
       return 0;
    }
    // handle requests
@@ -194,8 +218,10 @@ static s32 ARP_Tick(u32 bpm_tick)
    // whenever we reach a new 16th note (96 ticks @384 ppqn):
    if ((bpm_tick % (SEQ_BPM_PPQN_Get() / 4)) == 0) {
       // ensure that arp is reseted on first bpm_tick
-      if (bpm_tick == 0)
+      if (bpm_tick == 0) {
          arp_counter = 0;
+
+      }
       else {
          // increment arpeggiator counter
          ++arp_counter;
@@ -227,15 +253,73 @@ static s32 ARP_Tick(u32 bpm_tick)
 
    return 0; // no error
 }
+/////////////////////////////////////////////////////////////////////////////
+// Called to (re)fill the note stack in Root mode.
+/////////////////////////////////////////////////////////////////////////////
+s32 ARP_FillNoteStack() {
+   if (arpSettings.arpMode == ARP_MODE_KEYS) {
+      DEBUG_MSG("ARP_FillNoteStack:  Invalid call.  Current mode=%d", arpSettings.arpMode);
+      return -1;
+   }
+   // Init the notestack since the mode could have changes and compute the fill array from the chord
+   notestack_mode_t notestackMode = NOTESTACK_MODE_PUSH_TOP;
 
+   if (arpSettings.genOrder == ARP_GEN_ORDER_DESCENDING){
+      notestackMode = NOTESTACK_MODE_PUSH_BOTTOM;
+   }
+   NOTESTACK_Init(&notestack, notestackMode, &notestack_items[0], NOTESTACK_SIZE);
+
+   // Get the keys of the chord using the rootNote, the current keyMode, and the octave of the key
+   u8 key = rootNote % 12;
+
+   const chord_type_t chord = ARP_MODES_GetChordType(arpSettings.keyMode, key);
+   if (chord == CHORD_INVALID_ERROR) {
+      DEBUG_MSG("ARP_FillNoteStack: Invalid keyMode=%d or key=%d combination", arpSettings.keyMode, key);
+      return -1;
+   }
+   u8 octave = rootNote / 12;
+
+   // Push the keys onto the note stack
+   for (int keyNum = 0; keyNum < 6;keyNum++) {
+      u8 note = SEQ_CHORD_NoteGetByEnum(keyNum, chord, octave);
+      if (note >= 0){
+         NOTESTACK_Push(&notestack,note,0);
+      }
+   }
+   return 0;
+}
 
 /////////////////////////////////////////////////////////////////////////////
-// Should be called whenever a Note event has been received.
-// We expect, that velocity is 0 on a Note Off event
+// Should be called whenever a Note event has been received 
+// If velocity is 0 then this is a note off event.
 /////////////////////////////////////////////////////////////////////////////
 s32 ARP_NotifyNoteOn(u8 note, u8 velocity)
 {
    u8 clear_stack = 0;
+   if (arpSettings.arpMode == ARP_MODE_ROOT) {
+      // If Notestack length is > 0, then ignore (because this must be another key.  Have to release the root first.)
+      if (notestack.len > 0) {
+         return 0;
+      }
+      // Otherwise, this is either the release of the root or a new root
+      if (note == rootNote) {
+         if (velocity == 0) {
+            // Release of the root note so set clear_stack and fall through to
+            // shut everything off
+            clear_stack = 1;
+         }
+      }
+      else {
+         // This is a new root, so if velocity > 0 then refill the note stack
+         if (velocity > 0) {
+            rootNote = note;
+            rootNoteVelocity = velocity;
+            ARP_FillNoteStack();
+         }
+         // Just return even if velocity is 0 on a new root (which shouldn't happen)
+         return 0;
+      }
+   }
 
    if (velocity)
       // push note into note stack
@@ -280,19 +364,32 @@ s32 ARP_NotifyNoteOff(u8 note)
    return ARP_NotifyNoteOn(note, 0);
 }
 
+
 /**
  * Returns the current Arpeggiator generation mode.
 */
-arp_gen_mode_type_t ARP_GetArpGenMode() {
-   return arpSettings.genMode;
+arp_gen_order_t ARP_GetArpGenOrder() {
+   return arpSettings.genOrder;
 }
 
 /////////////////////////////////////////////////////////////////////////////
-// Sets the ArpGenMode
+// Sets the ArpGenMode.  On a change, the notestack order will be changed
+// at the next bar.
 /////////////////////////////////////////////////////////////////////////////
-u8 ARP_SetArpGenMode(arp_gen_mode_type_t mode){
-   arpSettings.genMode = mode;
-   return 0;   
+u8 ARP_SetArpGenOrder(arp_gen_order_t genOrder) {
+   if (arpSettings.genOrder == genOrder)
+      return 0;
+   // Otherwise this is a change
+   arpSettings.genOrder = genOrder;
+
+   // Persist settings to E2
+   ARP_PersistData();
+
+   // And refill the note stack if arpeggiator currently running
+   if (arpEnabled){
+      ARP_FillNoteStack();
+   }
+   return 0;
 }
 
 
@@ -300,14 +397,14 @@ u8 ARP_SetArpGenMode(arp_gen_mode_type_t mode){
 /////////////////////////////////////////////////////////////////////////////
 // Enables/Disables Arpeggiator.
 /////////////////////////////////////////////////////////////////////////////
-void ARP_SetEnabled(u8 enabled){
-   if (arpEnabled == 0){
-      if (enabled){
+void ARP_SetEnabled(u8 enabled) {
+   if (arpEnabled == 0) {
+      if (enabled) {
          arpEnabled = 1;
          ARP_Reset();
       }
    }
-   else{
+   else {
       // Disable Arp
       arpEnabled = 0;
       // Play Off Events to release all the notes
@@ -317,21 +414,21 @@ void ARP_SetEnabled(u8 enabled){
 /////////////////////////////////////////////////////////////////////////////
 // Returrns enabled/disable state of Arpeggiator
 /////////////////////////////////////////////////////////////////////////////
-u8 ARP_GetEnabled(){
+u8 ARP_GetEnabled() {
    return arpEnabled;
 }
 
 /////////////////////////////////////////////////////////////////////////////
 // Returns current BPM
 /////////////////////////////////////////////////////////////////////////////
-float ARP_GetBPM(){
+float ARP_GetBPM() {
    return SEQ_BPM_Get();
 }
 /////////////////////////////////////////////////////////////////////////////
 // Sets the BPM
 /////////////////////////////////////////////////////////////////////////////
-void ARP_SetBPM(u16 bpm){
-   if (bpm < 10){
+void ARP_SetBPM(u16 bpm) {
+   if (bpm < 10) {
       return;
    }
    arpSettings.bpm = bpm;

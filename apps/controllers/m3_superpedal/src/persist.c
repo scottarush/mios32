@@ -13,6 +13,11 @@
 
 #include "persist.h"
 
+
+#include "midi_presets.h"
+#include "pedals.h"
+#include "hmi.h" 
+
 #undef DEBUG_ENABLED
 
 #ifndef DEBUG_MSG
@@ -24,7 +29,7 @@
 #define MIDI_PRESETS_START_ADDR 0
 #define HMI_START_ADDR (MIDI_PRESETS_START_ADDR+sizeof(persisted_midi_presets_t)/2+GAP_SIZE)
 #define PEDALS_START_ADDR (HMI_START_ADDR+sizeof(persisted_hmi_settings_t)/2+GAP_SIZE)
-
+#define ARP_START_ADDR (PEDALS_START_ADDR+sizeof(persisted_pedal_confg_t)/2+GAP_SIZE)
 
 u16 PERSIST_Read16(u16 addr);
 u32 PERSIST_Read32(u16 addr);
@@ -174,6 +179,9 @@ u16 PERSIST_GetStartAddress(persist_block_t blockType) {
       break;
    case PERSIST_PEDALS_BLOCK:
       startAddress = PEDALS_START_ADDR;
+      break;
+   case PERSIST_ARP_BLOCK:
+      startAddress = ARP_START_ADDR;
       break;
    default:
       DEBUG_MSG("Invalid block type:%d", blockType);

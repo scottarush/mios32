@@ -53,6 +53,8 @@ typedef struct {
 
    // volume from 1 to PEDALS_MAX_VOLUME
    u8 volumeLevel;
+
+   // root key. 
 } persisted_pedal_confg_t;
 
 /////////////////////////////////////////////////////////////////////////////
@@ -67,6 +69,8 @@ extern u8 PEDALS_GetVolume();
 extern void PEDALS_SetVolume(u8 volumeLevel);
 
 extern u8 PEDALS_ScaleVelocity(u8 velocity,u8 volumeLevel);
+
+extern void PEDALS_SetScale(u8 enabled,u8 rootkey);
 
 /////////////////////////////////////////////////////////////////////////////
 // Export global variables

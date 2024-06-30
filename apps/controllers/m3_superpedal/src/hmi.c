@@ -114,8 +114,8 @@ typedef enum render_line_mode_e {
 // Total list of functions availabe in ARP Live mode.  Can be mapped to toe switches
 // in preesets
 typedef enum arp_live_toe_functions_e {
-   ARP_LIVE_TOE_GEN_MODE_UP_DOWN = 1,
-   ARP_LIVE_TOE_GEN_MODE_OCTAVE_RANDOM = 2,
+   ARP_LIVE_TOE_GEN_ORDER_UP_DOWN = 1,
+   ARP_LIVE_TOE_GEN_ORDER_OCTAVE_RANDOM = 2,
    ARP_LIVE_TOE_MAJOR_KEY = 3,
    ARP_LIVE_TOE_MINOR_KEY = 4,
    // 5 and 6 are unassigned
@@ -177,7 +177,7 @@ void HMI_MIDIProgramSelectPage_RotaryEncoderChanged(s8 increment);
 void HMI_MIDIProgramSelectPage_RotaryEncoderSelected();
 void HMI_MIDIProgramSelectPage_BackButtonCallback();
 
-void HMI_PersistData();
+s32 HMI_PersistData();
 
 void HMI_HandleArpLiveToeToggle(u8,u8);
 
@@ -242,7 +242,7 @@ void HMI_Init(void) {
       hmiSettings.lastSelectedMidiOutput = DEFAULT_PRESET_MIDI_PORTS;
       hmiSettings.lastSelectedMidiChannel = DEFAULT_PRESET_MIDI_CHANNEL;
 
-      valid = PERSIST_StoreBlock(PERSIST_HMI_BLOCK, (unsigned char*)&hmiSettings, sizeof(persisted_hmi_settings_t));
+      valid = HMI_PersistData();
       if (valid < 0) {
          DEBUG_MSG("HMI_Init:  Error persisting setting to EEPROM");
       }
@@ -1029,34 +1029,34 @@ void HMI_SetArpSettingsIndicators() {
    // Else, synch the indicators to the Arp state.
 
    // First the gen mode indicators
-   switch (ARP_GetArpGenMode()) {
-   case ARP_GEN_MODE_ASCENDING:
+   switch (ARP_GetArpGenOrder()) {
+   case ARP_GEN_ORDER_ASCENDING:
       // shut off octave/random indicator
-      IND_SetIndicatorState(ARP_LIVE_TOE_GEN_MODE_OCTAVE_RANDOM,IND_OFF);
-      IND_SetBlipIndicator(ARP_LIVE_TOE_GEN_MODE_UP_DOWN,0,ARP_GetBPM());
+      IND_SetIndicatorState(ARP_LIVE_TOE_GEN_ORDER_OCTAVE_RANDOM,IND_OFF);
+      IND_SetBlipIndicator(ARP_LIVE_TOE_GEN_ORDER_UP_DOWN,0,ARP_GetBPM());
       break;
-   case ARP_GEN_MODE_DESCENDING:
+   case ARP_GEN_ORDER_DESCENDING:
       // shut off octave/random indicator
-      IND_SetIndicatorState(ARP_LIVE_TOE_GEN_MODE_OCTAVE_RANDOM,IND_OFF);
-      IND_SetBlipIndicator(ARP_LIVE_TOE_GEN_MODE_UP_DOWN,1,ARP_GetBPM());
+      IND_SetIndicatorState(ARP_LIVE_TOE_GEN_ORDER_OCTAVE_RANDOM,IND_OFF);
+      IND_SetBlipIndicator(ARP_LIVE_TOE_GEN_ORDER_UP_DOWN,1,ARP_GetBPM());
       break;
-   case ARP_GEN_MODE_ASC_DESC:
+   case ARP_GEN_ORDER_ASC_DESC:
       // shut off octave/random indicator
-      IND_SetIndicatorState(ARP_LIVE_TOE_GEN_MODE_OCTAVE_RANDOM,IND_OFF);
+      IND_SetIndicatorState(ARP_LIVE_TOE_GEN_ORDER_OCTAVE_RANDOM,IND_OFF);
       // Ascending and descending is 50% flash at BPM rate
-      IND_SetFlashIndicator(ARP_LIVE_TOE_GEN_MODE_UP_DOWN, ARP_GetBPM());
+      IND_SetFlashIndicator(ARP_LIVE_TOE_GEN_ORDER_UP_DOWN, ARP_GetBPM());
       break;
-   case ARP_GEN_MODE_OCTAVE:
+   case ARP_GEN_ORDER_OCTAVE:
       // shut off asc/desc indicator
-      IND_SetIndicatorState(ARP_LIVE_TOE_GEN_MODE_UP_DOWN,IND_OFF);   
+      IND_SetIndicatorState(ARP_LIVE_TOE_GEN_ORDER_UP_DOWN,IND_OFF);   
       // Octave is 50% flash at BPM rate
-      IND_SetFlashIndicator(ARP_LIVE_TOE_GEN_MODE_OCTAVE_RANDOM, ARP_GetBPM());
+      IND_SetFlashIndicator(ARP_LIVE_TOE_GEN_ORDER_OCTAVE_RANDOM, ARP_GetBPM());
       break;
-   case ARP_GEN_MODE_RANDOM:
+   case ARP_GEN_ORDER_RANDOM:
       // shut off asc/desc indicator
-      IND_SetIndicatorState(ARP_LIVE_TOE_GEN_MODE_UP_DOWN,IND_OFF);   
+      IND_SetIndicatorState(ARP_LIVE_TOE_GEN_ORDER_UP_DOWN,IND_OFF);   
       // Random is a blip at the ARPM rate
-      IND_SetBlipIndicator(ARP_LIVE_TOE_GEN_MODE_OCTAVE_RANDOM,0, ARP_GetBPM());
+      IND_SetBlipIndicator(ARP_LIVE_TOE_GEN_ORDER_OCTAVE_RANDOM,0, ARP_GetBPM());
       break;
    }
    // TODO
@@ -1069,28 +1069,28 @@ void HMI_SetArpSettingsIndicators() {
 void HMI_HandleArpLiveToeToggle(u8 toeNum,u8 pressed){
    u16 bpm;
    switch(toeNum){
-      case ARP_LIVE_TOE_GEN_MODE_UP_DOWN:
+      case ARP_LIVE_TOE_GEN_ORDER_UP_DOWN:
          // Wrap the 3 modes on this toe switch
-         switch(ARP_GetArpGenMode()){
-            case ARP_GEN_MODE_ASCENDING:
-               ARP_SetArpGenMode(ARP_GEN_MODE_DESCENDING);
+         switch(ARP_GetArpGenOrder()){
+            case ARP_GEN_ORDER_ASCENDING:
+               ARP_SetArpGenOrder(ARP_GEN_ORDER_DESCENDING);
                break;
-            case ARP_GEN_MODE_DESCENDING:
-              ARP_SetArpGenMode(ARP_GEN_MODE_ASC_DESC);
+            case ARP_GEN_ORDER_DESCENDING:
+              ARP_SetArpGenOrder(ARP_GEN_ORDER_ASC_DESC);
                break;
-            case ARP_GEN_MODE_ASC_DESC:
-               ARP_SetArpGenMode(ARP_GEN_MODE_ASCENDING);
+            case ARP_GEN_ORDER_ASC_DESC:
+               ARP_SetArpGenOrder(ARP_GEN_ORDER_ASCENDING);
                break;            
          }
          break;
-     case ARP_LIVE_TOE_GEN_MODE_OCTAVE_RANDOM:
+     case ARP_LIVE_TOE_GEN_ORDER_OCTAVE_RANDOM:
          // Wrap the 2 modes on this toe switch
-         switch(ARP_GetArpGenMode()){
-            case ARP_GEN_MODE_OCTAVE:
-               ARP_SetArpGenMode(ARP_GEN_MODE_RANDOM);
+         switch(ARP_GetArpGenOrder()){
+            case ARP_GEN_ORDER_OCTAVE:
+               ARP_SetArpGenOrder(ARP_GEN_ORDER_RANDOM);
                break;
-            case ARP_GEN_MODE_RANDOM:
-              ARP_SetArpGenMode(ARP_GEN_MODE_OCTAVE);
+            case ARP_GEN_ORDER_RANDOM:
+              ARP_SetArpGenOrder(ARP_GEN_ORDER_OCTAVE);
                break;       
          }
       case ARP_LIVE_TOE_MAJOR_KEY:
@@ -1118,7 +1118,7 @@ void HMI_HandleArpLiveToeToggle(u8 toeNum,u8 pressed){
 /////////////////////////////////////////////////////////////////////////////
 // Helper to store persisted data 
 /////////////////////////////////////////////////////////////////////////////
-void HMI_PersistData() {
+s32 HMI_PersistData() {
 #ifdef DEBUG_ENABLED
    DEBUG_MSG("MIDI_PRESETS_PersistData: Writing persisted data:  sizeof(presets)=%d bytes", sizeof(presets));
 #endif
@@ -1126,7 +1126,7 @@ void HMI_PersistData() {
    if (valid < 0) {
       DEBUG_MSG("HMI_PersistData:  Error persisting setting to EEPROM");
    }
-   return;
+   return valid;
 }
 
 /////////////////////////////////////////////////////////////////////////////

@@ -21,7 +21,7 @@
 #include "arp.h"
 #include "pedals.h"
 #include "persist.h"
-
+#include "hmi.h"
 
 /////////////////////////////////////////////////////////////////////////////
 // Local defines

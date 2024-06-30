@@ -8,9 +8,6 @@
 
 #include <eeprom.h>
 
-#include "midi_presets.h"
-#include "pedals.h"
-#include "hmi.h" 
 
 /////////////////////////////////////////////////////////////////////////////
 // Global definitions

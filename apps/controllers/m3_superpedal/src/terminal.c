@@ -28,6 +28,7 @@
 #include "pedals.h"
 #include "hmi.h"
 #include "midi_presets.h"
+#include "arp.h"
 
 #include "uip_terminal.h"
 #include "tasks.h"
@@ -183,6 +184,7 @@ s32 TERMINAL_ParseLine(char* input, void* _output_function)
             MIDI_PRESETS_Init();
             HMI_Init();
             PEDALS_Init();
+            ARP_Init();
          }
          else {
             out("ERROR: failed to clear EEPROM (status %d)!", status);

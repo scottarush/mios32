@@ -25,10 +25,12 @@ THUMB_SOURCE    = src/app.c \
 		  src/terminal.c\
 		  src/shell.c \
 		  src/arp.c \
+		  src/arp_modes.c\
 		  src/seq/mid_file.c \
 		  src/seq/midio_file.c \
 		  src/seq/seq.c \
 		  src/seq/seq_chord.c \
+		  src/seq/seq_scale.c \
 		  src/seq/seq_core.c
 
 #  (following source stubs not relevant for Cortex M3 derivatives)
