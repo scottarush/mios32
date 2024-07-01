@@ -55,8 +55,8 @@ typedef union {
 /////////////////////////////////////////////////////////////////////////////
 
 static const seq_scale_entry_t seq_scale_table[] = {
-//	        C 	C#	D 	D#	E 	F 	F#	G 	G#	A 	A#	B
-//	        0 	1 	2 	3 	4 	5 	6 	7 	8 	9 	10	11 	Semitone
+//	             C 	C#	D 	D#	E 	F 	F#	G 	G#	A 	A#	B
+//	             0 	1 	2 	3 	4 	5 	6 	7 	8 	9 	10	11 	Semitone
 //              1 	b2	2 	b3	3 	4 	b5	5 	b6	6 	b7	7	Minor Tone
 //              1 	#1	2 	#2	3 	4 	#4	5 	#5	6 	#6	7 	Augmented Tone
 // 1..10                                                                                                         <------------------>
@@ -65,11 +65,11 @@ static const seq_scale_entry_t seq_scale_table[] = {
   {{            0,	2,	2,	3,	3,	5,	7,	7,	9,	9,	11,	11,	"Melodic Minor       " }},
   {{            0,	2,	2,	3,	3,	5,	7,	7,	8,	8,	10,	10,	"Natural Minor       " }},
   {{            0,	1,	2,	3,	4,	5,	6,	7,	8,	9,	10,	11,	"Chromatic           " }},
-  {{            0,	2,	2,	4,	4,	6,	6,	8,	8,	10,	10,	10,	"Whole Tone          " }},
-  {{            0,	2,	2,	4,	4,	7,	7,	7,	9,	9,	9,	9,	"Pentatonic Major    " }},
-  {{            0,	0,	3,	3,	3,	5,	7,	7,	7,	10,	10,	10,	"Pentatonic Minor    " }},
-  {{            0,	0,	3,	3,	3,	5,	6,	7,	7,	10,	10,	10,	"Pentatonic Blues    " }},
-  {{            0,	2,	2,	2,	5,	5,	7,	7,	7,	10,	10,	10,	"Pentatonic Neutral  " }},
+  {{            0,	2,	2,	4,	4,	6,	6,	8,	8,	10, 10,	10,	"Whole Tone          " }},
+  {{            0,	2,	2,	4,	4,	7,	7,	7,	9,	9,	9,	   9,	"Pentatonic Major    " }},
+  {{            0,	0,	3,	3,	3,	5,	7,	7,	7,	10, 10,	10,	"Pentatonic Minor    " }},
+  {{            0,	0,	3,	3,	3,	5,	6,	7,	7,	10, 10,  10,	"Pentatonic Blues    " }},
+  {{            0,	2,	2,	2,	5,	5,	7,	7,	7,	10, 10,	10,	"Pentatonic Neutral  " }},
 // 11..20                                                                                                        <------------------>
   {{            0,	1,	1,	3,	4,	6,	6,	7,	9,	9,	10,	10,	"Octatonic (H-W)     " }},
   {{            0,	2,	2,	3,	3,	5,	6,	6,	8,	9,	11,	11,	"Octatonic (W-H)     " }},

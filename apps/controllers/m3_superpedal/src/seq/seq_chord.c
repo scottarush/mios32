@@ -318,7 +318,7 @@ s32 SEQ_CHORD_NoteGet(u8 key_num, u8 chord_set, u8 chord)
 // Added by Scott Rush to get chord by chord_type enum instead of chord number
 // key_num:  key number (0..5) of the chord
 // chord:  enum for the cord
-// oct_transpose:  octave transpose
+// oct_transpose:  octave transpose from (0 corresponds to MIDI Note# 24=C0)
 /////////////////////////////////////////////////////////////////////////////
 s32 SEQ_CHORD_NoteGetByEnum(u8 key_num, chord_type_t chord, s8 oct_transpose) {
    if (key_num >= 6)

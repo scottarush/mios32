@@ -25,7 +25,6 @@
 #include <seq_midi_out.h>
 #include <midi_port.h>
 #include <file.h>
-#include <osc_client.h>
 #include <midi_router.h>
 
 #include <mid_parser.h>

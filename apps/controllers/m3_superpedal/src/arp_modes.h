@@ -18,10 +18,10 @@
 typedef enum modes_e {
    MODES_IONIAN = 0,
    MODES_DORIAN = 1,
-   MODIANS_PHYRIGIAN = 2,
-   MODES_LORIAN = 3,
+   MODES_PHYRIGIAN = 2,
+   MODES_LYDIAN= 3,
    MODES_MIXOLYDIAN = 4,
-   MODES_AEOLINA = 5,
+   MODES_AEOLIAN = 5,
    MODES_LOCRIAN = 6
 } modes_t;
 #define MAX_MODE_TYPE 6

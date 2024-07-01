@@ -167,7 +167,7 @@ s32 TERMINAL_ParseLine(char* input, void* _output_function)
          out("Following commands are available:");
          out("  system:                           print system info");
          //      KEYBOARD_TerminalHelp(_output_function);
-         UIP_TERMINAL_Help(_output_function);
+//         UIP_TERMINAL_Help(_output_function);
          MIDIMON_TerminalHelp(_output_function);
          MIDI_ROUTER_TerminalHelp(_output_function);
          out("  clearE2:                          Reformats EEPROM and re-Stores defaults.");

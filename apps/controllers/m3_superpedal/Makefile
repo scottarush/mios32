@@ -23,7 +23,6 @@ THUMB_SOURCE    = src/app.c \
 		  src/midi_presets.c\
         src/persist.c\
 		  src/terminal.c\
-		  src/shell.c \
 		  src/arp.c \
 		  src/arp_modes.c\
 		  src/seq/mid_file.c \
@@ -32,6 +31,9 @@ THUMB_SOURCE    = src/app.c \
 		  src/seq/seq_chord.c \
 		  src/seq/seq_scale.c \
 		  src/seq/seq_core.c
+
+#		  src/shell.c \
+
 
 #  (following source stubs not relevant for Cortex M3 derivatives)
 THUMB_AS_SOURCE =
@@ -74,6 +76,9 @@ include $(MIOS32_PATH)/modules/midi_router/midi_router.mk
 
 # MIDImo
 include $(MIOS32_PATH)/modules/midimon/midimon.mk
+
+# UIP driver and standard task aren't used (no OSC), but included because of
+# dependencies from the midi_router
 
 # UIP driver
 include $(MIOS32_PATH)/modules/uip/uip.mk

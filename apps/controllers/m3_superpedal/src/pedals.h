@@ -57,6 +57,9 @@ typedef struct {
    // root key. 
 } persisted_pedal_confg_t;
 
+// Callback function for receiving a selected pedal in pedalSelectMode
+typedef void (*GetSelectedPedal)(u8 pedalNum);
+
 /////////////////////////////////////////////////////////////////////////////
 // Prototypes
 /////////////////////////////////////////////////////////////////////////////
@@ -71,6 +74,7 @@ extern void PEDALS_SetVolume(u8 volumeLevel);
 extern u8 PEDALS_ScaleVelocity(u8 velocity,u8 volumeLevel);
 
 extern void PEDALS_SetScale(u8 enabled,u8 rootkey);
+extern void PEDALS_SetSelectPedalCallback(GetSelectedPedal callback);
 
 /////////////////////////////////////////////////////////////////////////////
 // Export global variables

@@ -28,8 +28,7 @@ typedef enum arp_gen_ordere {
    ARP_GEN_ORDER_ASCENDING = 0,
    ARP_GEN_ORDER_DESCENDING = 1,
    ARP_GEN_ORDER_ASC_DESC = 2,
-   ARP_GEN_ORDER_OCTAVE = 3,
-   ARP_GEN_ORDER_RANDOM = 4
+   ARP_GEN_ORDER_RANDOM = 3
 } arp_gen_order_t;
 
 typedef enum arp_mode_e {
@@ -43,10 +42,13 @@ typedef enum arp_mode_e {
 // Persisted Arpeggiatordata to E2 .
 /////////////////////////////////////////////////////////////////////////////
 typedef struct persisted_arp_data_s {
+   // First 4 bytes must be serialization version ID.  Big-ended order
+   u32 serializationID;
+
    arp_gen_order_t genOrder;
    arp_mode_t arpMode;
    key_t rootKey;
-   modes_t keyMode;
+   modes_t modeScale;
    int ppqn;
    double bpm;
 } persisted_arp_data_t;
@@ -76,6 +78,8 @@ extern u8 ARP_GetEnabled();
 extern float ARP_GetBPM();
 extern void ARP_SetBPM(u16 bpm);
 
+extern void ARP_SetRootKey(u8 rootKey);
+extern void ARP_SetModeScale(modes_t mode);
 /////////////////////////////////////////////////////////////////////////////
 // Export global variables
 /////////////////////////////////////////////////////////////////////////////

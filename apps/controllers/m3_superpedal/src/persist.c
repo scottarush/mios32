@@ -10,7 +10,7 @@
 #include <mios32.h>
 
 #include <eeprom.h>
-
+#include <midi_router.h>
 #include "persist.h"
 
 
@@ -26,7 +26,9 @@
 
 // Address for the blocks.  All in 16-bit word size
 #define GAP_SIZE 4
-#define MIDI_PRESETS_START_ADDR 0
+
+#define PRESETS_ADDR_ROUTER_BEGIN 0
+#define MIDI_PRESETS_START_ADDR (PRESETS_ADDR_ROUTER_BEGIN+(MIDI_ROUTER_NUM_NODES*4)+GAP_SIZE)
 #define HMI_START_ADDR (MIDI_PRESETS_START_ADDR+sizeof(persisted_midi_presets_t)/2+GAP_SIZE)
 #define PEDALS_START_ADDR (HMI_START_ADDR+sizeof(persisted_hmi_settings_t)/2+GAP_SIZE)
 #define ARP_START_ADDR (PEDALS_START_ADDR+sizeof(persisted_pedal_confg_t)/2+GAP_SIZE)
@@ -39,9 +41,7 @@ s32 PERSIST_Write32(u16 addr, u32 value);
 u32 PERSIST_ParseSerializationID(const unsigned char* pData);
 
 /////////////////////////////////////////////////////////////////////////////
-// Reads the EEPROM content during boot
-// If EEPROM content isn't valid (magic number mismatch), clear EEPROM
-// with default data
+// Initializes persistence.
 // mode:  0 for regular init, 1 for forced re-format.
 /////////////////////////////////////////////////////////////////////////////
 s32 PERSIST_Init(u32 mode) {
@@ -62,7 +62,16 @@ s32 PERSIST_Init(u32 mode) {
            }
         **/
    }
-
+   else if (mode > 0){
+      // E2 just got reformatted, write the MidiRouter settings
+      PERSIST_StoreMIDIRouter(); 
+   }
+   else{
+      // Restore midi_router settings.  Need to call from here to avoid modifying the midi_router
+      // module that doesn't support persist.c
+      PERSIST_RestoreMidiRouter();
+   }
+  
    return status;
 }
 
@@ -226,4 +235,48 @@ s32 PERSIST_Write32(u16 addr, u32 value) {
    return EEPROM_Write(addr, (value >> 16) & 0xffff) | EEPROM_Write(addr + 1, (value >> 0) & 0xffff);
 }
 
+/////////////////////////////////////////////////////////////////////////////
+// Helper to restore  the Midi Router settings since the midi_router module
+// doesn't support PERSIST.C.
+/////////////////////////////////////////////////////////////////////////////
+void PERSIST_RestoreMidiRouter() {
+   u8 node;
+   midi_router_node_entry_t* n = &midi_router_node[0];
+   for (node = 0; node < MIDI_ROUTER_NUM_NODES; ++node, ++n) {
+      u16 cfg1 = PERSIST_Read16(PRESETS_ADDR_ROUTER_BEGIN + node * 2 + 0);
+      u16 cfg2 = PERSIST_Read16(PRESETS_ADDR_ROUTER_BEGIN + node * 2 + 1);
 
+      // default setup
+      if (!cfg1 && !cfg2) {
+         n->src_port = USB0;
+         n->src_chn = 0;
+         n->dst_port = UART0;
+         n->dst_chn = 17; // All
+      }
+      else {
+         n->src_port = (cfg1 >> 0) & 0xff;
+         n->src_chn = (cfg1 >> 8) & 0xff;
+         n->dst_port = (cfg2 >> 0) & 0xff;
+         n->dst_chn = (cfg2 >> 8) & 0xff;
+      }
+   }
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// Helper to store  the Midi Router settings since the midi_router module
+// doesn't support PERSIST.C.
+/////////////////////////////////////////////////////////////////////////////
+s32 PERSIST_StoreMIDIRouter() {
+
+   u8 node;
+   s32 status = 0;
+   midi_router_node_entry_t* n = &midi_router_node[0];
+   for (node = 0; node < MIDI_ROUTER_NUM_NODES; ++node, ++n) {
+      u16 cfg1 = n->src_port | ((u16)n->src_chn << 8);
+      u16 cfg2 = n->dst_port | ((u16)n->dst_chn << 8);
+
+      status |= PERSIST_Write16(PRESETS_ADDR_ROUTER_BEGIN + node * 2 + 0, cfg1);
+      status |= PERSIST_Write16(PRESETS_ADDR_ROUTER_BEGIN + node * 2 + 1, cfg2);
+   }
+   return status;
+}

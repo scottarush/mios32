@@ -114,11 +114,12 @@ typedef enum render_line_mode_e {
 // Total list of functions availabe in ARP Live mode.  Can be mapped to toe switches
 // in preesets
 typedef enum arp_live_toe_functions_e {
-   ARP_LIVE_TOE_GEN_ORDER_UP_DOWN = 1,
-   ARP_LIVE_TOE_GEN_ORDER_OCTAVE_RANDOM = 2,
-   ARP_LIVE_TOE_MAJOR_KEY = 3,
-   ARP_LIVE_TOE_MINOR_KEY = 4,
-   // 5 and 6 are unassigned
+   ARP_LIVE_TOE_SELECT_KEY = 1,
+   ARP_LIVE_TOE_SELECT_MODE = 2,
+   ARP_LIVE_TOE_GEN_ORDER = 3,
+   ARP_LIVE_TOE_PRESET_1 = 4,
+   ARP_LIVE_TOE_PRESET_2 = 5,
+   ARP_LIVE_TOE_PRESET_3 = 6,
    ARP_LIVE_TOE_TEMPO_DECREMENT = 7,
    ARP_LIVE_TOE_TEMPO_INCREMENT = 8,
 } arp_live_toe_functions_t;
@@ -136,6 +137,14 @@ switchState_t toeSwitchState[NUM_TOE_SWITCHES];
 
 // Toe volume levels even split from 5 to 127
 u8 toeVolumeLevels[NUM_TOE_SWITCHES] = { 5,23,41,58,77,93,110,127 };
+
+typedef enum pedal_select_functions_e {
+   PEDAL_SELECT_INACTIVE = 0,
+   PEDAL_SELECT_ROOT_KEY = 1,
+   PEDAL_SELECT_MODAL_SCALE = 2
+} pedal_select_functions_t;
+
+pedal_select_functions_t pedalSelectStatus;
 
 /////////////////////////////////////////////////////////////////////////////
 // Stomp Switch types and non-persisted variables
@@ -179,7 +188,10 @@ void HMI_MIDIProgramSelectPage_BackButtonCallback();
 
 s32 HMI_PersistData();
 
-void HMI_HandleArpLiveToeToggle(u8,u8);
+void HMI_HandleArpLiveToeToggle(u8, u8);
+
+void HMI_SelectRootKeyCallback(u8 pedalNum);
+void HMI_SelectModeScaleCallback(u8 pedalNum);
 
 /////////////////////////////////////////////////////////////////////////////
 // called at Init to initialize the HMI
@@ -206,6 +218,8 @@ void HMI_Init(void) {
 
    currentPage = &homePage;
    lastPage = NULL;
+
+   pedalSelectStatus = PEDAL_SELECT_INACTIVE;
 
    // Restore settings from E^2 if they exist.  If not then initialize to defaults
    s32 valid = 0;
@@ -409,7 +423,7 @@ void HMI_NotifyToeToggle(u8 toeNum, u8 pressed, s32 timestamp) {
       // TODO
       break;
    case TOE_SWITCH_ARP_LIVE:
-      HMI_HandleArpLiveToeToggle(toeNum,pressed);
+      HMI_HandleArpLiveToeToggle(toeNum, pressed);
       break;
    break;  default:
    }
@@ -708,8 +722,8 @@ void HMI_HomePage_UpdateDisplay() {
 
 
    // Current octave and volume always go on line 3
-   u32 percentVolume = (PEDALS_GetVolume()*100)/127;
-   snprintf(lineBuffer, DISPLAY_CHAR_WIDTH, "Octave:%d Vol:%d%",PEDALS_GetOctave(),percentVolume);
+   u32 percentVolume = (PEDALS_GetVolume() * 100) / 127;
+   snprintf(lineBuffer, DISPLAY_CHAR_WIDTH, "Octave:%d Vol:%d%", PEDALS_GetOctave(), percentVolume);
    HMI_RenderLine(3, lineBuffer, RENDER_LINE_CENTER);
 
    // Show the Current Mode on top line.
@@ -746,10 +760,10 @@ void HMI_HomePage_UpdateDisplay() {
       // Arpeggiator state in Line 2
       u16 bpm = ARP_GetBPM();
       if (ARP_GetEnabled()) {
-         snprintf(lineBuffer, DISPLAY_CHAR_WIDTH, "Arp: RUN  %d BPM",bpm);
+         snprintf(lineBuffer, DISPLAY_CHAR_WIDTH, "Arp: RUN  %d BPM", bpm);
       }
       else {
-         snprintf(lineBuffer, DISPLAY_CHAR_WIDTH, "Arp: STOP %d BPM",bpm);
+         snprintf(lineBuffer, DISPLAY_CHAR_WIDTH, "Arp: STOP %d BPM", bpm);
       }
       HMI_RenderLine(2, lineBuffer, RENDER_LINE_CENTER);
       break;
@@ -1031,89 +1045,120 @@ void HMI_SetArpSettingsIndicators() {
    // First the gen mode indicators
    switch (ARP_GetArpGenOrder()) {
    case ARP_GEN_ORDER_ASCENDING:
-      // shut off octave/random indicator
-      IND_SetIndicatorState(ARP_LIVE_TOE_GEN_ORDER_OCTAVE_RANDOM,IND_OFF);
-      IND_SetBlipIndicator(ARP_LIVE_TOE_GEN_ORDER_UP_DOWN,0,ARP_GetBPM());
+      IND_SetBlipIndicator(ARP_LIVE_TOE_GEN_ORDER, 0, ARP_GetBPM());
       break;
    case ARP_GEN_ORDER_DESCENDING:
-      // shut off octave/random indicator
-      IND_SetIndicatorState(ARP_LIVE_TOE_GEN_ORDER_OCTAVE_RANDOM,IND_OFF);
-      IND_SetBlipIndicator(ARP_LIVE_TOE_GEN_ORDER_UP_DOWN,1,ARP_GetBPM());
+      IND_SetBlipIndicator(ARP_LIVE_TOE_GEN_ORDER, 1, ARP_GetBPM());
       break;
    case ARP_GEN_ORDER_ASC_DESC:
-      // shut off octave/random indicator
-      IND_SetIndicatorState(ARP_LIVE_TOE_GEN_ORDER_OCTAVE_RANDOM,IND_OFF);
-      // Ascending and descending is 50% flash at BPM rate
-      IND_SetFlashIndicator(ARP_LIVE_TOE_GEN_ORDER_UP_DOWN, ARP_GetBPM());
-      break;
-   case ARP_GEN_ORDER_OCTAVE:
-      // shut off asc/desc indicator
-      IND_SetIndicatorState(ARP_LIVE_TOE_GEN_ORDER_UP_DOWN,IND_OFF);   
-      // Octave is 50% flash at BPM rate
-      IND_SetFlashIndicator(ARP_LIVE_TOE_GEN_ORDER_OCTAVE_RANDOM, ARP_GetBPM());
+      // TODO
       break;
    case ARP_GEN_ORDER_RANDOM:
-      // shut off asc/desc indicator
-      IND_SetIndicatorState(ARP_LIVE_TOE_GEN_ORDER_UP_DOWN,IND_OFF);   
-      // Random is a blip at the ARPM rate
-      IND_SetBlipIndicator(ARP_LIVE_TOE_GEN_ORDER_OCTAVE_RANDOM,0, ARP_GetBPM());
+      // TODO
       break;
    }
-   // TODO
-   IND_SetIndicatorState(1, IND_FLASH_BLIP);
+   // TODO the rest
+   // IND_SetIndicatorState(1, IND_FLASH_BLIP);
 }
 
 /////////////////////////////////////////////////////////////////////////////
 // Helper to handle Arp live toe toggle. 
 /////////////////////////////////////////////////////////////////////////////
-void HMI_HandleArpLiveToeToggle(u8 toeNum,u8 pressed){
+void HMI_HandleArpLiveToeToggle(u8 toeNum, u8 pressed) {
    u16 bpm;
-   switch(toeNum){
-      case ARP_LIVE_TOE_GEN_ORDER_UP_DOWN:
-         // Wrap the 3 modes on this toe switch
-         switch(ARP_GetArpGenOrder()){
-            case ARP_GEN_ORDER_ASCENDING:
-               ARP_SetArpGenOrder(ARP_GEN_ORDER_DESCENDING);
-               break;
-            case ARP_GEN_ORDER_DESCENDING:
-              ARP_SetArpGenOrder(ARP_GEN_ORDER_ASC_DESC);
-               break;
-            case ARP_GEN_ORDER_ASC_DESC:
-               ARP_SetArpGenOrder(ARP_GEN_ORDER_ASCENDING);
-               break;            
-         }
+   switch (toeNum) {
+   case ARP_LIVE_TOE_GEN_ORDER:
+      // Wrap the 3 modes on this toe switch
+      switch (ARP_GetArpGenOrder()) {
+      case ARP_GEN_ORDER_ASCENDING:
+         ARP_SetArpGenOrder(ARP_GEN_ORDER_DESCENDING);
          break;
-     case ARP_LIVE_TOE_GEN_ORDER_OCTAVE_RANDOM:
-         // Wrap the 2 modes on this toe switch
-         switch(ARP_GetArpGenOrder()){
-            case ARP_GEN_ORDER_OCTAVE:
-               ARP_SetArpGenOrder(ARP_GEN_ORDER_RANDOM);
-               break;
-            case ARP_GEN_ORDER_RANDOM:
-              ARP_SetArpGenOrder(ARP_GEN_ORDER_OCTAVE);
-               break;       
-         }
-      case ARP_LIVE_TOE_MAJOR_KEY:
-         // TODO
+      case ARP_GEN_ORDER_DESCENDING:
+         ARP_SetArpGenOrder(ARP_GEN_ORDER_ASC_DESC);
          break;
-      case ARP_LIVE_TOE_MINOR_KEY:
-         // TODO:
+      case ARP_GEN_ORDER_ASC_DESC:
+         ARP_SetArpGenOrder(ARP_GEN_ORDER_RANDOM);
          break;
-      case ARP_LIVE_TOE_TEMPO_INCREMENT:
-         bpm = ARP_GetBPM();
-         bpm += TEMP_CHANGE_STEP;         
-         ARP_SetBPM(bpm);
-         break;
-      case ARP_LIVE_TOE_TEMPO_DECREMENT:
-         bpm = ARP_GetBPM();
-         bpm -= TEMP_CHANGE_STEP;
-         ARP_SetBPM(bpm);
-         break;      
+      case ARP_GEN_ORDER_RANDOM:
+         ARP_SetArpGenOrder(ARP_GEN_ORDER_ASCENDING);
+      }
+      break;
+   case ARP_LIVE_TOE_SELECT_KEY:
+      PEDALS_SetSelectPedalCallback(HMI_SelectRootKeyCallback);
+      pedalSelectStatus = PEDAL_SELECT_ROOT_KEY;
+      break;
+   case ARP_LIVE_TOE_SELECT_MODE:
+      PEDALS_SetSelectPedalCallback(HMI_SelectModeScaleCallback);
+      pedalSelectStatus = PEDAL_SELECT_MODAL_SCALE;
+      break;
+   case ARP_LIVE_TOE_PRESET_1:
+      // TODO
+      break;
+   case ARP_LIVE_TOE_PRESET_2:
+      // TODO
+      break;
+   case ARP_LIVE_TOE_PRESET_3:
+      // TODO
+      break;
+   case ARP_LIVE_TOE_TEMPO_INCREMENT:
+      bpm = ARP_GetBPM();
+      bpm += TEMP_CHANGE_STEP;
+      ARP_SetBPM(bpm);
+      break;
+   case ARP_LIVE_TOE_TEMPO_DECREMENT:
+      bpm = ARP_GetBPM();
+      bpm -= TEMP_CHANGE_STEP;
+      ARP_SetBPM(bpm);
+      break;
    }
    // Update the current display to reflect any content change
    currentPage->pUpdateDisplayCallback();
 }
 
+/////////////////////////////////////////////////////////////////////////////
+// Callback for selecting the arpeggiator key from the pedals.
+/////////////////////////////////////////////////////////////////////////////
+void HMI_SelectRootKeyCallback(u8 pedalNum){   
+   ARP_SetRootKey(pedalNum);
+   pedalSelectStatus = PEDAL_SELECT_INACTIVE;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+// Callback for selecting the modal scale from the pedals.  Only the main
+// keys are valid.
+/////////////////////////////////////////////////////////////////////////////
+void HMI_SelectModeScaleCallback(u8 pedalNum){   
+   modes_t mode;
+   switch(pedalNum){
+   case 0:
+      mode = MODES_IONIAN;
+      break;
+   case 2:
+      mode = MODES_DORIAN;
+      break;
+   case 4:
+      mode = MODES_PHYRIGIAN;
+      break;
+   case 5:
+      mode = MODES_LYDIAN;
+      break;
+   case 7:
+      mode = MODES_MIXOLYDIAN;
+      break;
+   case 9:
+      mode = MODES_AEOLIAN;
+      break;
+   case 11: 
+      mode = MODES_LOCRIAN;
+      break;
+   default:
+      // invalid
+      return;
+   }  
+   ARP_SetModeScale(mode);      
+   pedalSelectStatus = PEDAL_SELECT_INACTIVE;
+}
 
 /////////////////////////////////////////////////////////////////////////////
 // Helper to store persisted data 

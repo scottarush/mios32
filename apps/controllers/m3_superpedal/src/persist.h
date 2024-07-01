@@ -37,6 +37,9 @@ extern s32 PERSIST_ReadBlock(persist_block_t block, unsigned char* pData, u16 le
 
 extern u16 PERSIST_GetStartAddress(persist_block_t blockType);
 
+extern s32 PERSIST_StoreMIDIRouter();
+extern void PERSIST_RestoreMidiRouter();
+
 /////////////////////////////////////////////////////////////////////////////
 // Export global variables
 /////////////////////////////////////////////////////////////////////////////

@@ -10,6 +10,7 @@
 #include <mios32_midi.h>
 
 #include "midi_presets.h"
+#include "pedals.h"
 #include "persist.h"
 
 #define DEBUG_ENABLED
