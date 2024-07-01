@@ -29,6 +29,10 @@
 // Local variables
 /////////////////////////////////////////////////////////////////////////////
 
+static const char * key_names[] ={"C","C#","D","Eb","E","F","F#","G","Ab","A","Bb","B"};
+
+static const char * mode_short_names[] ={"Maj","Dor","Phry","Lyd","Mixo","Min","Loc"};
+
 // Defines the natural chords in the mode by key.
 typedef struct mode_chords_entry_s {
    chord_type_t chords[12];
@@ -51,7 +55,7 @@ static const mode_chords_entry_t mode_chords_table[] = {
 // mode:  selected mode.
 // key:  normalized key from 0..11 
 /////////////////////////////////////////////////////////////////////////////
-const chord_type_t ARP_MODES_GetChordType(modes_t mode,key_t key){
+const chord_type_t ARP_MODES_GetChordType(mode_t mode,key_t key){
    if (mode > MAX_MODE_TYPE){
       DEBUG_MSG("ARP_MODES_GetChordType:  Invalid mode=%d",mode);
       return CHORD_ERROR;  // invalid
@@ -62,4 +66,24 @@ const chord_type_t ARP_MODES_GetChordType(modes_t mode,key_t key){
    }
    const mode_chords_entry_t * ptr = &mode_chords_table[mode];
    return ptr->chords[key];
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// Utility returns string name for each note.
+// input:  notenumber from 0 to 127
+/////////////////////////////////////////////////////////////////////////////
+const char * ARP_MODES_GetNoteName(u8 note){
+   u8 key = note % 12;
+   return key_names[key];
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// Utility returns mode name
+// input:  notenumber from 0 to 127
+/////////////////////////////////////////////////////////////////////////////
+const char * ARP_MODES_GetModeName(mode_t mode){
+   if (mode < MAX_MODE_TYPE){
+      return mode_short_names[mode];
+   }
+   return "Err!";
 }

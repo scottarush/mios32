@@ -206,6 +206,9 @@ void PEDALS_NotifyChange(u8 pedalNum, u8 pressed, u32 timestamp) {
    }
    // Check if select pedal callback non-null.  If so, then forward the pedal number and clear for next time
    if (selectPedalCallback != NULL){
+#ifdef DEBUG
+   DEBUG_MSG("Pedal %d selected.  Calling selectPedalCallback",pedalNum);
+#endif
       (*selectPedalCallback)(pedalNum);
       selectPedalCallback = NULL;
       return;

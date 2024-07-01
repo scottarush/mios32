@@ -30,20 +30,18 @@
 #define DEBUG
 #undef HW_DEBUG
 
-/////////////////////////////////////////////////////////////////////////////
+//----------------------------------------------------------------------------
 // HMI defines and macros
-/////////////////////////////////////////////////////////////////////////////
+//----------------------------------------------------------------------------
 
 
 #define LONG_PRESS_TIME_MS 3000
-
 #define DISPLAY_CHAR_WIDTH 20
-
 #define TEMP_CHANGE_STEP 5
 
-/////////////////////////////////////////////////////////////////////////////
+//----------------------------------------------------------------------------
 // Display page variables
-/////////////////////////////////////////////////////////////////////////////
+//----------------------------------------------------------------------------
 
 typedef enum pageID_e {
    PAGE_HOME = 0,
@@ -51,7 +49,8 @@ typedef enum pageID_e {
    PAGE_EDIT_VOICE_PRESET = 2,
    PAGE_EDIT_PATTERN_PRESET = 3,
    PAGE_MIDI_PROGRAM_SELECT = 4,
-   PAGE_EDIT_ARP_PRESET = 5
+   PAGE_ARP_SETTINGS = 5,
+   PAGE_DIALOG = 6,
 } pageID_t;
 
 struct page_s {
@@ -65,24 +64,25 @@ struct page_s {
    struct page_s* pBackPage;
 };
 
-struct page_s homePage;
-struct page_s midiProgramSelectPage;
-struct page_s arpLivePage;
+static struct page_s homePage;
+static struct page_s midiProgramSelectPage;
+static struct page_s dialogPage;
 
-struct page_s* currentPage;
-struct page_s* lastPage;
+static struct page_s* currentPage;
+static struct page_s* lastPage;
 
 // Main Page variables
-struct page_s mainPage;
+static struct page_s mainPage;
 typedef enum main_page_entries_e {
    MAIN_PAGE_ENTRY_EDIT_TOE_MIDI_PRESET = 0,
    MAIN_PAGE_ENTRY_EDIT_TOE_PATTERN_PRESET = 1,
-   MAIN_PAGE_ENTRY_EDIT_STOMP_SWITCH = 2
+   MAIN_PAGE_ENTRY_ARP_SETTINGS = 2,
+   MAIN_PAGE_ENTRY_ABOUT = 3
 } main_page_entries_t;
 
-#define NUM_MAIN_PAGE_ENTRIES 3
-char* mainPageEntries[] = { "Edit Voice Preset","Edit Pattern Preset","Edit Stomp Switch" };
-u8 lastSelectedMainPageEntry;
+#define NUM_MAIN_PAGE_ENTRIES 4
+static const char* mainPageEntries[] = { "Edit Voice Preset","Edit Pattern Preset","Arp Settings","About" };
+static u8 lastSelectedMainPageEntry;
 
 // Edit Voice Preset page variables
 struct page_s editVoicePresetPage;
@@ -94,8 +94,8 @@ typedef enum edit_voice_preset_page_entries_e {
 } edit_voice_preset_page_entries_t;
 #define NUM_EDIT_VOICE_PRESET_PAGE_ENTRIES 4
 
-char* editVoicePageEntries[] = { "MIDI Program Number","Octave","MIDI Output","MIDI Channel" };
-u8 lastSelectedEditVoicePresetPageEntry;
+static const char* editVoicePageEntries[] = { "MIDI Program Number","Octave","MIDI Output","MIDI Channel" };
+static u8 lastSelectedEditVoicePresetPageEntry;
 
 // Edit Pattern Preset page variables
 struct page_s editPatternPresetPage;
@@ -107,15 +107,20 @@ typedef enum render_line_mode_e {
    RENDER_LINE_RIGHT = 3
 } render_line_mode_t;
 
-/////////////////////////////////////////////////////////////////////////////
+// Dialog page variables
+static char dialogPageTitle[DISPLAY_CHAR_WIDTH];
+static char dialogPageMessage1[DISPLAY_CHAR_WIDTH];
+static char dialogPageMessage2[DISPLAY_CHAR_WIDTH];
+
+//----------------------------------------------------------------------------
 // Toe Switch types and non-persisted variables
-/////////////////////////////////////////////////////////////////////////////
+//----------------------------------------------------------------------------
 
 // Total list of functions availabe in ARP Live mode.  Can be mapped to toe switches
 // in preesets
 typedef enum arp_live_toe_functions_e {
    ARP_LIVE_TOE_SELECT_KEY = 1,
-   ARP_LIVE_TOE_SELECT_MODE = 2,
+   ARP_LIVE_TOE_SELECT_MODAL_SCALE = 2,
    ARP_LIVE_TOE_GEN_ORDER = 3,
    ARP_LIVE_TOE_PRESET_1 = 4,
    ARP_LIVE_TOE_PRESET_2 = 5,
@@ -126,17 +131,17 @@ typedef enum arp_live_toe_functions_e {
 
 
 // Text for the toe switch
-char* pToeSwitchModeTitles[] = { "Octave","Volume","MIDI Presets","Pattern Presets","Arpeggiator" };
+static const char* pToeSwitchModeTitles[] = { "Octave","Volume","MIDI Presets","Pattern Presets","Arpeggiator" };
 
 typedef struct switchState_s {
    u8 switchState;
    s32 switchPressTimeStamp;
    u8 handled;
 } switchState_t;
-switchState_t toeSwitchState[NUM_TOE_SWITCHES];
+static switchState_t toeSwitchState[NUM_TOE_SWITCHES];
 
 // Toe volume levels even split from 5 to 127
-u8 toeVolumeLevels[NUM_TOE_SWITCHES] = { 5,23,41,58,77,93,110,127 };
+static u8 toeVolumeLevels[NUM_TOE_SWITCHES] = { 5,23,41,58,77,93,110,127 };
 
 typedef enum pedal_select_functions_e {
    PEDAL_SELECT_INACTIVE = 0,
@@ -144,27 +149,27 @@ typedef enum pedal_select_functions_e {
    PEDAL_SELECT_MODAL_SCALE = 2
 } pedal_select_functions_t;
 
-pedal_select_functions_t pedalSelectStatus;
+static pedal_select_functions_t pedalSelectStatus;
 
-/////////////////////////////////////////////////////////////////////////////
+//----------------------------------------------------------------------------
 // Stomp Switch types and non-persisted variables
-/////////////////////////////////////////////////////////////////////////////
+//----------------------------------------------------------------------------
 
-switchState_t stompSwitchState[NUM_STOMP_SWITCHES];
+static switchState_t stompSwitchState[NUM_STOMP_SWITCHES];
 
-switchState_t backSwitchState;
-switchState_t encoderSwitchState;
+static switchState_t backSwitchState;
+static switchState_t encoderSwitchState;
 
-/////////////////////////////////////////////////////////////////////////////
+//----------------------------------------------------------------------------
 // Persisted data to E^2
-/////////////////////////////////////////////////////////////////////////////
+//----------------------------------------------------------------------------
 
-persisted_hmi_settings_t hmiSettings;
+static persisted_hmi_settings_t hmiSettings;
 
 
-/////////////////////////////////////////////////////////////////////////////
+//----------------------------------------------------------------------------
 // Local prototypes
-/////////////////////////////////////////////////////////////////////////////
+//----------------------------------------------------------------------------
 void HMI_RenderLine(u8, const char*, render_line_mode_t);
 void HMI_ClearLine(u8);
 void HMI_InitPages();
@@ -185,6 +190,8 @@ void HMI_MIDIProgramSelectPage_UpdateDisplay();
 void HMI_MIDIProgramSelectPage_RotaryEncoderChanged(s8 increment);
 void HMI_MIDIProgramSelectPage_RotaryEncoderSelected();
 void HMI_MIDIProgramSelectPage_BackButtonCallback();
+
+void HMI_DialogPage_UpdateDisplay();
 
 s32 HMI_PersistData();
 
@@ -314,7 +321,6 @@ void HMI_InitPages() {
    editVoicePresetPage.pBackButtonCallback = NULL;
    editVoicePresetPage.pBackPage = &mainPage;
 
-
    editPatternPresetPage.pageID = PAGE_EDIT_PATTERN_PRESET;
    char* patternPresetTitle = { "Edit Toe Ptrn Pset" };
    editPatternPresetPage.pPageTitle = patternPresetTitle;
@@ -337,6 +343,18 @@ void HMI_InitPages() {
    midiProgramSelectPage.pBackButtonCallback = HMI_MIDIProgramSelectPage_BackButtonCallback;
    midiProgramSelectPage.pBackPage = &editVoicePresetPage;
 
+   dialogPage.pageID = PAGE_DIALOG;
+   dialogPage.pPageTitle = dialogPageTitle;
+   dialogPageTitle[0] = 0;
+   dialogPage.pBackButtonCallback = NULL;
+   dialogPage.pPedalSelectedCallback = NULL;
+   dialogPage.pUpdateDisplayCallback = HMI_DialogPage_UpdateDisplay;
+   dialogPage.pRotaryEncoderChangedCallback = NULL;
+   dialogPage.pRotaryEncoderSelectCallback = NULL;
+   dialogPage.pBackPage = NULL;
+
+   dialogPageMessage1[0] = 0;
+   dialogPageMessage2[0] = 0;
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -720,15 +738,13 @@ void HMI_HomePage_UpdateDisplay() {
 
    char lineBuffer[DISPLAY_CHAR_WIDTH];
 
-
-   // Current octave and volume always go on line 3
+   // Current octave, arp state, and volume always go on line 3
    u32 percentVolume = (PEDALS_GetVolume() * 100) / 127;
-   snprintf(lineBuffer, DISPLAY_CHAR_WIDTH, "Octave:%d Vol:%d%", PEDALS_GetOctave(), percentVolume);
+   snprintf(lineBuffer, DISPLAY_CHAR_WIDTH, "O-%d V-%d Arp:%s",
+      PEDALS_GetOctave(), percentVolume, (ARP_GetEnabled() ? "RUN" : "STOP"));
    HMI_RenderLine(3, lineBuffer, RENDER_LINE_CENTER);
 
    // Show the Current Mode on top line.
-   // TODO replace the direct array access below with an indirect enum in order
-   // to enable customization of the stomp switches.
    snprintf(lineBuffer, DISPLAY_CHAR_WIDTH, "%s Mode",
       pToeSwitchModeTitles[hmiSettings.toeSwitchMode]);
    HMI_RenderLine(0, lineBuffer, RENDER_LINE_CENTER);
@@ -757,14 +773,10 @@ void HMI_HomePage_UpdateDisplay() {
       HMI_ClearLine(2);
       break;
    case TOE_SWITCH_ARP_LIVE:
-      // Arpeggiator state in Line 2
+      // Arpeggiator details in Line 2
       u16 bpm = ARP_GetBPM();
-      if (ARP_GetEnabled()) {
-         snprintf(lineBuffer, DISPLAY_CHAR_WIDTH, "Arp: RUN  %d BPM", bpm);
-      }
-      else {
-         snprintf(lineBuffer, DISPLAY_CHAR_WIDTH, "Arp: STOP %d BPM", bpm);
-      }
+     
+      snprintf(lineBuffer, DISPLAY_CHAR_WIDTH, "Scale: %s BPM: %d",  ARP_MODES_GetModeName(ARP_GetModeScale()),bpm);
       HMI_RenderLine(2, lineBuffer, RENDER_LINE_CENTER);
       break;
    default:
@@ -786,10 +798,27 @@ void HMI_HomePage_RotaryEncoderChanged(s8 increment) {
    currentPage->pUpdateDisplayCallback();
 }
 /////////////////////////////////////////////////////////////////////////////
-// Callback for rotary encoder select on home page.
+// Callback for rotary encoder select on home page
 /////////////////////////////////////////////////////////////////////////////
 void HMI_HomePage_RotaryEncoderSelect() {
    HMI_HomePage_RotaryEncoderChanged(1);
+}
+////////////////////////////////////////////////////////////////////////////
+// Callback to update the display on the Dialog page.
+// dialogPageTitle, Message1, and Message2 must be filled prior to entry
+////////////////////////////////////////////////////////////////////////////
+void HMI_DialogPage_UpdateDisplay() {
+   if (lastPage != currentPage) {
+      // Clear display
+      MIOS32_LCD_Clear();
+      // Set to keep from redrawing the entire display next time.
+      lastPage = currentPage;
+   }
+   HMI_RenderLine(0,dialogPageTitle, RENDER_LINE_CENTER);
+
+   HMI_RenderLine(1, "--------------------", RENDER_LINE_LEFT);
+   HMI_RenderLine(2,dialogPageMessage1,RENDER_LINE_CENTER);
+   HMI_RenderLine(3,dialogPageMessage2,RENDER_LINE_CENTER);
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -854,8 +883,14 @@ void HMI_MainPage_RotaryEncoderSelected() {
    case MAIN_PAGE_ENTRY_EDIT_TOE_PATTERN_PRESET:
       // TODO
       break;
-   case MAIN_PAGE_ENTRY_EDIT_STOMP_SWITCH:
+   case MAIN_PAGE_ENTRY_ARP_SETTINGS:
       // TODO
+      break;
+   case MAIN_PAGE_ENTRY_ABOUT:
+      lastPage = &mainPage;
+      snprintf(dialogPageTitle,DISPLAY_CHAR_WIDTH,"%s","About M3-SuperPedal");
+      snprintf(dialogPageMessage1,DISPLAY_CHAR_WIDTH,"%s",M3_SUPERPEDAL_VERSION);
+      dialogPageMessage2[0] = 0;
       break;
    default:
       return;
@@ -1084,12 +1119,32 @@ void HMI_HandleArpLiveToeToggle(u8 toeNum, u8 pressed) {
       }
       break;
    case ARP_LIVE_TOE_SELECT_KEY:
+      // Set the pedal callback
       PEDALS_SetSelectPedalCallback(HMI_SelectRootKeyCallback);
       pedalSelectStatus = PEDAL_SELECT_ROOT_KEY;
+      /// Go to the dialog page
+      snprintf(dialogPageTitle,DISPLAY_CHAR_WIDTH,"%s","Set Arp Root Key");
+      snprintf(dialogPageMessage1,DISPLAY_CHAR_WIDTH,"%s","Press Pedal to");
+      snprintf(dialogPageMessage1,DISPLAY_CHAR_WIDTH,"%s","Select Key");
+      dialogPage.pBackPage = &homePage;
+      currentPage = &dialogPage;
+      currentPage->pUpdateDisplayCallback();
+      // Flash the indicators
+      IND_FlashAll(0);
       break;
-   case ARP_LIVE_TOE_SELECT_MODE:
+   case ARP_LIVE_TOE_SELECT_MODAL_SCALE:
+      // Set the pedal callback
       PEDALS_SetSelectPedalCallback(HMI_SelectModeScaleCallback);
       pedalSelectStatus = PEDAL_SELECT_MODAL_SCALE;
+
+      // Go to the dialog page
+      snprintf(dialogPageTitle,DISPLAY_CHAR_WIDTH,"%s","Set Arp Modal Scale");
+      snprintf(dialogPageMessage1,DISPLAY_CHAR_WIDTH,"%s","Press Brown Pedal to");
+      snprintf(dialogPageMessage1,DISPLAY_CHAR_WIDTH,"%s","Select Mode");
+      dialogPage.pBackPage = &homePage;
+      currentPage = &dialogPage;
+      currentPage->pUpdateDisplayCallback();
+      IND_FlashAll(0);      
       break;
    case ARP_LIVE_TOE_PRESET_1:
       // TODO
@@ -1118,7 +1173,7 @@ void HMI_HandleArpLiveToeToggle(u8 toeNum, u8 pressed) {
 /////////////////////////////////////////////////////////////////////////////
 // Callback for selecting the arpeggiator key from the pedals.
 /////////////////////////////////////////////////////////////////////////////
-void HMI_SelectRootKeyCallback(u8 pedalNum){   
+void HMI_SelectRootKeyCallback(u8 pedalNum) {
    ARP_SetRootKey(pedalNum);
    pedalSelectStatus = PEDAL_SELECT_INACTIVE;
 }
@@ -1128,9 +1183,9 @@ void HMI_SelectRootKeyCallback(u8 pedalNum){
 // Callback for selecting the modal scale from the pedals.  Only the main
 // keys are valid.
 /////////////////////////////////////////////////////////////////////////////
-void HMI_SelectModeScaleCallback(u8 pedalNum){   
-   modes_t mode;
-   switch(pedalNum){
+void HMI_SelectModeScaleCallback(u8 pedalNum) {
+   mode_t mode;
+   switch (pedalNum) {
    case 0:
       mode = MODES_IONIAN;
       break;
@@ -1149,14 +1204,14 @@ void HMI_SelectModeScaleCallback(u8 pedalNum){
    case 9:
       mode = MODES_AEOLIAN;
       break;
-   case 11: 
+   case 11:
       mode = MODES_LOCRIAN;
       break;
    default:
       // invalid
       return;
-   }  
-   ARP_SetModeScale(mode);      
+   }
+   ARP_SetModeScale(mode);
    pedalSelectStatus = PEDAL_SELECT_INACTIVE;
 }
 

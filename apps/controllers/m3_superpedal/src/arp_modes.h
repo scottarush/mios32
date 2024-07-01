@@ -23,7 +23,7 @@ typedef enum modes_e {
    MODES_MIXOLYDIAN = 4,
    MODES_AEOLIAN = 5,
    MODES_LOCRIAN = 6
-} modes_t;
+} mode_t;
 #define MAX_MODE_TYPE 6
 
 typedef enum key_e {
@@ -45,7 +45,9 @@ typedef enum key_e {
 // Prototypes
 /////////////////////////////////////////////////////////////////////////////
 
-extern const chord_type_t ARP_MODES_GetChordType(modes_t mode,key_t key);
+extern const chord_type_t ARP_MODES_GetChordType(mode_t mode,key_t key);
+extern const char * ARP_MODES_GetNoteName(u8 note);
+extern const char * ARP_MODES_GetModeName(mode_t mode);
 
 /////////////////////////////////////////////////////////////////////////////
 // Export global variables

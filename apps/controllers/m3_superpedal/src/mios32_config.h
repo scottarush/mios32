@@ -10,6 +10,9 @@
 #ifndef _MIOS32_CONFIG_H
 #define _MIOS32_CONFIG_H
 
+// Version string
+#define M3_SUPERPEDAL_VERSION "Version: 1.0 01JUL2024"
+
 // This disables the boot message to the LCD display (still goes to the terminal)
 // Otherwise it overwrites the one in the call trace from APP_Init() since APP_Init is
 // called in programming_models/traditional/main.c before the MIOS32 boot messages
@@ -42,8 +45,5 @@
 // EEPROM emulation
 // SIZE == 2048 halfwords -> 4096 bytes
 #define EEPROM_EMULATED_SIZE 2048
-
-// magic number in EEPROM 'M3SP' - if it doesn't exist at address 0x00..0x03, the EEPROM will be cleared
-#define EEPROM_MAGIC_NUMBER 0x6D337370 
 
 #endif /* _MIOS32_CONFIG_H */
