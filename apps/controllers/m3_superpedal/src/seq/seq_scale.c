@@ -363,3 +363,95 @@ s32 SEQ_SCALE_Note(mios32_midi_package_t *p, u8 scale, u8 root)
 
   return 0; // no error
 }
+
+/////////////////////////////////////////////////////////////////////////////
+// Returns number of distinct notes in the scale.
+// IN:  u8 scale #
+// # of notes in the scale or -1 if invalid scale #
+/////////////////////////////////////////////////////////////////////////////
+s32 SEQ_SCALE_GetScaleLength(u8 scale){
+   if (scale > SEQ_SCALE_NumGet()){
+      return -1;
+   }
+   u8 note = 0;
+   u8 count = 0;
+   for(u8 i=1;i < 12;i++){
+      // get scaled value from table
+      u8 tmp = seq_scale_table[scale].notes[i>>1];
+      u8 nextNote = (i & 1) ? (tmp >> 4) : (tmp & 0xf);
+      if (nextNote != note){
+         count++;
+         note = nextNote;
+      }
+   }
+   return count;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// Utility for determining whether a note is part of a scale.
+// scale: to search
+// note:  notenumber from 0 to 127
+// root:   root note of the scale from 0..11
+// returns:  1 if part of scale, 0 if not in scale
+/////////////////////////////////////////////////////////////////////////////
+u8 SEQ_SCALE_IsNoteInScale(u8 scale,u8 rootNote,u8 note){
+   // Decrement note and then call SEQ_SCALE_NextNoteInScale.  If the 
+   // returned note is the same then this note is part of scale.  If not, then
+   // it is not in the scale
+   int prevNote = note-1;
+   if (prevNote < 0){
+      prevNote = 11;
+   }
+   
+   s32 index = SEQ_SCALE_GetScaleIndex(scale,rootNote,note);
+   return (index >= 0) ? 1 : 0;
+}
+
+////////////////////////////////////////////////////////////////////////////
+// Utility for determining the index into the scale
+// scale: to search
+// root:  rootNote of the key 
+// note:  notenumber from 0 to 127
+// scale:  
+// returns:  -1 if note note part of scale or index number from 0..scale length if valid
+/////////////////////////////////////////////////////////////////////////////
+s32 SEQ_SCALE_GetScaleIndex(u8 scale,u8 root,u8 note){
+   if (scale > SEQ_SCALE_NumGet()){
+      return -1;
+   }
+   u8 normNote = note %12;
+   u8 normRoot = root % 12;
+   
+   u8 keyNote = 0;
+   if (normNote >= normRoot){
+      keyNote = normNote-normRoot;
+   }
+   else{
+      // key is below root so add 12 then subtract
+      keyNote = normNote+12-normRoot;
+   }
+   if (keyNote == 0){
+      return 0;  // always part of scale
+   }
+
+   u8 index = 0;
+   u8 prevKey = 0;
+   for(u8 i=1;i < 12;i++){
+      // get scaled value from table
+      u8 tmp = seq_scale_table[scale].notes[i>>1];
+      u8 nextKey = (i & 1) ? (tmp >> 4) : (tmp & 0xf);
+      if (nextKey != prevKey){
+         index++;
+         if (keyNote == nextKey){
+            return index;
+         }
+         else if (keyNote < nextKey){
+            // We went past the scale without a matched return above so the 
+            // note must not actually be in the scale
+            return -1;
+         }
+         prevKey = nextKey;
+      }
+   }
+   return -1;  // Can't happen
+}

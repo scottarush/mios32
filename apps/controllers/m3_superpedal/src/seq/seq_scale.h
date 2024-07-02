@@ -29,7 +29,7 @@
 // Enum constants are indexes into seq_scale_table so that they 
 // can be used in SEQ_SCALE_NameGet, NoteValueGet, etc.
 /////////////////////////////////////////////////////////////////////////////
-typedef enum scales_e {
+typedef enum scale_e {
    SCALE_MAJOR = 0,
    SCALE_HARMONIC_MINOR =1,
    SCALE_MELODIC_MINOR = 2,
@@ -69,10 +69,11 @@ typedef enum scales_e {
    SCALE_DOMINANT_7TH = 37,
    SCALE_DOUBLE_HARMONIC = 38,
    SCALE_EGYPTIAN = 39,
-   SCALE_EIGHT_TONE_SPANISH = 40
+   SCALE_EIGHT_TONE_SPANISH = 40,
    // TODO:  Finish all of the others later
-} scales_t;
-
+   SCALE_INVALID = 0xFF
+} scale_t;
+#define SCALE_MAX_ENUM_VALUE 40
 
 /////////////////////////////////////////////////////////////////////////////
 // Prototypes
@@ -81,10 +82,14 @@ typedef enum scales_e {
 extern s32 SEQ_SCALE_Init(u32 mode);
 
 extern s32 SEQ_SCALE_NumGet(void);
-extern char *SEQ_SCALE_NameGet(u8 scale);
+extern char * SEQ_SCALE_NameGet(u8 scale);
 
 extern s32 SEQ_SCALE_NoteValueGet(u8 note, u8 scale, u8 root);
 extern s32 SEQ_SCALE_NextNoteInScale(u8 current_note, u8 scale, u8 root);
+
+extern s32 SEQ_SCALE_GetScaleLength(u8 scale);
+extern s32 SEQ_SCALE_GetScaleIndex(u8 scale,u8 root,u8 note);
+extern u8 SEQ_SCALE_IsNoteInScale(u8 scale,u8 rootNote,u8 note);
 
 extern s32 SEQ_SCALE_Note(mios32_midi_package_t *p, u8 scale, u8 root);
 

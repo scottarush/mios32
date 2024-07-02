@@ -13,7 +13,6 @@
 
 #include <notestack.h>
 
-#include "seq_chord.h"
 #include "arp_modes.h"
 
 /////////////////////////////////////////////////////////////////////////////
@@ -35,7 +34,7 @@ typedef enum arp_mode_e {
    // Depressed keys only
    ARP_MODE_KEYS = 0,
    // Single key/pedal press arpeggiates a chord from the root.
-   ARP_MODE_ROOT = 1
+   ARP_MODE_CHORD = 1
 } arp_mode_t;
 
 /////////////////////////////////////////////////////////////////////////////
@@ -48,7 +47,8 @@ typedef struct persisted_arp_data_s {
    arp_gen_order_t genOrder;
    arp_mode_t arpMode;
    key_t rootKey;
-   mode_t modeScale;
+   scale_t modeScale;
+   chord_extflags_t chordExtFlags;
    int ppqn;
    double bpm;
 } persisted_arp_data_t;
@@ -79,8 +79,10 @@ extern float ARP_GetBPM();
 extern void ARP_SetBPM(u16 bpm);
 
 extern void ARP_SetRootKey(u8 rootKey);
-extern void ARP_SetModeScale(mode_t mode);
-extern mode_t ARP_GetModeScale();
+extern u8 ARP_GetRootKey();
+
+extern void ARP_SetModeScale(scale_t scale);
+extern scale_t ARP_GetModeScale();
 
 /////////////////////////////////////////////////////////////////////////////
 // Export global variables

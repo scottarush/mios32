@@ -6,7 +6,7 @@
 #define _ARP_MODES_H
 
 #include "seq_chord.h"
-
+#include "seq_scale.h"
 /////////////////////////////////////////////////////////////////////////////
 // Global definitions
 /////////////////////////////////////////////////////////////////////////////
@@ -15,17 +15,6 @@
 /////////////////////////////////////////////////////////////////////////////
 // Global Types
 /////////////////////////////////////////////////////////////////////////////
-typedef enum mode_e {
-   MODE_IONIAN = 0,
-   MODE_DORIAN = 1,
-   MODE_PHYRIGIAN = 2,
-   MODE_LYDIAN= 3,
-   MODE_MIXOLYDIAN = 4,
-   MODE_AEOLIAN = 5,
-   MODE_LOCRIAN = 6,
-   MODE_INVALID = 0xFF
-} mode_t;
-#define MAX_MODE_TYPE 6
 
 typedef enum key_e {
    KEY_C = 0,
@@ -42,13 +31,18 @@ typedef enum key_e {
    KEY_B = 11
 } key_t;
 
+typedef enum chord_extflags_e {
+   CHORD_EXT_NONE = 0,
+   CHORD_EXT_SEVENTH = 0x01,
+   CHORD_EXT_OCTAVE1 = 0X02
+}  chord_extflags_t;
+
 /////////////////////////////////////////////////////////////////////////////
 // Prototypes
 /////////////////////////////////////////////////////////////////////////////
 
-extern const chord_type_t ARP_MODES_GetChordType(mode_t mode,key_t key);
 extern const char * ARP_MODES_GetNoteName(u8 note);
-extern const char * ARP_MODES_GetModeName(mode_t mode);
+extern const chord_type_t ARP_MODES_GetModeChord(scale_t scale,chord_extflags_t extFlags,u8 keySig,u8 note);
 
 /////////////////////////////////////////////////////////////////////////////
 // Export global variables

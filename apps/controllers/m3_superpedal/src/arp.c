@@ -49,11 +49,11 @@ static s32 ARP_FillNoteStack();
 // the arpeggiator position
 static u8 arp_counter;
 
-// current root note for ARP_ROOT_MODE or 0 if invalid/not active
-static u8 rootNote;
+// current root note for ARP_CHORD_MODE or 0 if invalid/not active
+static u8 chordModeNote;
 
 // velocity for root note
-static u8 rootNoteVelocity;
+static u8 chordModeNoteVelocity;
 
 // pause mode (will be controlled from user interface)
 static u8 arpPause = 0;
@@ -86,9 +86,10 @@ s32 ARP_Init()
    if (valid < 0) {
       DEBUG_MSG("ARP_Init:  PERSIST_ReadBlock return invalid. Re-initing persisted settings to defaults");
       arpSettings.genOrder = ARP_GEN_ORDER_ASCENDING;
-      arpSettings.arpMode = ARP_MODE_ROOT;
+      arpSettings.arpMode = ARP_MODE_CHORD;
       arpSettings.rootKey = KEY_C;
-      arpSettings.modeScale = MODE_AEOLIAN;
+      arpSettings.modeScale = SCALE_AEOLIAN;
+      arpSettings.chordExtFlags = 0;
       arpSettings.ppqn = 384;
       arpSettings.bpm = 120.0;
 
@@ -97,8 +98,8 @@ s32 ARP_Init()
          DEBUG_MSG("ARP_Init:  Error persisting settings to EEPROM");
       }
 
-      rootNote = 0;  // invalid, inactive
-      rootNoteVelocity = 0;
+      chordModeNote = 0;  // invalid, inactive
+      chordModeNoteVelocity = 0;
    }
 
    // clear the arp counter
@@ -272,18 +273,18 @@ s32 ARP_FillNoteStack() {
    // Clear the note stack
    NOTESTACK_Clear(&notestack);
 
-   // Get the keys of the chord using the rootNote, the current modeScale, and the octave of the key
-   u8 rootKey = rootNote % 12;
-
-   const chord_type_t chord = ARP_MODES_GetChordType(arpSettings.modeScale, rootKey);
+   // Get the keys of the chord
+   const chord_type_t chord = ARP_MODES_GetModeChord(arpSettings.modeScale, 
+         arpSettings.chordExtFlags,arpSettings.rootKey,chordModeNote);
    if ((chord == CHORD_INVALID) || (chord == CHORD_ERROR)) {
-      DEBUG_MSG("ARP_FillNoteStack: Invalid modeScale=%d or rootKey=%d combination", arpSettings.modeScale, rootKey);
+      DEBUG_MSG("ARP_FillNoteStack: Invalid modeScale=%d, extFlags=%d, or chordModeNote=%d combination", 
+         arpSettings.modeScale, arpSettings.chordExtFlags,chordModeNote);
       return -1;
    }
    // Compute octave by subtracting C-2 (note 24)
-   s8 octave = ((rootNote - 24) / 12) - 1;
+   s8 octave = ((chordModeNote - 24) / 12) - 1;
 #ifdef DEBUG
-   DEBUG_MSG("ARP_FillNoteStack:  Filling stack for chord: %s, rootKey=%d octave=%d", SEQ_CHORD_NameGetByEnum(chord), rootKey, octave);
+   DEBUG_MSG("ARP_FillNoteStack:  Filling stack for chord: %s, chordModeNote=%d octave=%d", SEQ_CHORD_NameGetByEnum(chord), chordModeNote, octave);
 #endif   
    // Push the keys one by one onto the note stack in the proper gen order
    for (int count = 0; count < 6;count++) {
@@ -302,9 +303,9 @@ s32 ARP_FillNoteStack() {
       }
       s32 note = SEQ_CHORD_NoteGetByEnum(keyNum, chord, octave);
       if (note >= 0) {
-         // Add root key offset to transpose to the correct key.  rootKey = 0 is C.
-         note += rootKey;
-         NOTESTACK_Push(&notestack, note, rootNoteVelocity);
+         // add offset for the chordModeNote
+         note += (chordModeNote %12);
+         NOTESTACK_Push(&notestack, note, chordModeNoteVelocity);
       }
    }
 
@@ -323,7 +324,7 @@ s32 ARP_NotifyNoteOn(u8 note, u8 velocity)
       return 0;   // Not consumed
    }
    u8 clear_stack = 0;
-   if (arpSettings.arpMode == ARP_MODE_ROOT) {
+   if (arpSettings.arpMode == ARP_MODE_CHORD) {
       if (velocity == 0) {
          // It's a release, fall through to clear the stack
          clear_stack = 1;
@@ -331,9 +332,7 @@ s32 ARP_NotifyNoteOn(u8 note, u8 velocity)
       else {
          // Save the root and verify that it has a valid chord in the current scale.
          // If not then just add it alone to the notestack.
-
-         u8 key = note % 12;
-         chord_type_t chord = ARP_MODES_GetChordType(arpSettings.modeScale, key);
+         chord_type_t chord = ARP_MODES_GetModeChord(arpSettings.modeScale, arpSettings.chordExtFlags, arpSettings.rootKey,note);
          if (chord == CHORD_INVALID) {
             // This key is not a valid key in this cord.  Just fill the note stack with 
             // this single note instead
@@ -342,8 +341,8 @@ s32 ARP_NotifyNoteOn(u8 note, u8 velocity)
          }
          else {
             // This is a valid root of a chord witin the scale so replace the root and refill the stack
-            rootNote = note;
-            rootNoteVelocity = velocity;
+            chordModeNote = note;
+            chordModeNoteVelocity = velocity;
             ARP_FillNoteStack();
          }
       }
@@ -483,13 +482,13 @@ void ARP_SetRootKey(u8 rootKey) {
 /////////////////////////////////////////////////////////////////////////////
 // Returns current ModeScale
 /////////////////////////////////////////////////////////////////////////////
-mode_t ARP_GetModeScale() {
+scale_t ARP_GetModeScale() {
    return arpSettings.modeScale;
 }
 /////////////////////////////////////////////////////////////////////////////
 // Sets the mode and persists to EEPROM
 /////////////////////////////////////////////////////////////////////////////
-void ARP_SetModeScale(mode_t mode) {
-   arpSettings.modeScale = mode;
+void ARP_SetModeScale(scale_t scale) {
+   arpSettings.modeScale = scale;
    ARP_PersistData();
 }

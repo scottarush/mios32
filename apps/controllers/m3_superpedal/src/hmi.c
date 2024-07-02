@@ -100,19 +100,19 @@ static u8 lastSelectedEditVoicePresetPageEntry;
 // Edit Pattern Preset page variables
 struct page_s editPatternPresetPage;
 
-typedef enum render_line_mode_e {
+typedef enum renderline_justify_e {
    RENDER_LINE_LEFT = 0,
    RENDER_LINE_CENTER = 1,
    RENDER_LINE_SELECT = 2,
    RENDER_LINE_RIGHT = 3
-} render_line_mode_t;
+} renderline_justify_t;
 
 // Buffer for dialog Page Title
-static char dialogPageTitle[DISPLAY_CHAR_WIDTH];
+static char dialogPageTitle[DISPLAY_CHAR_WIDTH+1];
 // Buffer for dialog Page Message Line 1
-static char dialogPageMessage1[DISPLAY_CHAR_WIDTH];
+static char dialogPageMessage1[DISPLAY_CHAR_WIDTH+1];
 // Buffer for dialog Page Message Line 2
-static char dialogPageMessage2[DISPLAY_CHAR_WIDTH];
+static char dialogPageMessage2[DISPLAY_CHAR_WIDTH+1];
 
 //----------------------------------------------------------------------------
 // Toe Switch types and non-persisted variables
@@ -164,7 +164,7 @@ static persisted_hmi_settings_t hmiSettings;
 //----------------------------------------------------------------------------
 // Local prototypes
 //----------------------------------------------------------------------------
-void HMI_RenderLine(u8, const char*, render_line_mode_t);
+void HMI_RenderLine(u8, const char*, renderline_justify_t);
 void HMI_ClearLine(u8);
 void HMI_InitPages();
 
@@ -658,7 +658,7 @@ void HMI_NotifyBackToggle(u8 pressed, s32 timestamp) {
 // Helper function renders a line and pads out to full display width or
 // truncates to width
 /////////////////////////////////////////////////////////////////////////////
-void HMI_RenderLine(u8 lineNum, const char* pLineText, render_line_mode_t renderMode) {
+void HMI_RenderLine(u8 lineNum, const char* pLineText, renderline_justify_t renderMode) {
    char lineBuffer[DISPLAY_CHAR_WIDTH + 1] = "";
    u8 leftIndent = 0;
    switch (renderMode) {
@@ -736,16 +736,17 @@ void HMI_HomePage_UpdateDisplay() {
       lastPage = currentPage;
    }
 
-   char lineBuffer[DISPLAY_CHAR_WIDTH];
+   char lineBuffer[DISPLAY_CHAR_WIDTH+1];
+   char scratchBuffer[DISPLAY_CHAR_WIDTH+1];
 
    // Current octave, arp state, and volume always go on line 3
    u32 percentVolume = (PEDALS_GetVolume() * 100) / 127;
-   snprintf(lineBuffer, DISPLAY_CHAR_WIDTH, "Oct:%d V:%d Arp:%s",
+   snprintf(lineBuffer, DISPLAY_CHAR_WIDTH+1, "Oct:%d V:%d Arp:%s",
       PEDALS_GetOctave(), percentVolume, (ARP_GetEnabled() ? "RUN" : "STOP"));
    HMI_RenderLine(3, lineBuffer, RENDER_LINE_CENTER);
 
    // Show the Current Mode on top line.
-   snprintf(lineBuffer, DISPLAY_CHAR_WIDTH, "%s Mode",
+   snprintf(lineBuffer, DISPLAY_CHAR_WIDTH+1, "%s Mode",
       pToeSwitchModeTitles[hmiSettings.toeSwitchMode]);
    HMI_RenderLine(0, lineBuffer, RENDER_LINE_CENTER);
    HMI_RenderLine(1, "--------------------", RENDER_LINE_LEFT);
@@ -775,8 +776,18 @@ void HMI_HomePage_UpdateDisplay() {
    case TOE_SWITCH_ARP_LIVE:
       // Arpeggiator details in Line 2
       u16 bpm = ARP_GetBPM();
+      // Truncate scale/mode name
+      const char * scaleName = SEQ_SCALE_NameGet(ARP_GetModeScale());
+      u8 truncLength = 9;
+      u8 nameLength = strlen(scaleName);
+      if (nameLength< truncLength){
+         truncLength = nameLength;
+      }
+      memcpy(scratchBuffer,scaleName,truncLength);
+      scratchBuffer[truncLength]= '\0';
 
-      snprintf(lineBuffer, DISPLAY_CHAR_WIDTH, "Scale: %s BPM: %d", ARP_MODES_GetModeName(ARP_GetModeScale()), bpm);
+      snprintf(lineBuffer, DISPLAY_CHAR_WIDTH+1, "%s %s %d BPM", 
+         ARP_MODES_GetNoteName(ARP_GetRootKey()),scratchBuffer,bpm);
       HMI_RenderLine(2, lineBuffer, RENDER_LINE_CENTER);
       break;
    default:
@@ -876,9 +887,9 @@ void HMI_MainPage_RotaryEncoderSelected() {
       break;
    case MAIN_PAGE_ENTRY_ABOUT:
       lastPage = &mainPage;
-      snprintf(dialogPageTitle, DISPLAY_CHAR_WIDTH, "%s", "About M3-SuperPedal");
-      snprintf(dialogPageMessage1, DISPLAY_CHAR_WIDTH, "%s", M3_SUPERPEDAL_VERSION);
-      dialogPageMessage2[0] = 0;
+      snprintf(dialogPageTitle, DISPLAY_CHAR_WIDTH+1, "%s", "About M3-SuperPedal");
+      snprintf(dialogPageMessage1, DISPLAY_CHAR_WIDTH+1, "%s", M3_SUPERPEDAL_VERSION);
+      dialogPageMessage2[0] = '\0';
       break;
    default:
       return;
@@ -1057,10 +1068,10 @@ void HMI_SetArpSettingsIndicators() {
    // First the gen mode indicators
    switch (ARP_GetArpGenOrder()) {
    case ARP_GEN_ORDER_ASCENDING:
-      IND_SetBlipIndicator(ARP_LIVE_TOE_GEN_ORDER, 0, ARP_GetBPM());
+      IND_SetBlipIndicator(ARP_LIVE_TOE_GEN_ORDER, 0, ARP_GetBPM()/60);
       break;
    case ARP_GEN_ORDER_DESCENDING:
-      IND_SetBlipIndicator(ARP_LIVE_TOE_GEN_ORDER, 1, ARP_GetBPM());
+      IND_SetBlipIndicator(ARP_LIVE_TOE_GEN_ORDER, 1, ARP_GetBPM()/60);
       break;
    case ARP_GEN_ORDER_ASC_DESC:
       // TODO
@@ -1097,9 +1108,9 @@ void HMI_HandleArpLiveToeToggle(u8 toeNum, u8 pressed) {
       break;
    case ARP_LIVE_TOE_SELECT_KEY:
       /// Go to the dialog page
-      snprintf(dialogPageTitle, DISPLAY_CHAR_WIDTH, "%s", "Set Arp Root Key");
-      snprintf(dialogPageMessage1, DISPLAY_CHAR_WIDTH, "%s", "Press Pedal to");
-      snprintf(dialogPageMessage2, DISPLAY_CHAR_WIDTH, "%s", "Select Key");
+      snprintf(dialogPageTitle, DISPLAY_CHAR_WIDTH+1, "%s", "Set Arp Root Key");
+      snprintf(dialogPageMessage1, DISPLAY_CHAR_WIDTH+1, "%s", "Press Pedal to");
+      snprintf(dialogPageMessage2, DISPLAY_CHAR_WIDTH+1, "%s", "Select Key");
       dialogPage.pBackPage = currentPage;
       lastPage = currentPage;
       currentPage = &dialogPage;
@@ -1112,9 +1123,9 @@ void HMI_HandleArpLiveToeToggle(u8 toeNum, u8 pressed) {
       break;
    case ARP_LIVE_TOE_SELECT_MODAL_SCALE:
       // Go to the dialog page
-      snprintf(dialogPageTitle, DISPLAY_CHAR_WIDTH, "%s", "Set Arp Modal Scale  ");
-      snprintf(dialogPageMessage1, DISPLAY_CHAR_WIDTH, "%s", "Press Brown Pedal to");
-      snprintf(dialogPageMessage2, DISPLAY_CHAR_WIDTH, "%s", "Select Mode");
+      snprintf(dialogPageTitle, DISPLAY_CHAR_WIDTH+1, "%s", "Set Arp Modal Scale  ");
+      snprintf(dialogPageMessage1, DISPLAY_CHAR_WIDTH+1, "%s", "Press Brown Pedal to");
+      snprintf(dialogPageMessage2, DISPLAY_CHAR_WIDTH+1, "%s", "Select Mode");
       dialogPage.pBackPage = currentPage;
       lastPage = currentPage;
       currentPage = &dialogPage;
@@ -1153,7 +1164,7 @@ void HMI_HandleArpLiveToeToggle(u8 toeNum, u8 pressed) {
 // Callback for selecting the arpeggiator key from the pedals.
 /////////////////////////////////////////////////////////////////////////////
 void HMI_SelectRootKeyCallback(u8 pedalNum) {
-   ARP_SetRootKey(pedalNum);
+   ARP_SetRootKey(pedalNum-1);
    // go back to last page and refresh displays
    lastPage = NULL;
    currentPage = &homePage;
@@ -1171,35 +1182,37 @@ void HMI_SelectModeScaleCallback(u8 pedalNum) {
    DEBUG_MSG("HMI_SelectModeScaleCallback called with pedal #%d", pedalNum);
 #endif
 
-   mode_t mode;
+   scale_t mode;
+   u8 valid = 1;
    switch (pedalNum) {
    case 1:
-      mode = MODE_IONIAN;
+      mode = SCALE_IONIAN;
       break;
    case 3:
-      mode = MODE_DORIAN;
+      mode = SCALE_DORIAN;
       break;
    case 5:
-      mode = MODE_PHYRIGIAN;
+      mode = SCALE_PHRYGIAN;
       break;
    case 6:
-      mode = MODE_LYDIAN;
+      mode = SCALE_LYDIAN;
       break;
    case 8:
-      mode = MODE_MIXOLYDIAN;
+      mode = SCALE_MIXOLYDIAN;
       break;
    case 10:
-      mode = MODE_AEOLIAN;
+      mode = SCALE_AEOLIAN;
       break;
    case 12:
-      mode = MODE_LOCRIAN;
+      mode = SCALE_LOCRIAN;
       break;
    default:
       // invalid
-      return;
+      valid = 0;
    }
-   ARP_SetModeScale(mode);
-
+   if (valid){
+      ARP_SetModeScale(mode);
+   }
    // go back to home page and refresh displays
    lastPage = NULL;
    currentPage = &homePage;
