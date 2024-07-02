@@ -27,7 +27,7 @@
 // Local defines
 /////////////////////////////////////////////////////////////////////////////
 
-#undef DEBUG_ENABLED
+#undef DEBUG
 
 #define DEBUG_MSG MIOS32_MIDI_SendDebugMessage
 
@@ -196,7 +196,9 @@ void PEDALS_NotifyMakeChange(u8 pressed, u32 timestamp) {
 void PEDALS_NotifyChange(u8 pedalNum, u8 pressed, u32 timestamp) {
    persisted_pedal_confg_t* pc = (persisted_pedal_confg_t*)&pedal_config;
 
-   //DEBUG_MSG("PEDALS_NotifyChange: pedal %d %s.  time=%d",pedalNum, pressed > 0 ? "pressed" : "released",timestamp);
+#ifdef DEBUG
+   DEBUG_MSG("PEDALS_NotifyChange: pedal %d %s.  time=%d",pedalNum, pressed > 0 ? "pressed" : "released",timestamp);
+#endif
 
    u8 note_number = 0;
 
@@ -207,7 +209,7 @@ void PEDALS_NotifyChange(u8 pedalNum, u8 pressed, u32 timestamp) {
    // Check if select pedal callback non-null.  If so, then forward the pedal number and clear for next time
    if (selectPedalCallback != NULL){
 #ifdef DEBUG
-   DEBUG_MSG("Pedal %d selected.  Calling selectPedalCallback",pedalNum);
+   DEBUG_MSG("Pedal %d selected.  Calling selectPedalCallback 0x%x",pedalNum,selectPedalCallback);
 #endif
       (*selectPedalCallback)(pedalNum);
       selectPedalCallback = NULL;
@@ -266,7 +268,7 @@ s32 PEDALS_SendNote(u8 note_number, u8 velocity, u8 pressed) {
 
    // Compute velocity and send to the Arpeggiator.  If consumed there then don't send to 
    u8 scaledVelocity = PEDALS_ScaleVelocity(velocity, PEDALS_GetVolume());
-   #ifdef DEBUG_ENABLED
+   #ifdef DEBUG
       DEBUG_MSG("PEDALS_SendNote: velocity=%d scaledVelocity=%d", velocity, scaledVelocity);
    #endif   
    u8 arpConsumed = 0;
@@ -322,6 +324,7 @@ void PEDALS_SendAllNotesOff() {
    for (int i = 0;i < PEDALS_NOTE_ON_LIST_MAX;i++) {
       if (noteOnNumbersList[i] != 0) {
          PEDALS_SendNote(noteOnNumbersList[i], pedal_config.minimum_release_velocity, 0);
+         noteOnNumbersList[i] = 0;
       }
    }
 }
@@ -400,6 +403,9 @@ u8 PEDALS_GetVolume() {
 // will be forwarded to the provide callback function
 /////////////////////////////////////////////////////////////////////////////
 void PEDALS_SetSelectPedalCallback(GetSelectedPedal callback){
+#ifdef DEBUG
+   DEBUG_MSG("PEDALS_SetSelectPedalCallback:  Setting callback pointer 0x%x",callback);
+#endif
    selectPedalCallback = callback;   
 }
 
@@ -408,7 +414,7 @@ void PEDALS_SetSelectPedalCallback(GetSelectedPedal callback){
 // Global function to store persisted pedal data 
 /////////////////////////////////////////////////////////////////////////////
 void PEDALS_PersistData() {
-#ifdef DEBUG_ENABLED
+#ifdef DEBUG
    DEBUG_MSG("MIDI_PRESETS_PersistData: Writing persisted data:  sizeof(presets)=%d bytes", sizeof(persisted_pedal_confg_t));
 #endif
    s32 valid = PERSIST_StoreBlock(PERSIST_PEDALS_BLOCK, (unsigned char*)&pedal_config, sizeof(pedal_config));

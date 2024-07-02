@@ -15,14 +15,15 @@
 /////////////////////////////////////////////////////////////////////////////
 // Global Types
 /////////////////////////////////////////////////////////////////////////////
-typedef enum modes_e {
-   MODES_IONIAN = 0,
-   MODES_DORIAN = 1,
-   MODES_PHYRIGIAN = 2,
-   MODES_LYDIAN= 3,
-   MODES_MIXOLYDIAN = 4,
-   MODES_AEOLIAN = 5,
-   MODES_LOCRIAN = 6
+typedef enum mode_e {
+   MODE_IONIAN = 0,
+   MODE_DORIAN = 1,
+   MODE_PHYRIGIAN = 2,
+   MODE_LYDIAN= 3,
+   MODE_MIXOLYDIAN = 4,
+   MODE_AEOLIAN = 5,
+   MODE_LOCRIAN = 6,
+   MODE_INVALID = 0xFF
 } mode_t;
 #define MAX_MODE_TYPE 6
 

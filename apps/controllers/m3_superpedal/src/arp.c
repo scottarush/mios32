@@ -88,7 +88,7 @@ s32 ARP_Init()
       arpSettings.genOrder = ARP_GEN_ORDER_ASCENDING;
       arpSettings.arpMode = ARP_MODE_ROOT;
       arpSettings.rootKey = KEY_C;
-      arpSettings.modeScale = MODES_AEOLIAN;
+      arpSettings.modeScale = MODE_AEOLIAN;
       arpSettings.ppqn = 384;
       arpSettings.bpm = 120.0;
 

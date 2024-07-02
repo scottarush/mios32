@@ -107,9 +107,11 @@ typedef enum render_line_mode_e {
    RENDER_LINE_RIGHT = 3
 } render_line_mode_t;
 
-// Dialog page variables
+// Buffer for dialog Page Title
 static char dialogPageTitle[DISPLAY_CHAR_WIDTH];
+// Buffer for dialog Page Message Line 1
 static char dialogPageMessage1[DISPLAY_CHAR_WIDTH];
+// Buffer for dialog Page Message Line 2
 static char dialogPageMessage2[DISPLAY_CHAR_WIDTH];
 
 //----------------------------------------------------------------------------
@@ -143,14 +145,6 @@ static switchState_t toeSwitchState[NUM_TOE_SWITCHES];
 // Toe volume levels even split from 5 to 127
 static u8 toeVolumeLevels[NUM_TOE_SWITCHES] = { 5,23,41,58,77,93,110,127 };
 
-typedef enum pedal_select_functions_e {
-   PEDAL_SELECT_INACTIVE = 0,
-   PEDAL_SELECT_ROOT_KEY = 1,
-   PEDAL_SELECT_MODAL_SCALE = 2
-} pedal_select_functions_t;
-
-static pedal_select_functions_t pedalSelectStatus;
-
 //----------------------------------------------------------------------------
 // Stomp Switch types and non-persisted variables
 //----------------------------------------------------------------------------
@@ -173,6 +167,8 @@ static persisted_hmi_settings_t hmiSettings;
 void HMI_RenderLine(u8, const char*, render_line_mode_t);
 void HMI_ClearLine(u8);
 void HMI_InitPages();
+
+void HMI_UpdateIndicators();
 
 void HMI_HomePage_UpdateDisplay();
 void HMI_HomePage_RotaryEncoderChanged(s8);
@@ -226,8 +222,6 @@ void HMI_Init(void) {
    currentPage = &homePage;
    lastPage = NULL;
 
-   pedalSelectStatus = PEDAL_SELECT_INACTIVE;
-
    // Restore settings from E^2 if they exist.  If not then initialize to defaults
    s32 valid = 0;
 
@@ -273,8 +267,8 @@ void HMI_Init(void) {
    // Init the display pages now that settings are restored
    HMI_InitPages();
 
-   // Set toe indicators to the current mode
-   IND_SetIndicatorState(hmiSettings.selectedToeIndicator[hmiSettings.toeSwitchMode], IND_ON);
+   // Set the indicators to the curren toe switch mode
+   HMI_UpdateIndicators();
 
    // Activate the last selected preset
    u8 presetNumber = hmiSettings.selectedToeIndicator[TOE_SWITCH_VOICE_PRESETS];
@@ -408,10 +402,9 @@ void HMI_NotifyToeToggle(u8 toeNum, u8 pressed, s32 timestamp) {
       hmiSettings.selectedToeIndicator[TOE_SWITCH_VOLUME] = toeNum;
       // Persist the updated volume indicator setting
       HMI_PersistData();
-      // Clear the indicators to turn off the current one (if any)
-      IND_ClearAll();
-      // Now set the one for the selected toe 
-      IND_SetIndicatorState(toeNum, IND_ON);
+
+      // Update the indicators
+      HMI_UpdateIndicators();
       // And update the current page display
       currentPage->pUpdateDisplayCallback();
       break;
@@ -421,12 +414,10 @@ void HMI_NotifyToeToggle(u8 toeNum, u8 pressed, s32 timestamp) {
             // Activate this preset
       u8 errorNum = MIDI_PRESETS_ActivateMIDIPreset(presetNum);
       if (errorNum > 0) {
-         // Clear the indicators to turn off the current one (if any)
-         IND_ClearAll();
-         // Now set the one for the toe     
-         IND_SetIndicatorState(toeNum, IND_ON);
          //  IND_SetTempIndicatorState(toeNum, IND_FLASH_FAST, IND_TEMP_FLASH_STATE_DEFAULT_DURATION, IND_ON);
          hmiSettings.selectedToeIndicator[TOE_SWITCH_VOICE_PRESETS] = toeNum;
+         // Update the indicators
+         HMI_UpdateIndicators();
          // And update the current page display
          currentPage->pUpdateDisplayCallback();
       }
@@ -520,8 +511,17 @@ void HMI_NotifyStompToggle(u8 stompNum, u8 pressed, s32 timestamp) {
       return;
    }
    // Update the toe switch indicators and the display in case the mode changed.
+   HMI_UpdateIndicators();
+
+   // update the current page display
+   currentPage->pUpdateDisplayCallback();
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// Helper to restore the indicators based on the toe switch mode.
+/////////////////////////////////////////////////////////////////////////////
+void HMI_UpdateIndicators() {
    IND_ClearAll();
-   DEBUG_MSG("mode=%d", hmiSettings.selectedToeIndicator[hmiSettings.toeSwitchMode]);
    if (hmiSettings.toeSwitchMode == TOE_SWITCH_ARP_LIVE) {
       // Call dedicated function to set the indicators to the ARP settings since multiple
       // indicators can be set in this mode.
@@ -530,8 +530,6 @@ void HMI_NotifyStompToggle(u8 stompNum, u8 pressed, s32 timestamp) {
    else {
       IND_SetIndicatorState(hmiSettings.selectedToeIndicator[hmiSettings.toeSwitchMode], IND_ON);
    }
-   // update the current page display
-   currentPage->pUpdateDisplayCallback();
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -649,6 +647,8 @@ void HMI_NotifyBackToggle(u8 pressed, s32 timestamp) {
    if (currentPage->pBackPage != NULL) {
       lastPage = currentPage;
       currentPage = currentPage->pBackPage;
+      // Update indicators in case they are different now
+      HMI_UpdateIndicators();
       // And force an update to the current page display
       currentPage->pUpdateDisplayCallback();
    }
@@ -712,7 +712,7 @@ void HMI_RenderLine(u8 lineNum, const char* pLineText, render_line_mode_t render
       break;
    }
 #ifdef DEBUG
-   DEBUG_MSG("HMI_RenderLine %d: '%s'", lineNum, lineBuffer);
+   // DEBUG_MSG("HMI_RenderLine %d: '%s'", lineNum, lineBuffer);
 #endif
    MIOS32_LCD_CursorSet(0, lineNum);
    MIOS32_LCD_PrintString(lineBuffer);
@@ -740,7 +740,7 @@ void HMI_HomePage_UpdateDisplay() {
 
    // Current octave, arp state, and volume always go on line 3
    u32 percentVolume = (PEDALS_GetVolume() * 100) / 127;
-   snprintf(lineBuffer, DISPLAY_CHAR_WIDTH, "O-%d V-%d Arp:%s",
+   snprintf(lineBuffer, DISPLAY_CHAR_WIDTH, "Oct:%d V:%d Arp:%s",
       PEDALS_GetOctave(), percentVolume, (ARP_GetEnabled() ? "RUN" : "STOP"));
    HMI_RenderLine(3, lineBuffer, RENDER_LINE_CENTER);
 
@@ -775,8 +775,8 @@ void HMI_HomePage_UpdateDisplay() {
    case TOE_SWITCH_ARP_LIVE:
       // Arpeggiator details in Line 2
       u16 bpm = ARP_GetBPM();
-     
-      snprintf(lineBuffer, DISPLAY_CHAR_WIDTH, "Scale: %s BPM: %d",  ARP_MODES_GetModeName(ARP_GetModeScale()),bpm);
+
+      snprintf(lineBuffer, DISPLAY_CHAR_WIDTH, "Scale: %s BPM: %d", ARP_MODES_GetModeName(ARP_GetModeScale()), bpm);
       HMI_RenderLine(2, lineBuffer, RENDER_LINE_CENTER);
       break;
    default:
@@ -808,29 +808,17 @@ void HMI_HomePage_RotaryEncoderSelect() {
 // dialogPageTitle, Message1, and Message2 must be filled prior to entry
 ////////////////////////////////////////////////////////////////////////////
 void HMI_DialogPage_UpdateDisplay() {
-   if (lastPage != currentPage) {
-      // Clear display
-      MIOS32_LCD_Clear();
-      // Set to keep from redrawing the entire display next time.
-      lastPage = currentPage;
-   }
-   HMI_RenderLine(0,dialogPageTitle, RENDER_LINE_CENTER);
+   HMI_RenderLine(0, dialogPageTitle, RENDER_LINE_CENTER);
 
    HMI_RenderLine(1, "--------------------", RENDER_LINE_LEFT);
-   HMI_RenderLine(2,dialogPageMessage1,RENDER_LINE_CENTER);
-   HMI_RenderLine(3,dialogPageMessage2,RENDER_LINE_CENTER);
+   HMI_RenderLine(2, dialogPageMessage1, RENDER_LINE_CENTER);
+   HMI_RenderLine(3, dialogPageMessage2, RENDER_LINE_CENTER);
 }
 
 ////////////////////////////////////////////////////////////////////////////
 // Callback to update the display on the Main page.
 ////////////////////////////////////////////////////////////////////////////
 void HMI_MainPage_UpdateDisplay() {
-   if (lastPage != currentPage) {
-      // Clear display
-      MIOS32_LCD_Clear();
-      // Set to keep from redrawing the entire display next time.
-      lastPage = currentPage;
-   }
    MIOS32_LCD_CursorSet(0, 0);
    MIOS32_LCD_PrintString(currentPage->pPageTitle);
 
@@ -888,8 +876,8 @@ void HMI_MainPage_RotaryEncoderSelected() {
       break;
    case MAIN_PAGE_ENTRY_ABOUT:
       lastPage = &mainPage;
-      snprintf(dialogPageTitle,DISPLAY_CHAR_WIDTH,"%s","About M3-SuperPedal");
-      snprintf(dialogPageMessage1,DISPLAY_CHAR_WIDTH,"%s",M3_SUPERPEDAL_VERSION);
+      snprintf(dialogPageTitle, DISPLAY_CHAR_WIDTH, "%s", "About M3-SuperPedal");
+      snprintf(dialogPageMessage1, DISPLAY_CHAR_WIDTH, "%s", M3_SUPERPEDAL_VERSION);
       dialogPageMessage2[0] = 0;
       break;
    default:
@@ -902,12 +890,7 @@ void HMI_MainPage_RotaryEncoderSelected() {
 // Callback to update the display on the Voice Preset Edit Page
 ////////////////////////////////////////////////////////////////////////////
 void HMI_EditVoicePresetPage_UpdateDisplay() {
-   if (lastPage != currentPage) {
-      // Clear display
-      MIOS32_LCD_Clear();
-      // Set to keep from redrawing the entire display next time.
-      lastPage = currentPage;
-   }
+
    MIOS32_LCD_CursorSet(0, 0);
    MIOS32_LCD_PrintString(currentPage->pPageTitle);
 
@@ -974,12 +957,6 @@ void HMI_EditVoicePresetPage_RotaryEncoderSelected() {
 // Callback to update the display on the MIDIProgramSelectPage
 ////////////////////////////////////////////////////////////////////////////
 void HMI_MIDIProgramSelectPage_UpdateDisplay() {
-   if (lastPage != currentPage) {
-      // Clear display
-      MIOS32_LCD_Clear();
-      // Set to keep from redrawing the entire display next time.
-      lastPage = currentPage;
-   }
    MIOS32_LCD_CursorSet(0, 0);
    MIOS32_LCD_PrintString(currentPage->pPageTitle);
 
@@ -1119,32 +1096,34 @@ void HMI_HandleArpLiveToeToggle(u8 toeNum, u8 pressed) {
       }
       break;
    case ARP_LIVE_TOE_SELECT_KEY:
-      // Set the pedal callback
-      PEDALS_SetSelectPedalCallback(HMI_SelectRootKeyCallback);
-      pedalSelectStatus = PEDAL_SELECT_ROOT_KEY;
       /// Go to the dialog page
-      snprintf(dialogPageTitle,DISPLAY_CHAR_WIDTH,"%s","Set Arp Root Key");
-      snprintf(dialogPageMessage1,DISPLAY_CHAR_WIDTH,"%s","Press Pedal to");
-      snprintf(dialogPageMessage1,DISPLAY_CHAR_WIDTH,"%s","Select Key");
-      dialogPage.pBackPage = &homePage;
+      snprintf(dialogPageTitle, DISPLAY_CHAR_WIDTH, "%s", "Set Arp Root Key");
+      snprintf(dialogPageMessage1, DISPLAY_CHAR_WIDTH, "%s", "Press Pedal to");
+      snprintf(dialogPageMessage2, DISPLAY_CHAR_WIDTH, "%s", "Select Key");
+      dialogPage.pBackPage = currentPage;
+      lastPage = currentPage;
       currentPage = &dialogPage;
       currentPage->pUpdateDisplayCallback();
+
       // Flash the indicators
       IND_FlashAll(0);
+      // Set the pedal callback to get the selected root key
+      PEDALS_SetSelectPedalCallback(&HMI_SelectRootKeyCallback);
       break;
    case ARP_LIVE_TOE_SELECT_MODAL_SCALE:
-      // Set the pedal callback
-      PEDALS_SetSelectPedalCallback(HMI_SelectModeScaleCallback);
-      pedalSelectStatus = PEDAL_SELECT_MODAL_SCALE;
-
       // Go to the dialog page
-      snprintf(dialogPageTitle,DISPLAY_CHAR_WIDTH,"%s","Set Arp Modal Scale");
-      snprintf(dialogPageMessage1,DISPLAY_CHAR_WIDTH,"%s","Press Brown Pedal to");
-      snprintf(dialogPageMessage1,DISPLAY_CHAR_WIDTH,"%s","Select Mode");
-      dialogPage.pBackPage = &homePage;
+      snprintf(dialogPageTitle, DISPLAY_CHAR_WIDTH, "%s", "Set Arp Modal Scale  ");
+      snprintf(dialogPageMessage1, DISPLAY_CHAR_WIDTH, "%s", "Press Brown Pedal to");
+      snprintf(dialogPageMessage2, DISPLAY_CHAR_WIDTH, "%s", "Select Mode");
+      dialogPage.pBackPage = currentPage;
+      lastPage = currentPage;
       currentPage = &dialogPage;
       currentPage->pUpdateDisplayCallback();
-      IND_FlashAll(0);      
+
+      IND_FlashAll(0);
+
+      // Set the pedal callback to get the selected root key
+      PEDALS_SetSelectPedalCallback(&HMI_SelectModeScaleCallback);
       break;
    case ARP_LIVE_TOE_PRESET_1:
       // TODO
@@ -1175,7 +1154,11 @@ void HMI_HandleArpLiveToeToggle(u8 toeNum, u8 pressed) {
 /////////////////////////////////////////////////////////////////////////////
 void HMI_SelectRootKeyCallback(u8 pedalNum) {
    ARP_SetRootKey(pedalNum);
-   pedalSelectStatus = PEDAL_SELECT_INACTIVE;
+   // go back to last page and refresh displays
+   lastPage = NULL;
+   currentPage = &homePage;
+   HMI_UpdateIndicators();
+   currentPage->pUpdateDisplayCallback();
 }
 
 
@@ -1184,44 +1167,50 @@ void HMI_SelectRootKeyCallback(u8 pedalNum) {
 // keys are valid.
 /////////////////////////////////////////////////////////////////////////////
 void HMI_SelectModeScaleCallback(u8 pedalNum) {
+#ifdef DEBUG
+   DEBUG_MSG("HMI_SelectModeScaleCallback called with pedal #%d", pedalNum);
+#endif
+
    mode_t mode;
    switch (pedalNum) {
-   case 0:
-      mode = MODES_IONIAN;
+   case 1:
+      mode = MODE_IONIAN;
       break;
-   case 2:
-      mode = MODES_DORIAN;
-      break;
-   case 4:
-      mode = MODES_PHYRIGIAN;
+   case 3:
+      mode = MODE_DORIAN;
       break;
    case 5:
-      mode = MODES_LYDIAN;
+      mode = MODE_PHYRIGIAN;
       break;
-   case 7:
-      mode = MODES_MIXOLYDIAN;
+   case 6:
+      mode = MODE_LYDIAN;
       break;
-   case 9:
-      mode = MODES_AEOLIAN;
+   case 8:
+      mode = MODE_MIXOLYDIAN;
       break;
-   case 11:
-      mode = MODES_LOCRIAN;
+   case 10:
+      mode = MODE_AEOLIAN;
+      break;
+   case 12:
+      mode = MODE_LOCRIAN;
       break;
    default:
       // invalid
       return;
    }
    ARP_SetModeScale(mode);
-   pedalSelectStatus = PEDAL_SELECT_INACTIVE;
+
+   // go back to home page and refresh displays
+   lastPage = NULL;
+   currentPage = &homePage;
+   HMI_UpdateIndicators();
+   currentPage->pUpdateDisplayCallback();
 }
 
 /////////////////////////////////////////////////////////////////////////////
 // Helper to store persisted data 
 /////////////////////////////////////////////////////////////////////////////
 s32 HMI_PersistData() {
-#ifdef DEBUG_ENABLED
-   DEBUG_MSG("MIDI_PRESETS_PersistData: Writing persisted data:  sizeof(presets)=%d bytes", sizeof(presets));
-#endif
    s32 valid = PERSIST_StoreBlock(PERSIST_HMI_BLOCK, (unsigned char*)&hmiSettings, sizeof(persisted_hmi_settings_t));
    if (valid < 0) {
       DEBUG_MSG("HMI_PersistData:  Error persisting setting to EEPROM");
