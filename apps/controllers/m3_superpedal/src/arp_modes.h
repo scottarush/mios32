@@ -31,18 +31,18 @@ typedef enum key_e {
    KEY_B = 11
 } key_t;
 
-typedef enum chord_extflags_e {
+typedef enum chord_extension_e {
    CHORD_EXT_NONE = 0,
-   CHORD_EXT_SEVENTH = 0x01,
-   CHORD_EXT_OCTAVE1 = 0X02
-}  chord_extflags_t;
+   CHORD_EXT_SEVENTH = 1,
+   CHORD_EXT_NINTH = 2
+}  chord_extension_t;
 
 /////////////////////////////////////////////////////////////////////////////
 // Prototypes
 /////////////////////////////////////////////////////////////////////////////
 
 extern const char * ARP_MODES_GetNoteName(u8 note);
-extern const chord_type_t ARP_MODES_GetModeChord(scale_t scale,chord_extflags_t extFlags,u8 keySig,u8 note);
+extern const chord_type_t ARP_MODES_GetModeChord(scale_t scale,chord_extension_t extension,u8 keySig,u8 note);
 
 /////////////////////////////////////////////////////////////////////////////
 // Export global variables

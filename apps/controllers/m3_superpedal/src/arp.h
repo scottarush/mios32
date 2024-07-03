@@ -48,7 +48,7 @@ typedef struct persisted_arp_data_s {
    arp_mode_t arpMode;
    key_t rootKey;
    scale_t modeScale;
-   chord_extflags_t chordExtFlags;
+   chord_extension_t chordExtension;
    int ppqn;
    double bpm;
 } persisted_arp_data_t;

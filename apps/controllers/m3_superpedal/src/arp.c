@@ -89,7 +89,7 @@ s32 ARP_Init()
       arpSettings.arpMode = ARP_MODE_CHORD;
       arpSettings.rootKey = KEY_C;
       arpSettings.modeScale = SCALE_AEOLIAN;
-      arpSettings.chordExtFlags = 0;
+      arpSettings.chordExtension = CHORD_EXT_SEVENTH;
       arpSettings.ppqn = 384;
       arpSettings.bpm = 120.0;
 
@@ -275,10 +275,11 @@ s32 ARP_FillNoteStack() {
 
    // Get the keys of the chord
    const chord_type_t chord = ARP_MODES_GetModeChord(arpSettings.modeScale, 
-         arpSettings.chordExtFlags,arpSettings.rootKey,chordModeNote);
+         arpSettings.chordExtension,arpSettings.rootKey,chordModeNote);
+         
    if ((chord == CHORD_INVALID) || (chord == CHORD_ERROR)) {
-      DEBUG_MSG("ARP_FillNoteStack: Invalid modeScale=%d, extFlags=%d, or chordModeNote=%d combination", 
-         arpSettings.modeScale, arpSettings.chordExtFlags,chordModeNote);
+      DEBUG_MSG("ARP_FillNoteStack: Invalid modeScale=%d, chordExtension=%d, or chordModeNote=%d combination", 
+         arpSettings.modeScale, arpSettings.chordExtension,chordModeNote);
       return -1;
    }
    // Compute octave by subtracting C-2 (note 24)
@@ -332,7 +333,8 @@ s32 ARP_NotifyNoteOn(u8 note, u8 velocity)
       else {
          // Save the root and verify that it has a valid chord in the current scale.
          // If not then just add it alone to the notestack.
-         chord_type_t chord = ARP_MODES_GetModeChord(arpSettings.modeScale, arpSettings.chordExtFlags, arpSettings.rootKey,note);
+         chord_type_t chord = ARP_MODES_GetModeChord(arpSettings.modeScale, 
+            arpSettings.chordExtension, arpSettings.rootKey,note);
          if (chord == CHORD_INVALID) {
             // This key is not a valid key in this cord.  Just fill the note stack with 
             // this single note instead
@@ -490,5 +492,13 @@ scale_t ARP_GetModeScale() {
 /////////////////////////////////////////////////////////////////////////////
 void ARP_SetModeScale(scale_t scale) {
    arpSettings.modeScale = scale;
+   ARP_PersistData();
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// Sets chord extension and persists to EEPROM
+/////////////////////////////////////////////////////////////////////////////
+void ARP_SetChordExtension(chord_extension_t extension) {
+   arpSettings.chordExtension = extension;
    ARP_PersistData();
 }

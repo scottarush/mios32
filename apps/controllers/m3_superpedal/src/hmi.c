@@ -39,6 +39,8 @@
 #define DISPLAY_CHAR_WIDTH 20
 #define TEMP_CHANGE_STEP 5
 
+#define MIN_DIRECT_OCTAVE_NUMBER 0
+
 //----------------------------------------------------------------------------
 // Display page variables
 //----------------------------------------------------------------------------
@@ -108,11 +110,11 @@ typedef enum renderline_justify_e {
 } renderline_justify_t;
 
 // Buffer for dialog Page Title
-static char dialogPageTitle[DISPLAY_CHAR_WIDTH+1];
+static char dialogPageTitle[DISPLAY_CHAR_WIDTH + 1];
 // Buffer for dialog Page Message Line 1
-static char dialogPageMessage1[DISPLAY_CHAR_WIDTH+1];
+static char dialogPageMessage1[DISPLAY_CHAR_WIDTH + 1];
 // Buffer for dialog Page Message Line 2
-static char dialogPageMessage2[DISPLAY_CHAR_WIDTH+1];
+static char dialogPageMessage2[DISPLAY_CHAR_WIDTH + 1];
 
 //----------------------------------------------------------------------------
 // Toe Switch types and non-persisted variables
@@ -386,12 +388,33 @@ void HMI_NotifyToeToggle(u8 toeNum, u8 pressed, s32 timestamp) {
       return;
    }
 
-   // process the stomp switch
+
+   // process the toe switch
    switch (hmiSettings.toeSwitchMode) {
    case TOE_SWITCH_OCTAVE:
-      // Set the octave in PEDALS.  Note that PEDALS will directly call HMI_NotifyOctaveChange
-      // which will update everything else.
-      PEDALS_SetOctave(toeNum - 1);
+      switch (toeNum) {
+      case 1:
+         // Toenum 1 always decrements.  Note that we don't have to check
+         // range here.  PEDALS will do that and will call HMI_NotifyOctaveChange iff
+         // there was a change.
+         PEDALS_SetOctave(PEDALS_GetOctave()- 1);
+         break;
+      case 8:
+         // Toenum 8 always increments
+         PEDALS_SetOctave(PEDALS_GetOctave() + 1);
+         break;
+      case 2:
+      case 3:
+      case 4:
+      case 5:
+      case 6:
+      case 7:
+         // Toe switch numbers 2 through 7 are fixed starting at MIN_DIRECT_OCTAVE_NUMBER
+         PEDALS_SetOctave(toeNum-2 + MIN_DIRECT_OCTAVE_NUMBER);
+         break;
+      }
+      // Note that we don't have to call HMI_UpdateIndicators because this will be 
+      // call in HMI_NotifyOctaveChange
       break;
    case TOE_SWITCH_VOLUME:
       // Get the volumeLevel corresponding to the pressed switch
@@ -526,10 +549,31 @@ void HMI_UpdateIndicators() {
       // Call dedicated function to set the indicators to the ARP settings since multiple
       // indicators can be set in this mode.
       HMI_SetArpSettingsIndicators();
+      return;
    }
-   else {
+   // Otherwise process according to toeSwitchMode
+   switch (hmiSettings.toeSwitchMode) {
+   case TOE_SWITCH_OCTAVE:
+      // For Octave, pedals 1 and 8 increment/decrement and indicators 2-7 are fixed starting
+      // at MIN_DIRECT_OCTAVE_NUMBER.  On the first click below this, indicator 1 is solid,
+      // one more click down it blips.  Same behavior on the top side with indicator 8.
+      s8 octave = PEDALS_GetOctave();
+      if (octave < MIN_DIRECT_OCTAVE_NUMBER-1) {
+         IND_SetBlipIndicator(1, 0, 2.0);
+      }
+      else if (octave > MIN_DIRECT_OCTAVE_NUMBER + 6) {
+         IND_SetBlipIndicator(8, 0, 2.0);
+      }
+      else {
+         // Indicators 2 through 7 show direct octave.
+         IND_SetIndicatorState(octave - MIN_DIRECT_OCTAVE_NUMBER+2, IND_ON);
+      }
+      break;
+   default:
+      // For the other modes, just set according to the settings
       IND_SetIndicatorState(hmiSettings.selectedToeIndicator[hmiSettings.toeSwitchMode], IND_ON);
    }
+
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -736,17 +780,17 @@ void HMI_HomePage_UpdateDisplay() {
       lastPage = currentPage;
    }
 
-   char lineBuffer[DISPLAY_CHAR_WIDTH+1];
-   char scratchBuffer[DISPLAY_CHAR_WIDTH+1];
+   char lineBuffer[DISPLAY_CHAR_WIDTH + 1];
+   char scratchBuffer[DISPLAY_CHAR_WIDTH + 1];
 
    // Current octave, arp state, and volume always go on line 3
-   u32 percentVolume = (PEDALS_GetVolume() * 100) / 127;
-   snprintf(lineBuffer, DISPLAY_CHAR_WIDTH+1, "Oct:%d V:%d Arp:%s",
-      PEDALS_GetOctave(), percentVolume, (ARP_GetEnabled() ? "RUN" : "STOP"));
+   u32 volumeLevel = (PEDALS_GetVolume() * 8) / 127;
+   snprintf(lineBuffer, DISPLAY_CHAR_WIDTH + 1, "Oct:%d V:%d Arp:%s",
+      PEDALS_GetOctave(), volumeLevel, (ARP_GetEnabled() ? "RUN" : "STOP"));
    HMI_RenderLine(3, lineBuffer, RENDER_LINE_CENTER);
 
    // Show the Current Mode on top line.
-   snprintf(lineBuffer, DISPLAY_CHAR_WIDTH+1, "%s Mode",
+   snprintf(lineBuffer, DISPLAY_CHAR_WIDTH + 1, "%s Mode",
       pToeSwitchModeTitles[hmiSettings.toeSwitchMode]);
    HMI_RenderLine(0, lineBuffer, RENDER_LINE_CENTER);
    HMI_RenderLine(1, "--------------------", RENDER_LINE_LEFT);
@@ -777,17 +821,17 @@ void HMI_HomePage_UpdateDisplay() {
       // Arpeggiator details in Line 2
       u16 bpm = ARP_GetBPM();
       // Truncate scale/mode name
-      const char * scaleName = SEQ_SCALE_NameGet(ARP_GetModeScale());
+      const char* scaleName = SEQ_SCALE_NameGet(ARP_GetModeScale());
       u8 truncLength = 9;
       u8 nameLength = strlen(scaleName);
-      if (nameLength< truncLength){
+      if (nameLength < truncLength) {
          truncLength = nameLength;
       }
-      memcpy(scratchBuffer,scaleName,truncLength);
-      scratchBuffer[truncLength]= '\0';
+      memcpy(scratchBuffer, scaleName, truncLength);
+      scratchBuffer[truncLength] = '\0';
 
-      snprintf(lineBuffer, DISPLAY_CHAR_WIDTH+1, "%s %s %d BPM", 
-         ARP_MODES_GetNoteName(ARP_GetRootKey()),scratchBuffer,bpm);
+      snprintf(lineBuffer, DISPLAY_CHAR_WIDTH + 1, "%s %s %d BPM",
+         ARP_MODES_GetNoteName(ARP_GetRootKey()), scratchBuffer, bpm);
       HMI_RenderLine(2, lineBuffer, RENDER_LINE_CENTER);
       break;
    default:
@@ -887,8 +931,8 @@ void HMI_MainPage_RotaryEncoderSelected() {
       break;
    case MAIN_PAGE_ENTRY_ABOUT:
       lastPage = &mainPage;
-      snprintf(dialogPageTitle, DISPLAY_CHAR_WIDTH+1, "%s", "About M3-SuperPedal");
-      snprintf(dialogPageMessage1, DISPLAY_CHAR_WIDTH+1, "%s", M3_SUPERPEDAL_VERSION);
+      snprintf(dialogPageTitle, DISPLAY_CHAR_WIDTH + 1, "%s", "About M3-SuperPedal");
+      snprintf(dialogPageMessage1, DISPLAY_CHAR_WIDTH + 1, "%s", M3_SUPERPEDAL_VERSION);
       dialogPageMessage2[0] = '\0';
       break;
    default:
@@ -1068,10 +1112,10 @@ void HMI_SetArpSettingsIndicators() {
    // First the gen mode indicators
    switch (ARP_GetArpGenOrder()) {
    case ARP_GEN_ORDER_ASCENDING:
-      IND_SetBlipIndicator(ARP_LIVE_TOE_GEN_ORDER, 0, ARP_GetBPM()/60);
+      IND_SetBlipIndicator(ARP_LIVE_TOE_GEN_ORDER, 0, ARP_GetBPM() / 60);
       break;
    case ARP_GEN_ORDER_DESCENDING:
-      IND_SetBlipIndicator(ARP_LIVE_TOE_GEN_ORDER, 1, ARP_GetBPM()/60);
+      IND_SetBlipIndicator(ARP_LIVE_TOE_GEN_ORDER, 1, ARP_GetBPM() / 60);
       break;
    case ARP_GEN_ORDER_ASC_DESC:
       // TODO
@@ -1108,9 +1152,9 @@ void HMI_HandleArpLiveToeToggle(u8 toeNum, u8 pressed) {
       break;
    case ARP_LIVE_TOE_SELECT_KEY:
       /// Go to the dialog page
-      snprintf(dialogPageTitle, DISPLAY_CHAR_WIDTH+1, "%s", "Set Arp Root Key");
-      snprintf(dialogPageMessage1, DISPLAY_CHAR_WIDTH+1, "%s", "Press Pedal to");
-      snprintf(dialogPageMessage2, DISPLAY_CHAR_WIDTH+1, "%s", "Select Key");
+      snprintf(dialogPageTitle, DISPLAY_CHAR_WIDTH + 1, "%s", "Set Arp Root Key");
+      snprintf(dialogPageMessage1, DISPLAY_CHAR_WIDTH + 1, "%s", "Press Pedal to");
+      snprintf(dialogPageMessage2, DISPLAY_CHAR_WIDTH + 1, "%s", "Select Key");
       dialogPage.pBackPage = currentPage;
       lastPage = currentPage;
       currentPage = &dialogPage;
@@ -1123,9 +1167,9 @@ void HMI_HandleArpLiveToeToggle(u8 toeNum, u8 pressed) {
       break;
    case ARP_LIVE_TOE_SELECT_MODAL_SCALE:
       // Go to the dialog page
-      snprintf(dialogPageTitle, DISPLAY_CHAR_WIDTH+1, "%s", "Set Arp Modal Scale  ");
-      snprintf(dialogPageMessage1, DISPLAY_CHAR_WIDTH+1, "%s", "Press Brown Pedal to");
-      snprintf(dialogPageMessage2, DISPLAY_CHAR_WIDTH+1, "%s", "Select Mode");
+      snprintf(dialogPageTitle, DISPLAY_CHAR_WIDTH + 1, "%s", "Set Arp Modal Scale  ");
+      snprintf(dialogPageMessage1, DISPLAY_CHAR_WIDTH + 1, "%s", "Press Brown Pedal to");
+      snprintf(dialogPageMessage2, DISPLAY_CHAR_WIDTH + 1, "%s", "Select Mode");
       dialogPage.pBackPage = currentPage;
       lastPage = currentPage;
       currentPage = &dialogPage;
@@ -1164,7 +1208,7 @@ void HMI_HandleArpLiveToeToggle(u8 toeNum, u8 pressed) {
 // Callback for selecting the arpeggiator key from the pedals.
 /////////////////////////////////////////////////////////////////////////////
 void HMI_SelectRootKeyCallback(u8 pedalNum) {
-   ARP_SetRootKey(pedalNum-1);
+   ARP_SetRootKey(pedalNum - 1);
    // go back to last page and refresh displays
    lastPage = NULL;
    currentPage = &homePage;
@@ -1210,7 +1254,7 @@ void HMI_SelectModeScaleCallback(u8 pedalNum) {
       // invalid
       valid = 0;
    }
-   if (valid){
+   if (valid) {
       ARP_SetModeScale(mode);
    }
    // go back to home page and refresh displays
@@ -1237,23 +1281,10 @@ s32 HMI_PersistData() {
 // Used to automatically synch the Indicators
 /////////////////////////////////////////////////////////////////////////////
 void HMI_NotifyOctaveChange(u8 octave) {
-   u8 indicator = octave + 1;
-   if (hmiSettings.selectedToeIndicator[TOE_SWITCH_OCTAVE] != indicator) {
-      // Indicator has change. 
-      hmiSettings.selectedToeIndicator[TOE_SWITCH_OCTAVE] = indicator;
-      // Save the new indicator position
-      HMI_PersistData();
-
-      // If TOE_SWITCH_OCTAVE also currently active, then update the 
-      // indicator
-      if (hmiSettings.toeSwitchMode == TOE_SWITCH_OCTAVE) {
-         IND_ClearAll();
-         IND_SetIndicatorState(indicator, IND_ON);
-      }
-      // And update the current display in case it is showing Octave
-      currentPage->pUpdateDisplayCallback();
-   }
-
+   // Update the Indicators and the current display
+   HMI_UpdateIndicators();
+   // And update the current display in case it is showing Octave
+   currentPage->pUpdateDisplayCallback();
 }
 
 

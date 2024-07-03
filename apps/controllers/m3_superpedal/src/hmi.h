@@ -45,7 +45,8 @@ typedef struct {
    // The current mode of the toe switches
    toeSwitchMode_t toeSwitchMode;
 
-   // Last selected toe switch in each mode except for TOE_SWITCH_ARP_SETTINGS
+   // Last selected toe switch in each mode except for TOE_SWITCH_ARP_SETTINGS and TOE_SWITCH_OCTAVE
+   // that are not stored
    u8 selectedToeIndicator[NUM_TOE_SWITCH_MODES-1];
 
    // presetNumbers for toe switch gen MIDI presets. 0 is unset

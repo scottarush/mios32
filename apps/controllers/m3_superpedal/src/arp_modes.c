@@ -22,7 +22,7 @@
 /////////////////////////////////////////////////////////////////////////////
 // Local prototypes
 /////////////////////////////////////////////////////////////////////////////
-s32 ARP_MODES_GetChordTableIndex(scale_t scale,chord_extflags_t extFlags);
+s32 ARP_MODES_GetChordTableIndex(scale_t scale,chord_extension_t extension);
 
 /////////////////////////////////////////////////////////////////////////////
 // Local variables
@@ -33,20 +33,30 @@ static const char * key_names[] ={"C","C#","D","Eb","E","F","F#","G","Ab","A","B
 // Defines the natural chords in the mode by key.
 typedef struct mode_chords_entry_s {
    chord_type_t chords[12];
-   chord_extflags_t chordExtFlags;
+   chord_extension_t chordExt;
    scale_t scale;
 } mode_chords_entry_t;
 #define MODE_CHORD_TABLE_SIZE 7
 
 static const mode_chords_entry_t mode_chord_table[] = {
-   {{CHORD_MAJOR_I,  CHORD_MINOR_I, CHORD_MINOR_I, CHORD_MAJOR_I, CHORD_DOM7,    CHORD_MINOR_I, CHORD_MIN7B5},    CHORD_EXT_NONE,   SCALE_IONIAN},
-   {{CHORD_MINOR_I,  CHORD_MINOR_I,  CHORD_MAJOR_I, CHORD_DOM7, CHORD_MINOR_I, CHORD_MIN7B5, CHORD_MAJOR_I},   CHORD_EXT_NONE,   SCALE_DORIAN},
-   {{CHORD_MINOR_I,  CHORD_MAJOR_I, CHORD_DOM7,    CHORD_MINOR_I, CHORD_MIN7B5,  CHORD_MAJOR_I, CHORD_MINOR_I},   CHORD_EXT_NONE,   SCALE_PHRYGIAN},
-   {{CHORD_MAJOR_I,  CHORD_DOM7,    CHORD_MINOR_I, CHORD_MIN7B5,  CHORD_MAJOR_I, CHORD_MINOR_I, CHORD_MINOR_I},   CHORD_EXT_NONE,   SCALE_LYDIAN},
-   {{CHORD_DOM7,     CHORD_MINOR_I, CHORD_MIN7B5,  CHORD_MAJOR_I, CHORD_MINOR_I, CHORD_MINOR_I, CHORD_MAJOR_I},   CHORD_EXT_NONE,   SCALE_MIXOLYDIAN},
-   {{CHORD_MINOR_I,  CHORD_MIN7B5,  CHORD_MAJOR_I, CHORD_MINOR_I, CHORD_MINOR_I, CHORD_MAJOR_I, CHORD_DOM7},      CHORD_EXT_NONE,   SCALE_AEOLIAN},
-   {{CHORD_MIN7B5,   CHORD_MAJOR_I, CHORD_MINOR_I, CHORD_MINOR_I, CHORD_DOM7,    CHORD_MAJOR_I, CHORD_MINOR_I},   CHORD_EXT_NONE,   SCALE_LOCRIAN},
-};
+   // 0..7 Modes w/ Major Minor
+   {{CHORD_MAJOR_I,  CHORD_MINOR_I, CHORD_MINOR_I, CHORD_MAJOR_I, CHORD_MAJOR_I,    CHORD_MINOR_I, CHORD_MIN7B5},    CHORD_EXT_NONE,   SCALE_IONIAN},
+   {{CHORD_MINOR_I,  CHORD_MINOR_I,  CHORD_MAJOR_I, CHORD_MAJOR_I, CHORD_MINOR_I, CHORD_MIN7B5, CHORD_MAJOR_I},   CHORD_EXT_NONE,   SCALE_DORIAN},
+   {{CHORD_MINOR_I,  CHORD_MAJOR_I, CHORD_MAJOR_I,    CHORD_MINOR_I, CHORD_MIN7B5,  CHORD_MAJOR_I, CHORD_MINOR_I},   CHORD_EXT_NONE,   SCALE_PHRYGIAN},
+   {{CHORD_MAJOR_I,  CHORD_MAJOR_I, CHORD_MINOR_I, CHORD_MIN7B5,  CHORD_MAJOR_I, CHORD_MINOR_I, CHORD_MINOR_I},   CHORD_EXT_NONE,   SCALE_LYDIAN},
+   {{CHORD_MAJOR_I,  CHORD_MINOR_I, CHORD_MIN7B5,  CHORD_MAJOR_I, CHORD_MINOR_I, CHORD_MINOR_I, CHORD_MAJOR_I},   CHORD_EXT_NONE,   SCALE_MIXOLYDIAN},
+   {{CHORD_MINOR_I,  CHORD_MIN7B5,  CHORD_MAJOR_I, CHORD_MINOR_I, CHORD_MINOR_I, CHORD_MAJOR_I, CHORD_MAJOR_I},      CHORD_EXT_NONE,   SCALE_AEOLIAN},
+   {{CHORD_MIN7B5,   CHORD_MAJOR_I, CHORD_MINOR_I, CHORD_MINOR_I, CHORD_MAJOR_I,  CHORD_MAJOR_I, CHORD_MINOR_I},   CHORD_EXT_NONE,   SCALE_LOCRIAN},
+   // 8..15 Modes w/ CHORD_EXT_SEVENTH
+   {{CHORD_MAJ7,  CHORD_MIN7, CHORD_MINOR_I, CHORD_MAJ7, CHORD_DOM7,    CHORD_MIN7, CHORD_MIN7B5},    CHORD_EXT_SEVENTH,   SCALE_IONIAN},
+   {{CHORD_MIN7,  CHORD_MIN7,  CHORD_MAJ7, CHORD_DOM7, CHORD_MIN7, CHORD_MIN7B5, CHORD_MAJ7},   CHORD_EXT_SEVENTH,   SCALE_DORIAN},
+   {{CHORD_MIN7,  CHORD_MAJ7, CHORD_DOM7,    CHORD_MIN7, CHORD_MIN7B5,  CHORD_MAJ7, CHORD_MIN7},   CHORD_EXT_SEVENTH,   SCALE_PHRYGIAN},
+   {{CHORD_MAJ7,  CHORD_DOM7,    CHORD_MIN7, CHORD_MIN7B5,  CHORD_MAJ7, CHORD_MIN7, CHORD_MIN7},   CHORD_EXT_SEVENTH,   SCALE_LYDIAN},
+   {{CHORD_DOM7,  CHORD_MIN7, CHORD_MIN7B5,  CHORD_MAJ7, CHORD_MIN7, CHORD_MIN7, CHORD_MAJ7},   CHORD_EXT_SEVENTH,   SCALE_MIXOLYDIAN},
+   {{CHORD_MIN7,  CHORD_MIN7B5,  CHORD_MAJ7, CHORD_MIN7, CHORD_MIN7, CHORD_MAJ7, CHORD_DOM7},      CHORD_EXT_SEVENTH,   SCALE_AEOLIAN},
+   {{CHORD_MIN7B5, CHORD_MAJ7, CHORD_MIN7, CHORD_MIN7, CHORD_DOM7,    CHORD_MAJ7, CHORD_MIN7},   CHORD_EXT_SEVENTH,   SCALE_LOCRIAN}
+   // 16
+   };
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -56,7 +66,7 @@ static const mode_chords_entry_t mode_chord_table[] = {
 // keySig:  key signature root
 // note:  root note of the chord 
 /////////////////////////////////////////////////////////////////////////////
-const chord_type_t ARP_MODES_GetModeChord(scale_t scale,chord_extflags_t extFlags,u8 keySig,u8 note){
+const chord_type_t ARP_MODES_GetModeChord(scale_t scale,chord_extension_t extension,u8 keySig,u8 note){
    if (scale > SCALE_MAX_ENUM_VALUE){
       DEBUG_MSG("ARP_MODES_GetChordType:  Invalid scale=%d",scale);
       return CHORD_ERROR;  // invalid
@@ -67,19 +77,18 @@ const chord_type_t ARP_MODES_GetModeChord(scale_t scale,chord_extflags_t extFlag
    for(int i=0;i < MODE_CHORD_TABLE_SIZE;i++){
       scale_t checkScale = mode_chord_table[i].scale;
       if (checkScale == scale){
-         modeTableIndex = i;
-         break;
+         // Check if extension flags match.  If so, then this is the chord.  If not keep searching.
+         if (mode_chord_table[modeTableIndex].chordExt != extension){
+            modeTableIndex = i;
+            break;
+         }
       }
    }
    if (modeTableIndex < 0){
-      DEBUG_MSG("ARP_MODES_GetChordType:  Scale=%d not found in Mode table.",scale);
+      DEBUG_MSG("ARP_MODES_GetChordType:  Scale: %s and chord extension %d match not found",SEQ_SCALE_NameGet(scale),extension);
       return CHORD_ERROR;  // invalid      
    }
-   // Check if extFlags match
-   if (mode_chord_table[modeTableIndex].chordExtFlags != extFlags){
-      DEBUG_MSG("ARP_MODES_GetChordType:  chordExtFlags=%d not available for modeScale %s",SEQ_SCALE_NameGet(scale));
-      return CHORD_INVALID;
-   }
+
    // Check if key is part of mode scale.  
    if (!SEQ_SCALE_IsNoteInScale(mode_chord_table[modeTableIndex].scale,keySig,note)){
 #ifdef DEBUG
@@ -115,10 +124,10 @@ const char * ARP_MODES_GetNoteName(u8 note){
 // extFlags:  flags
 // Returns -1 if combination not found in table
 /////////////////////////////////////////////////////////////////////////////
-s32 ARP_MODES_GetChordTableIndex(scale_t scale,chord_extflags_t extFlags){
+s32 ARP_MODES_GetChordTableIndex(scale_t scale,chord_extension_t extension){
    for(int i=0;i < MODE_CHORD_TABLE_SIZE;i++){
       mode_chords_entry_t entry = mode_chord_table[i];
-      if ((entry.scale == scale) && (entry.chordExtFlags == extFlags)){
+      if ((entry.scale == scale) && (entry.chordExt == extension)){
          return i;
       }
    }

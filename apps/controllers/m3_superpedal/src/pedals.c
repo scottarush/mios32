@@ -354,9 +354,10 @@ int PEDALS_GetVelocity(u16 delay, u16 delay_slowest, u16 delay_fastest) {
 // octave:  MIDI octave from 0 to 7.
 // On change the persisted data will automatically be updated.
 /////////////////////////////////////////////////////////////////////////////
-void PEDALS_SetOctave(u8 octave) {
-   if (octave > 7) {
-      DEBUG_MSG("Invalid octave number=%d", octave);
+void PEDALS_SetOctave(s8 octave) {
+   if ((octave > PEDALS_MAX_OCTAVE_NUMBER) ||
+      (octave < PEDALS_MIN_OCTAVE_NUMBER)) {
+      DEBUG_MSG("PEDALS_SetOctave:  Invalid octave number=%d", octave);
       return;
    }
    if (pedal_config.octave != octave) {
@@ -372,9 +373,9 @@ void PEDALS_SetOctave(u8 octave) {
 
 /////////////////////////////////////////////////////////////////////////////
 // API to get the current octave
-// returns octave from 0 to 7
+// returns octave #
 /////////////////////////////////////////////////////////////////////////////
-u8 PEDALS_GetOctave() {
+s8 PEDALS_GetOctave() {
    return pedal_config.octave;
 }
 
