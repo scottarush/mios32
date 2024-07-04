@@ -117,7 +117,6 @@ void ARP_HMI_HandleArpLiveToeToggle(u8 toeNum, u8 pressed) {
       snprintf(dialogPageMessage1, DISPLAY_CHAR_WIDTH + 1, "%s", "Press Pedal to");
       snprintf(dialogPageMessage2, DISPLAY_CHAR_WIDTH + 1, "%s", "Select Key");
       dialogPage.pBackPage = currentPage;
-      lastPage = currentPage;
       currentPage = &dialogPage;
       currentPage->pUpdateDisplayCallback();
 
@@ -132,7 +131,6 @@ void ARP_HMI_HandleArpLiveToeToggle(u8 toeNum, u8 pressed) {
       snprintf(dialogPageMessage1, DISPLAY_CHAR_WIDTH + 1, "%s", "Press Brown Pedal to");
       snprintf(dialogPageMessage2, DISPLAY_CHAR_WIDTH + 1, "%s", "Select Mode");
       dialogPage.pBackPage = currentPage;
-      lastPage = currentPage;
       currentPage = &dialogPage;
       currentPage->pUpdateDisplayCallback();
 
@@ -162,7 +160,6 @@ void ARP_HMI_HandleArpLiveToeToggle(u8 toeNum, u8 pressed) {
 void ARP_HMI_SelectRootKeyCallback(u8 pedalNum) {
    ARP_SetRootKey(pedalNum - 1);
    // go back to last page and refresh displays
-   lastPage = NULL;
    currentPage = &homePage;
    HMI_UpdateIndicators();
    currentPage->pUpdateDisplayCallback();
@@ -210,7 +207,6 @@ void ARP_HMI_SelectModeScaleCallback(u8 pedalNum) {
       ARP_SetModeScale(mode);
    }
    // go back to home page and refresh displays
-   lastPage = NULL;
    currentPage = &homePage;
    HMI_UpdateIndicators();
    currentPage->pUpdateDisplayCallback();

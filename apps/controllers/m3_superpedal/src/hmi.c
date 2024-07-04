@@ -49,7 +49,6 @@ struct page_s midiProgramSelectPage;
 struct page_s homePage;
 struct page_s dialogPage;
 struct page_s* currentPage;
-struct page_s* lastPage;
 
 
 // Buffer for dialog Page Title
@@ -170,7 +169,6 @@ void HMI_Init(void) {
    lastSelectedMainPageEntry = MAIN_PAGE_ENTRY_EDIT_TOE_MIDI_PRESET;
 
    currentPage = &homePage;
-   lastPage = NULL;
 
    // Restore settings from E^2 if they exist.  If not then initialize to defaults
    s32 valid = 0;
@@ -286,7 +284,7 @@ void HMI_InitPages() {
 
    dialogPage.pageID = PAGE_DIALOG;
    dialogPage.pPageTitle = dialogPageTitle;
-   dialogPageTitle[0] = 0;
+   dialogPageTitle[0] = '\0';
    dialogPage.pBackButtonCallback = NULL;
    dialogPage.pPedalSelectedCallback = NULL;
    dialogPage.pUpdateDisplayCallback = HMI_DialogPage_UpdateDisplay;
@@ -294,8 +292,8 @@ void HMI_InitPages() {
    dialogPage.pRotaryEncoderSelectCallback = NULL;
    dialogPage.pBackPage = NULL;
 
-   dialogPageMessage1[0] = 0;
-   dialogPageMessage2[0] = 0;
+   dialogPageMessage1[0] = '\0';
+   dialogPageMessage2[0] = '\0';
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -396,14 +394,12 @@ void HMI_NotifyToeToggle(u8 toeNum, u8 pressed, s32 timestamp) {
          }
          break;
       }
-
-
       break;
    case TOE_SWITCH_PATTERN_PRESETS:
 
       // TODO
       break;
-   case TOE_SWITCH_ARP_LIVE:
+   case TOE_SWITCH_ARP:
       switch (toeNum) {
       case 1:
          // Toe 1 decrements
@@ -477,7 +473,7 @@ void HMI_NotifyStompToggle(u8 stompNum, u8 pressed, s32 timestamp) {
       hmiSettings.toeSwitchMode = TOE_SWITCH_PATTERN_PRESETS;
       break;
    case STOMP_SWITCH_ARPEGGIATOR:
-      if (hmiSettings.toeSwitchMode == TOE_SWITCH_ARP_LIVE) {
+      if (hmiSettings.toeSwitchMode == TOE_SWITCH_ARP) {
          // This is a second press so toggle the state of the Arpeggiator
          if (ARP_GetEnabled() == 0) {
             // Turn on the Arpeggiator
@@ -490,18 +486,17 @@ void HMI_NotifyStompToggle(u8 stompNum, u8 pressed, s32 timestamp) {
       }
       else {
          // This is a first press, so just go to the page
-         hmiSettings.toeSwitchMode = TOE_SWITCH_ARP_LIVE;
+         hmiSettings.toeSwitchMode = TOE_SWITCH_ARP;
       }
-      // Set to home page and clear last page
+      // Set to home page
       currentPage = &homePage;
-      lastPage = NULL;
       break;
    case STOMP_SWITCH_VOLUME:
       hmiSettings.toeSwitchMode = TOE_SWITCH_VOLUME;
       break;
    default:
       // Invalid.  Just return;
-      DEBUG_MSG("HMI_NotifyStompToggle:  Invalid setting %d for stompNum %d", hmiSettings.stompSwitchSetting[stompNum - 1],stompNum);
+      DEBUG_MSG("HMI_NotifyStompToggle:  Invalid setting %d for stompNum %d", hmiSettings.stompSwitchSetting[stompNum - 1], stompNum);
       return;
    }
    // Update the toe switch indicators and the display in case the mode changed.
@@ -538,7 +533,7 @@ void HMI_UpdateIndicators() {
          IND_SetIndicatorState(octave - MIN_DIRECT_OCTAVE_NUMBER + 2, IND_ON);
       }
       break;
-   case TOE_SWITCH_ARP_LIVE:
+   case TOE_SWITCH_ARP:
       if (octave < MIN_DIRECT_OCTAVE_NUMBER - 1) {
          IND_SetBlipIndicator(1, 0, 2.0);
       }
@@ -551,9 +546,12 @@ void HMI_UpdateIndicators() {
       }
       break;
    case TOE_SWITCH_VOICE_PRESETS:
-      // Set the indicator for the bank index + 1 of the last activated presetNum 
+      // Set the indicator for the bank index + 1 of the last activated presetNum if we 
+      // are currently on that bank.
       const midi_preset_num_t* presetNum = MIDI_PRESETS_GetLastActivatedGenMIDIPreset();
-      IND_SetIndicatorState(presetNum->bankIndex + 1, IND_ON);
+      if (presetNum->bankNumber == hmiSettings.currentToeSwitchGenMIDIPresetBank) {
+         IND_SetIndicatorState(presetNum->bankIndex + 1, IND_ON);
+      }
       break;
    case TOE_SWITCH_PATTERN_PRESETS:
       // TODO;
@@ -608,8 +606,8 @@ void HMI_NotifyEncoderSwitchToggle(u8 pressed, s32 timestamp) {
    switch (currentPage->pageID) {
    case PAGE_HOME:
       // On encoder switch initial press go to main page and save home page for Back button functionalyt
-      lastPage = currentPage;
       currentPage = &mainPage;
+      mainPage.pBackPage = &homePage;
       // And force an update to the current page display
       currentPage->pUpdateDisplayCallback();
       break;
@@ -660,8 +658,7 @@ void HMI_NotifyBackToggle(u8 pressed, s32 timestamp) {
    }
 
    if (longPress && !backSwitchState.handled) {
-      // Go back to home page and null last Page
-      lastPage = NULL;
+      // Go back to home page 
       currentPage = &homePage;
       // And force an update to the current page display
       currentPage->pUpdateDisplayCallback();
@@ -676,7 +673,6 @@ void HMI_NotifyBackToggle(u8 pressed, s32 timestamp) {
    }
    // If the back page is non-null then transition to that page.
    if (currentPage->pBackPage != NULL) {
-      lastPage = currentPage;
       currentPage = currentPage->pBackPage;
       // Update indicators in case they are different now
       HMI_UpdateIndicators();
@@ -760,12 +756,7 @@ void HMI_ClearLine(u8 lineNum) {
 // Callback to update the display on the Home page.
 ////////////////////////////////////////////////////////////////////////////
 void HMI_HomePage_UpdateDisplay() {
-   if (lastPage != currentPage) {
-      // Clear display
-      MIOS32_LCD_Clear();
-      // Set to keep from redrawing the entire display next time.
-      lastPage = currentPage;
-   }
+
    // Get the current Bank and Preset names
    const midi_preset_num_t* presetNum = MIDI_PRESETS_GetLastActivatedGenMIDIPreset();
    const midi_preset_t* preset = MIDI_PRESETS_GetGenMidiPreset(presetNum);
@@ -775,10 +766,26 @@ void HMI_HomePage_UpdateDisplay() {
    char lineBuffer[DISPLAY_CHAR_WIDTH + 1];
    char scratchBuffer[DISPLAY_CHAR_WIDTH + 1];
 
-   // Render line 0 with the mode and bank name.
-   snprintf(lineBuffer, DISPLAY_CHAR_WIDTH + 1, "%s:%s",
-      pToeSwitchModeTitles[hmiSettings.toeSwitchMode], bankNamePtr);
-   HMI_RenderLine(0, lineBuffer, RENDER_LINE_CENTER);
+   ///////////////////////////////////////
+   // line 0 based oin toeSwitchMode
+   switch (hmiSettings.toeSwitchMode) {
+   case TOE_SWITCH_OCTAVE:
+   case TOE_SWITCH_VOLUME:
+   case TOE_SWITCH_VOICE_PRESETS:
+      // Render line 0 with the mode and bank name.
+      snprintf(lineBuffer, DISPLAY_CHAR_WIDTH + 1, "%s:%s",
+         pToeSwitchModeTitles[hmiSettings.toeSwitchMode], bankNamePtr);
+      HMI_RenderLine(0, lineBuffer, RENDER_LINE_CENTER);
+      break;
+   case TOE_SWITCH_ARP:
+      // Mode and preset name since preset can't be displayed on line 2
+      snprintf(lineBuffer, DISPLAY_CHAR_WIDTH + 1, "%s:%s",
+         pToeSwitchModeTitles[hmiSettings.toeSwitchMode], presetName);
+      HMI_RenderLine(0, lineBuffer, RENDER_LINE_CENTER);
+      break;
+   }
+
+
    // Spacer on line 1
    HMI_RenderLine(1, "--------------------", RENDER_LINE_LEFT);
 
@@ -788,6 +795,7 @@ void HMI_HomePage_UpdateDisplay() {
       PEDALS_GetOctave(), volume, (ARP_GetEnabled() ? "RUN" : "STOP"));
    HMI_RenderLine(3, lineBuffer, RENDER_LINE_CENTER);
 
+   ///////////////////////////////////////
    // Render line 2 based on the current toe switch mode
    switch (hmiSettings.toeSwitchMode) {
    case TOE_SWITCH_OCTAVE:
@@ -800,7 +808,7 @@ void HMI_HomePage_UpdateDisplay() {
       // TODO - Render the pattern preset line
       HMI_ClearLine(2);
       break;
-   case TOE_SWITCH_ARP_LIVE:
+   case TOE_SWITCH_ARP:
       // Arpeggiator details in Line 2 insted of preset name
       u16 bpm = ARP_GetBPM();
       // Truncate scale/mode name
@@ -829,16 +837,23 @@ void HMI_HomePage_UpdateDisplay() {
 // Callback for rotary encoder change on home page.
 /////////////////////////////////////////////////////////////////////////////
 void HMI_HomePage_RotaryEncoderChanged(s8 increment) {
-   // On any change of encoder go to PAGE_MAIN_MENU
-   lastPage = currentPage;
-   currentPage = &mainPage;
-   // And force an update to the current page display
+   switch (hmiSettings.toeSwitchMode) {
+   case TOE_SWITCH_VOICE_PRESETS:
+      // Go directly to MIDI program number page
+      currentPage = &midiProgramSelectPage;
+      break;
+   default:
+      // Otherwise go to the MAIN PAGE
+      currentPage = &mainPage;
+   }
+   // update the current page display
    currentPage->pUpdateDisplayCallback();
 }
 /////////////////////////////////////////////////////////////////////////////
 // Callback for rotary encoder select on home page
 /////////////////////////////////////////////////////////////////////////////
 void HMI_HomePage_RotaryEncoderSelect() {
+   // Same as a rotary encoder change
    HMI_HomePage_RotaryEncoderChanged(1);
 }
 ////////////////////////////////////////////////////////////////////////////
@@ -903,7 +918,7 @@ void HMI_MainPage_RotaryEncoderChanged(s8 increment) {
 void HMI_MainPage_RotaryEncoderSelected() {
    switch (lastSelectedMainPageEntry) {
    case MAIN_PAGE_ENTRY_EDIT_TOE_MIDI_PRESET:
-      lastPage = &mainPage;
+      mainPage.pBackPage = currentPage;
       currentPage = &editVoicePresetPage;
       break;
    case MAIN_PAGE_ENTRY_EDIT_TOE_PATTERN_PRESET:
@@ -913,10 +928,12 @@ void HMI_MainPage_RotaryEncoderSelected() {
       // TODO
       break;
    case MAIN_PAGE_ENTRY_ABOUT:
-      lastPage = &mainPage;
       snprintf(dialogPageTitle, DISPLAY_CHAR_WIDTH + 1, "%s", "About M3-SuperPedal");
       snprintf(dialogPageMessage1, DISPLAY_CHAR_WIDTH + 1, "%s", M3_SUPERPEDAL_VERSION);
-      dialogPageMessage2[0] = '\0';
+      snprintf(dialogPageMessage2, DISPLAY_CHAR_WIDTH + 1, "%s", M3_SUPERPEDAL_VERSION_DATE);
+      
+      dialogPage.pBackPage = currentPage;
+      currentPage = &dialogPage;
       break;
    default:
       return;
@@ -973,7 +990,7 @@ void HMI_EditVoicePresetPage_RotaryEncoderChanged(s8 increment) {
 void HMI_EditVoicePresetPage_RotaryEncoderSelected() {
    switch (lastSelectedMainPageEntry) {
    case EDIT_VOICE_PRESET_PAGE_ENTRY_PROGRAM_NUMBER:
-      lastPage = &editVoicePresetPage;
+      editVoicePresetPage.pBackPage = currentPage;
       currentPage = &midiProgramSelectPage;
       break;
    case EDIT_VOICE_PRESET_PAGE_ENTRY_OCTAVE:
@@ -1061,16 +1078,15 @@ void HMI_MIDIProgramSelectPage_RotaryEncoderSelected() {
    else {
       // Success, set the toe switch mode to VOICE_PRESET
       hmiSettings.toeSwitchMode = TOE_SWITCH_VOICE_PRESETS;
-      // Force the current bank to the bank of this preset
-      hmiSettings.currentToeSwitchGenMIDIPresetBank = presetNum->bankIndex;
+      // Force the current bank to the bank number of this preset
+      hmiSettings.currentToeSwitchGenMIDIPresetBank = presetNum->bankNumber;
       // Update the indicators
       HMI_UpdateIndicators();
-      // And then flash the newly replaced prest
+      // And then flash the newly replaced preset
       IND_SetTempIndicatorState(presetNum->bankIndex + 1, IND_FLASH_FAST, IND_TEMP_FLASH_STATE_DEFAULT_DURATION, IND_ON);
    }
 
-   // Go back to the home page and null lastPage
-   lastPage = NULL;
+   // Go back to the home page 
    currentPage = &homePage;
    // And force an update to the current page display
    currentPage->pUpdateDisplayCallback();

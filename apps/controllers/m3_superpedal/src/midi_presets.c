@@ -13,7 +13,7 @@
 #include "pedals.h"
 #include "persist.h"
 
-#define DEBUG_ENABLED
+#undef DEBUG
 
 #ifndef DEBUG_MSG
 # define DEBUG_MSG MIOS32_MIDI_SendDebugMessage
@@ -296,7 +296,7 @@ const midi_preset_t* MIDI_PRESETS_GetGenMidiPreset(const midi_preset_num_t* pres
       return NULL;
    }
    midi_preset_t* ptr = &presets.generalMidiPresets[presetNum->bankNumber - 1][presetNum->bankIndex - 1];
-#ifdef DEBUG_ENABLED
+#ifdef DEBUG
    DEBUG_MSG("MIDI_PRESETS_GetMidiPreset: bank%d index%d progNumber=%d", presetNum->bankNumber, presetNum->bankIndex , ptr->programNumber);
 #endif
    return ptr;
@@ -315,7 +315,7 @@ const midi_preset_num_t* MIDI_PRESETS_GetLastActivatedGenMIDIPreset() {
 // Helper to store persisted data to EEPROM
 /////////////////////////////////////////////////////////////////////////////
 void MIDI_PRESETS_PersistData() {
-#ifdef DEBUG_ENABLED
+#ifdef DEBUG
    DEBUG_MSG("MIDI_PRESETS_PersistData: Writing persisted data:  sizeof(presets)=%d bytes", sizeof(presets));
 #endif
    s32 valid = PERSIST_StoreBlock(PERSIST_MIDI_PRESETS_BLOCK, (unsigned char*)&presets, sizeof(presets));
