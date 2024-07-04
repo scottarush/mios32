@@ -36,10 +36,10 @@ typedef struct mode_chords_entry_s {
    chord_extension_t chordExt;
    scale_t scale;
 } mode_chords_entry_t;
-#define MODE_CHORD_TABLE_SIZE 7
+#define MODE_CHORD_TABLE_SIZE 14
 
 static const mode_chords_entry_t mode_chord_table[] = {
-   // 0..7 Modes w/ Major Minor
+   // 0..6 Modes w/ Major Minor
    {{CHORD_MAJOR_I,  CHORD_MINOR_I, CHORD_MINOR_I, CHORD_MAJOR_I, CHORD_MAJOR_I,    CHORD_MINOR_I, CHORD_MIN7B5},    CHORD_EXT_NONE,   SCALE_IONIAN},
    {{CHORD_MINOR_I,  CHORD_MINOR_I,  CHORD_MAJOR_I, CHORD_MAJOR_I, CHORD_MINOR_I, CHORD_MIN7B5, CHORD_MAJOR_I},   CHORD_EXT_NONE,   SCALE_DORIAN},
    {{CHORD_MINOR_I,  CHORD_MAJOR_I, CHORD_MAJOR_I,    CHORD_MINOR_I, CHORD_MIN7B5,  CHORD_MAJOR_I, CHORD_MINOR_I},   CHORD_EXT_NONE,   SCALE_PHRYGIAN},
@@ -47,7 +47,7 @@ static const mode_chords_entry_t mode_chord_table[] = {
    {{CHORD_MAJOR_I,  CHORD_MINOR_I, CHORD_MIN7B5,  CHORD_MAJOR_I, CHORD_MINOR_I, CHORD_MINOR_I, CHORD_MAJOR_I},   CHORD_EXT_NONE,   SCALE_MIXOLYDIAN},
    {{CHORD_MINOR_I,  CHORD_MIN7B5,  CHORD_MAJOR_I, CHORD_MINOR_I, CHORD_MINOR_I, CHORD_MAJOR_I, CHORD_MAJOR_I},      CHORD_EXT_NONE,   SCALE_AEOLIAN},
    {{CHORD_MIN7B5,   CHORD_MAJOR_I, CHORD_MINOR_I, CHORD_MINOR_I, CHORD_MAJOR_I,  CHORD_MAJOR_I, CHORD_MINOR_I},   CHORD_EXT_NONE,   SCALE_LOCRIAN},
-   // 8..15 Modes w/ CHORD_EXT_SEVENTH
+   // 7..13 Modes w/ CHORD_EXT_SEVENTH
    {{CHORD_MAJ7,  CHORD_MIN7, CHORD_MINOR_I, CHORD_MAJ7, CHORD_DOM7,    CHORD_MIN7, CHORD_MIN7B5},    CHORD_EXT_SEVENTH,   SCALE_IONIAN},
    {{CHORD_MIN7,  CHORD_MIN7,  CHORD_MAJ7, CHORD_DOM7, CHORD_MIN7, CHORD_MIN7B5, CHORD_MAJ7},   CHORD_EXT_SEVENTH,   SCALE_DORIAN},
    {{CHORD_MIN7,  CHORD_MAJ7, CHORD_DOM7,    CHORD_MIN7, CHORD_MIN7B5,  CHORD_MAJ7, CHORD_MIN7},   CHORD_EXT_SEVENTH,   SCALE_PHRYGIAN},
@@ -55,7 +55,7 @@ static const mode_chords_entry_t mode_chord_table[] = {
    {{CHORD_DOM7,  CHORD_MIN7, CHORD_MIN7B5,  CHORD_MAJ7, CHORD_MIN7, CHORD_MIN7, CHORD_MAJ7},   CHORD_EXT_SEVENTH,   SCALE_MIXOLYDIAN},
    {{CHORD_MIN7,  CHORD_MIN7B5,  CHORD_MAJ7, CHORD_MIN7, CHORD_MIN7, CHORD_MAJ7, CHORD_DOM7},      CHORD_EXT_SEVENTH,   SCALE_AEOLIAN},
    {{CHORD_MIN7B5, CHORD_MAJ7, CHORD_MIN7, CHORD_MIN7, CHORD_DOM7,    CHORD_MAJ7, CHORD_MIN7},   CHORD_EXT_SEVENTH,   SCALE_LOCRIAN}
-   // 16
+   // 14
    };
 
 
@@ -78,7 +78,7 @@ const chord_type_t ARP_MODES_GetModeChord(scale_t scale,chord_extension_t extens
       scale_t checkScale = mode_chord_table[i].scale;
       if (checkScale == scale){
          // Check if extension flags match.  If so, then this is the chord.  If not keep searching.
-         if (mode_chord_table[modeTableIndex].chordExt != extension){
+         if (mode_chord_table[i].chordExt == extension){
             modeTableIndex = i;
             break;
          }

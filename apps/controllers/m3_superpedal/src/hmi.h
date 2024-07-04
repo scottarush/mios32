@@ -16,10 +16,34 @@
 /////////////////////////////////////////////////////////////////////////////
 #define NUM_STOMP_SWITCHES 5
 #define NUM_TOE_SWITCHES 8
+#define DISPLAY_CHAR_WIDTH 20
 
 /////////////////////////////////////////////////////////////////////////////
 // Global Types
 /////////////////////////////////////////////////////////////////////////////
+
+typedef enum pageID_e {
+   PAGE_HOME = 0,
+   PAGE_MAIN_MENU = 1,
+   PAGE_EDIT_VOICE_PRESET = 2,
+   PAGE_EDIT_PATTERN_PRESET = 3,
+   PAGE_MIDI_PROGRAM_SELECT = 4,
+   PAGE_ARP_SETTINGS = 5,
+   PAGE_DIALOG = 6,
+} pageID_t;
+
+struct page_s {
+   pageID_t pageID;
+   char* pPageTitle;
+   void (*pUpdateDisplayCallback)();
+   void (*pRotaryEncoderChangedCallback)(s8 increment);
+   void (*pRotaryEncoderSelectCallback)();
+   void (*pPedalSelectedCallback)(u8 pedalNum);
+   void (*pBackButtonCallback)();
+   struct page_s* pBackPage;
+};
+
+
 // Following type is used as an array index so must be 0 based and consecutive
 typedef enum {
    STOMP_SWITCH_OCTAVE = 0,
@@ -37,6 +61,36 @@ typedef enum {
    TOE_SWITCH_ARP_LIVE = 4
 } toeSwitchMode_t;
 #define NUM_TOE_SWITCH_MODES 5
+
+typedef enum renderline_justify_e {
+   RENDER_LINE_LEFT = 0,
+   RENDER_LINE_CENTER = 1,
+   RENDER_LINE_SELECT = 2,
+   RENDER_LINE_RIGHT = 3
+} renderline_justify_t;
+
+
+//----------------------------------------------------------------------------
+// Export Global Display page variables
+//----------------------------------------------------------------------------
+extern struct page_s midiProgramSelectPage;
+extern struct page_s homePage;
+extern struct page_s dialogPage;
+extern struct page_s* currentPage;
+extern struct page_s* lastPage;
+
+
+// Buffer for dialog Page Title
+extern char dialogPageTitle[DISPLAY_CHAR_WIDTH + 1];
+// Buffer for dialog Page Message Line 1
+extern char dialogPageMessage1[DISPLAY_CHAR_WIDTH + 1];
+// Buffer for dialog Page Message Line 2
+extern char dialogPageMessage2[DISPLAY_CHAR_WIDTH + 1];
+
+
+//----------------------------------------------------------------------------
+// Persisted data to E^2 
+//----------------------------------------------------------------------------
 
 typedef struct {
    // First 4 bytes must be serialization version ID.  Big-ended order
@@ -78,7 +132,9 @@ extern void HMI_NotifyBackToggle(u8 pressed,s32 timestamp);
 extern void HMI_NotifyEncoderChange(s32 incrementer);
 extern void HMI_NotifyEncoderSwitchToggle(u8 pressed,s32 timestamp);
 extern void HMI_NotifyOctaveChange(u8 octave);
-extern void HMI_SetArpSettingsIndicators();
+extern void HMI_DialogPage_UpdateDisplay();
+extern void HMI_UpdateIndicators();
+extern void HMI_RenderLine(u8, const char*, renderline_justify_t);
 
 /////////////////////////////////////////////////////////////////////////////
 // Export global variables
