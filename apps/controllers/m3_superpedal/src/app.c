@@ -621,3 +621,36 @@ static s32 NOTIFY_MIDI_TimeOut(mios32_midi_port_t port) {
 }
 
 
+/////////////////////////////////////////////////////////////////////////////
+// MSD access functions
+/////////////////////////////////////////////////////////////////////////////
+s32 TASK_MSD_EnableSet(u8 enable)
+{
+  MIOS32_IRQ_Disable();
+  if( msd_state == MSD_DISABLED && enable ) {
+    msd_state = MSD_INIT;
+  } else if( msd_state == MSD_READY && !enable )
+    msd_state = MSD_SHUTDOWN;
+  MIOS32_IRQ_Enable();
+
+  return 0; // no error
+}
+
+s32 TASK_MSD_EnableGet()
+{
+  return (msd_state == MSD_READY) ? 1 : 0;
+}
+
+s32 TASK_MSD_FlagStrGet(char str[5])
+{
+  str[0] = MSD_CheckAvailable() ? 'U' : '-';
+  str[1] = MSD_LUN_AvailableGet(0) ? 'M' : '-';
+  str[2] = MSD_RdLEDGet(250) ? 'R' : '-';
+  str[3] = MSD_WrLEDGet(250) ? 'W' : '-';
+  str[4] = 0;
+
+  return 0; // no error
+}
+
+
+
