@@ -143,6 +143,7 @@ void HMI_MIDIProgramSelectPage_RotaryEncoderSelected();
 void HMI_MIDIProgramSelectPage_BackButtonCallback();
 
 s32 HMI_PersistData();
+void HMI_UpdateOctaveIncDecIndicators();
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -344,7 +345,7 @@ void HMI_NotifyToeToggle(u8 toeNum, u8 pressed, s32 timestamp) {
          // Toenum 1 always decrements.  Note that we don't have to check
          // range here.  PEDALS will do that and will call HMI_NotifyOctaveChange iff
          // there was a change.
-         PEDALS_SetOctave(PEDALS_GetOctave()- 1);
+         PEDALS_SetOctave(PEDALS_GetOctave() - 1);
          break;
       case 8:
          // Toenum 8 always increments
@@ -357,7 +358,7 @@ void HMI_NotifyToeToggle(u8 toeNum, u8 pressed, s32 timestamp) {
       case 6:
       case 7:
          // Toe switch numbers 2 through 7 are fixed starting at MIN_DIRECT_OCTAVE_NUMBER
-         PEDALS_SetOctave(toeNum-2 + MIN_DIRECT_OCTAVE_NUMBER);
+         PEDALS_SetOctave(toeNum - 2 + MIN_DIRECT_OCTAVE_NUMBER);
          break;
       }
       // Note that we don't have to call HMI_UpdateIndicators because this will be 
@@ -402,7 +403,19 @@ void HMI_NotifyToeToggle(u8 toeNum, u8 pressed, s32 timestamp) {
       // TODO
       break;
    case TOE_SWITCH_ARP_LIVE:
-      ARP_HMI_HandleArpLiveToeToggle(toeNum, pressed);
+      switch (toeNum) {
+      case 1:
+         // Toe 1 decrements
+         PEDALS_SetOctave(PEDALS_GetOctave() - 1);
+         break;
+      case 8:
+         // Toe3 increments
+         PEDALS_SetOctave(PEDALS_GetOctave() + 1);
+         break;
+      default:
+         // switches 2-7 handled by separate module/function
+         ARP_HMI_HandleArpLiveToeToggle(toeNum, pressed);
+      }
       break;
    break;  default:
    }
@@ -492,20 +505,15 @@ void HMI_NotifyStompToggle(u8 stompNum, u8 pressed, s32 timestamp) {
 /////////////////////////////////////////////////////////////////////////////
 void HMI_UpdateIndicators() {
    IND_ClearAll();
-   if (hmiSettings.toeSwitchMode == TOE_SWITCH_ARP_LIVE) {
-      // Call dedicated function to set the indicators to the ARP settings since multiple
-      // indicators can be set in this mode.
-      ARP_HMI_SetArpSettingsIndicators();
-      return;
-   }
-   // Otherwise process according to toeSwitchMode
+
+   //  process according to toeSwitchMode
+   s8 octave = PEDALS_GetOctave();
    switch (hmiSettings.toeSwitchMode) {
    case TOE_SWITCH_OCTAVE:
       // For Octave, pedals 1 and 8 increment/decrement and indicators 2-7 are fixed starting
       // at MIN_DIRECT_OCTAVE_NUMBER.  On the first click below this, indicator 1 is solid,
       // one more click down it blips.  Same behavior on the top side with indicator 8.
-      s8 octave = PEDALS_GetOctave();
-      if (octave < MIN_DIRECT_OCTAVE_NUMBER-1) {
+      if (octave < MIN_DIRECT_OCTAVE_NUMBER - 1) {
          IND_SetBlipIndicator(1, 0, 2.0);
       }
       else if (octave > MIN_DIRECT_OCTAVE_NUMBER + 6) {
@@ -513,8 +521,20 @@ void HMI_UpdateIndicators() {
       }
       else {
          // Indicators 2 through 7 show direct octave.
-         IND_SetIndicatorState(octave - MIN_DIRECT_OCTAVE_NUMBER+2, IND_ON);
+         IND_SetIndicatorState(octave - MIN_DIRECT_OCTAVE_NUMBER + 2, IND_ON);
+      }            
+      break;
+   case TOE_SWITCH_ARP_LIVE:
+      if (octave < MIN_DIRECT_OCTAVE_NUMBER - 1) {
+         IND_SetBlipIndicator(1, 0, 2.0);
       }
+      else if (octave > MIN_DIRECT_OCTAVE_NUMBER + 6) {
+         IND_SetBlipIndicator(8, 0, 2.0);
+      }
+      else {
+         // Call separate function in ARP_HMI to handle indicators 2-7
+         ARP_HMI_SetArpSettingsIndicators();
+      }       
       break;
    default:
       // For the other modes, just set according to the settings
@@ -522,6 +542,7 @@ void HMI_UpdateIndicators() {
    }
 
 }
+
 
 /////////////////////////////////////////////////////////////////////////////
 // Called on a change in the rotary encoder.
@@ -731,9 +752,9 @@ void HMI_HomePage_UpdateDisplay() {
    char scratchBuffer[DISPLAY_CHAR_WIDTH + 1];
 
    // Current octave, arp state, and volume always go on line 3
-   u32 volumeLevel = (PEDALS_GetVolume() * 8) / 127;
+   u32 volume = ((PEDALS_GetVolume() * 8) + 4) / (127);
    snprintf(lineBuffer, DISPLAY_CHAR_WIDTH + 1, "Oct:%d V:%d Arp:%s",
-      PEDALS_GetOctave(), volumeLevel, (ARP_GetEnabled() ? "RUN" : "STOP"));
+      PEDALS_GetOctave(), volume, (ARP_GetEnabled() ? "RUN" : "STOP"));
    HMI_RenderLine(3, lineBuffer, RENDER_LINE_CENTER);
 
    // Show the Current Mode on top line.

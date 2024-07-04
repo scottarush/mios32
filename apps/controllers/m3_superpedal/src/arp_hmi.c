@@ -40,17 +40,15 @@
 // ARP-HMI specific Switch types and non-persisted variables
 //----------------------------------------------------------------------------
 
-// Total list of functions availabe in ARP Live mode.  Can be mapped to toe switches
-// in preesets
+// Total list of functions availabe in ARP Live mode.  Note that toe switches 1 and 8 are
+// dedicated to Octave decrement/increment respectively
 typedef enum arp_live_toe_functions_e {
-   ARP_LIVE_TOE_SELECT_KEY = 1,
-   ARP_LIVE_TOE_SELECT_MODAL_SCALE = 2,
-   ARP_LIVE_TOE_GEN_ORDER = 3,
-   ARP_LIVE_TOE_PRESET_1 = 4,
-   ARP_LIVE_TOE_PRESET_2 = 5,
-   ARP_LIVE_TOE_PRESET_3 = 6,
-   ARP_LIVE_TOE_TEMPO_DECREMENT = 7,
-   ARP_LIVE_TOE_TEMPO_INCREMENT = 8,
+   ARP_LIVE_TOE_SELECT_KEY = 2,
+   ARP_LIVE_TOE_SELECT_MODAL_SCALE = 3,
+   ARP_LIVE_TOE_GEN_ORDER = 4,
+   // 5 is unused
+   ARP_LIVE_TOE_TEMPO_DECREMENT = 6,
+   ARP_LIVE_TOE_TEMPO_INCREMENT = 7,
 } arp_live_toe_functions_t;
 
 
@@ -142,15 +140,6 @@ void ARP_HMI_HandleArpLiveToeToggle(u8 toeNum, u8 pressed) {
 
       // Set the pedal callback to get the selected root key
       PEDALS_SetSelectPedalCallback(&ARP_HMI_SelectModeScaleCallback);
-      break;
-   case ARP_LIVE_TOE_PRESET_1:
-      // TODO
-      break;
-   case ARP_LIVE_TOE_PRESET_2:
-      // TODO
-      break;
-   case ARP_LIVE_TOE_PRESET_3:
-      // TODO
       break;
    case ARP_LIVE_TOE_TEMPO_INCREMENT:
       bpm = ARP_GetBPM();
