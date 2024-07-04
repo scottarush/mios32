@@ -92,6 +92,7 @@ s32 ARP_Init()
       arpSettings.chordExtension = CHORD_EXT_SEVENTH;
       arpSettings.ppqn = 384;
       arpSettings.bpm = 120.0;
+      arpSettings.midi_ports = 0x0031;     // OUT1 and USB
 
       ARP_PersistData();
 
@@ -250,7 +251,17 @@ static s32 ARP_Tick(u32 bpm_tick)
             midi_package.note = note;
             midi_package.velocity = velocity;
 
-            SEQ_MIDI_OUT_Send(DEFAULT, midi_package, SEQ_MIDI_OUT_OnOffEvent, bpm_tick, length);
+            // Play on the enabled ports.
+            int i;
+            u16 mask = 1;
+            for (i = 0; i < 16; ++i, mask <<= 1) {
+               if (arpSettings.midi_ports & mask) {
+                  // USB0/1/2/3, UART0/1/2/3, IIC0/1/2/3, OSC0/1/2/3
+                  mios32_midi_port_t port = 0x10 + ((i & 0xc) << 2) + (i & 3);
+
+                  SEQ_MIDI_OUT_Send(port, midi_package, SEQ_MIDI_OUT_OnOffEvent, bpm_tick, length);
+               }
+            }
          }
       }
    }
@@ -271,12 +282,12 @@ s32 ARP_FillNoteStack() {
    NOTESTACK_Clear(&notestack);
 
    // Get the keys of the chord
-   const chord_type_t chord = ARP_MODES_GetModeChord(arpSettings.modeScale, 
-         arpSettings.chordExtension,arpSettings.rootKey,chordModeNote);
-         
+   const chord_type_t chord = ARP_MODES_GetModeChord(arpSettings.modeScale,
+      arpSettings.chordExtension, arpSettings.rootKey, chordModeNote);
+
    if ((chord == CHORD_INVALID) || (chord == CHORD_ERROR)) {
-      DEBUG_MSG("ARP_FillNoteStack: Invalid modeScale=%d, chordExtension=%d, or chordModeNote=%d combination", 
-         arpSettings.modeScale, arpSettings.chordExtension,chordModeNote);
+      DEBUG_MSG("ARP_FillNoteStack: Invalid modeScale=%d, chordExtension=%d, or chordModeNote=%d combination",
+         arpSettings.modeScale, arpSettings.chordExtension, chordModeNote);
       return -1;
    }
    // Compute octave by subtracting C-2 (note 24)
@@ -302,7 +313,7 @@ s32 ARP_FillNoteStack() {
       s32 note = SEQ_CHORD_NoteGetByEnum(keyNum, chord, octave);
       if (note >= 0) {
          // add offset for the chordModeNote
-         note += (chordModeNote %12);
+         note += (chordModeNote % 12);
          NOTESTACK_Push(&notestack, note, chordModeNoteVelocity);
       }
    }
@@ -330,8 +341,8 @@ s32 ARP_NotifyNoteOn(u8 note, u8 velocity)
       else {
          // Save the root and verify that it has a valid chord in the current scale.
          // If not then just add it alone to the notestack.
-         chord_type_t chord = ARP_MODES_GetModeChord(arpSettings.modeScale, 
-            arpSettings.chordExtension, arpSettings.rootKey,note);
+         chord_type_t chord = ARP_MODES_GetModeChord(arpSettings.modeScale,
+            arpSettings.chordExtension, arpSettings.rootKey, note);
          if (chord == CHORD_INVALID) {
             // This key is not a valid key in this cord.  Just fill the note stack with 
             // this single note instead

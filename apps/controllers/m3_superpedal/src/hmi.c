@@ -143,7 +143,7 @@ void HMI_MIDIProgramSelectPage_BackButtonCallback();
 
 s32 HMI_PersistData();
 void HMI_UpdateOctaveIncDecIndicators();
-
+u8 HMI_GetToeVolumeIndex();
 
 /////////////////////////////////////////////////////////////////////////////
 // called at Init to initialize the HMI
@@ -203,7 +203,6 @@ void HMI_Init(void) {
       hmiSettings.lastSelectedMIDIProgNumber = 1;
       hmiSettings.lastSelectedMidiOutput = DEFAULT_PRESET_MIDI_PORTS;
       hmiSettings.lastSelectedMidiChannel = DEFAULT_PRESET_MIDI_CHANNEL;
-
 
       HMI_PersistData();
    }
@@ -518,6 +517,9 @@ void HMI_UpdateIndicators() {
    //  process according to toeSwitchMode
    s8 octave = PEDALS_GetOctave();
    switch (hmiSettings.toeSwitchMode) {
+   case TOE_SWITCH_VOLUME:
+      IND_SetIndicatorState(HMI_GetToeVolumeIndex(), IND_ON);
+      break;
    case TOE_SWITCH_OCTAVE:
       // For Octave, pedals 1 and 8 increment/decrement and indicators 2-7 are fixed starting
       // at MIN_DIRECT_OCTAVE_NUMBER.  On the first click below this, indicator 1 is solid,
@@ -788,11 +790,9 @@ void HMI_HomePage_UpdateDisplay() {
 
    // Spacer on line 1
    HMI_RenderLine(1, "--------------------", RENDER_LINE_LEFT);
-
    // Current octave, arp state, and volume always go on line 3
-   u32 volume = ((PEDALS_GetVolume() * 8) + 4) / (127);
    snprintf(lineBuffer, DISPLAY_CHAR_WIDTH + 1, "Oct:%d V:%d Arp:%s",
-      PEDALS_GetOctave(), volume, (ARP_GetEnabled() ? "RUN" : "STOP"));
+      PEDALS_GetOctave(), HMI_GetToeVolumeIndex(), (ARP_GetEnabled() ? "RUN" : "STOP"));
    HMI_RenderLine(3, lineBuffer, RENDER_LINE_CENTER);
 
    ///////////////////////////////////////
@@ -811,7 +811,9 @@ void HMI_HomePage_UpdateDisplay() {
    case TOE_SWITCH_ARP:
       // Arpeggiator details in Line 2 insted of preset name
       u16 bpm = ARP_GetBPM();
-      // Truncate scale/mode name
+      // Truncate scale/mode name.  Had problems with snprintf for some reason so
+      // went to memcpy instead.  
+      // TODO: Figure out why snprintf didn't work.
       const char* scaleName = SEQ_SCALE_NameGet(ARP_GetModeScale());
       u8 truncLength = 9;
       u8 nameLength = strlen(scaleName);
@@ -931,7 +933,7 @@ void HMI_MainPage_RotaryEncoderSelected() {
       snprintf(dialogPageTitle, DISPLAY_CHAR_WIDTH + 1, "%s", "About M3-SuperPedal");
       snprintf(dialogPageMessage1, DISPLAY_CHAR_WIDTH + 1, "%s", M3_SUPERPEDAL_VERSION);
       snprintf(dialogPageMessage2, DISPLAY_CHAR_WIDTH + 1, "%s", M3_SUPERPEDAL_VERSION_DATE);
-      
+
       dialogPage.pBackPage = currentPage;
       currentPage = &dialogPage;
       break;
@@ -1124,4 +1126,20 @@ void HMI_NotifyOctaveChange(u8 octave) {
    HMI_UpdateIndicators();
    // And update the current display in case it is showing Octave
    currentPage->pUpdateDisplayCallback();
+}
+
+// Helper computes the volume level from 1 to 8 for both display and
+// indicator updates:
+u8 HMI_GetToeVolumeIndex() {
+   u8 volume = PEDALS_GetVolume();
+   u8 index = 1;
+   for (int i = 0;i < sizeof(toeVolumeLevels) - 1;i++) {
+      if ((volume >= toeVolumeLevels[i]) && (volume < toeVolumeLevels[i + 1])) {
+         break;
+      }
+      else {
+         index++;
+      }
+   }
+   return index;
 }

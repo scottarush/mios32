@@ -46,6 +46,7 @@ typedef struct persisted_arp_data_s {
 
    arp_gen_order_t genOrder;
    arp_mode_t arpMode;
+   u16 midi_ports;
    key_t rootKey;
    scale_t modeScale;
    chord_extension_t chordExtension;
