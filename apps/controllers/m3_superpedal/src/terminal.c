@@ -208,7 +208,8 @@ s32 TERMINAL_ParseLine(char* input, void* _output_function)
          //         UIP_TERMINAL_Help(_output_function);
          MIDIMON_TerminalHelp(_output_function);
          MIDI_ROUTER_TerminalHelp(_output_function);
-         out("  clear:                            Reformats EEPROM and re-Stores defaults.");
+         out("  clearee:                          Reformats EEPROM and re-Stores defaults.");
+         out("  reinit:                           reinits all components to load their EE settings");
          out("  reset:                            resets the MIDIbox (!)\n");
          out("  help:                             this page");
          out("  exit:                             (telnet only) exits the terminal");
@@ -281,7 +282,7 @@ s32 TERMINAL_ParseLine(char* input, void* _output_function)
             out("Please enter 'msd on' or 'msd off'\n");
          }
       }
-      else if (strcmp(parameter, "clear") == 0) {
+      else if (strcmp(parameter, "clearee") == 0) {
          s32 status = PERSIST_Init(1);
          if (status >= 0) {
             MIDI_PRESETS_Init();
@@ -293,7 +294,13 @@ s32 TERMINAL_ParseLine(char* input, void* _output_function)
             out("ERROR: failed to clear EEPROM (status %d)!", status);
          }
       }
-
+      else if (strcmp(parameter, "reinit") == 0) {
+         out("Re-Initing MIDI_PRESETS, HMI, PEDALS, & ARP");
+         MIDI_PRESETS_Init();
+         HMI_Init();
+         PEDALS_Init();
+         ARP_Init();
+      }
       else if (strcmp(parameter, "reset") == 0) {
          MIOS32_SYS_Reset();
       }

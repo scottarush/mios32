@@ -20,6 +20,7 @@ THUMB_SOURCE    = src/app.c \
  		  src/pedals.c \
 		  src/indicators.c \
 		  src/hmi.c \
+		  src/arp_hmi.c\
 		  src/midi_presets.c\
         src/persist.c\
 		  src/terminal.c\

@@ -22,9 +22,26 @@
 /////////////////////////////////////////////////////////////////////////////
 // Local Variables
 /////////////////////////////////////////////////////////////////////////////
-u8 defaultMIDIPresetProgramNumbers[] = { 43,49,50,51,17,20,33,92 };
-u8 defaultMIDIPresetBankNumbers[] = { 0,0,0,0,0,0,0,0 };
-u8 defaultMIDIPresetOctaveNumbers[] = { 3,3,3,3,3,3,3,3 };
+u8 defaultGenMIDIPresetProgramNumbers[MAX_NUM_GEN_MIDI_PRESET_BANKS][MAX_NUM_PRESETS_PER_BANK] = {
+   // Bank 1 Strings
+   {43,47,49,50,51,52},
+   // Bank 2 Bass
+   {33,34,35,37,39,40},
+   // Bank 3 Keys
+   {1,17,18,19,20,23},
+   // Bank 4 Bells/Wind
+   {10,15,63,65,71,74}
+};
+u8 defaultMIDIPresetOctaveNumbers[MAX_NUM_GEN_MIDI_PRESET_BANKS][MAX_NUM_PRESETS_PER_BANK] = {
+   // Bank 1 Strings
+   {3,3,3,3,3,3 },
+   // Bank 2 Bass
+   {3,3,3,3,3,3 },
+   // Bank 3 Keys
+   {3,3,3,3,3,3 },
+   // Bank 4 Bells/Wind
+   {3,3,3,3,3,3 }
+};
 
 /////////////////////////////////////////////////////////////////////////////
 // Persisted data to E^2
@@ -36,8 +53,9 @@ persisted_midi_presets_t presets;
 /////////////////////////////////////////////////////////////////////////////
 void MIDI_PRESETS_PersistData();
 
+const char* defaultGenMIDIBankNames[] = { "Strings","Bass","Keys","Bells/Wind" };
 
-char* genMIDIVoiceNames[] = { "Acoustic Grand Piano","Bright Acoustic Piano","Electric Grand Piano","Honky-tonk Piano","Electric Piano 1",
+const char* genMIDIVoiceNames[] = { "Acoustic Grand Piano","Bright Acoustic Piano","Electric Grand Piano","Honky-tonk Piano","Electric Piano 1",
 "Electric Piano 2","Harpsichord","Clavi","Celesta","Glockenspiel",
 "Music Box","Vibraphone","Marimba","Xylophone","Tubular Bells",
 "Dulcimer","Drawbar Organ","Percussive Organ","Rock Organ","Church Organ",
@@ -62,12 +80,12 @@ char* genMIDIVoiceNames[] = { "Acoustic Grand Piano","Bright Acoustic Piano","El
 "Fiddle","Shanai","Tinkle Bell","Agogo","Steel Drums",
 "Woodblock","Taiko Drum","Melodic Tom","Synth Drum","Reverse Cymbal",
 "Guitar Fret Noise","Breath Noise","Seashore","Bird Tweet","Telephone Ring",
-"Helicopter","Applause","Gunshot"};
+"Helicopter","Applause","Gunshot" };
 
 
 // Bank number Control Change for JV880 A & B Presets.  See JV880 Manual page 10-32
 #define JV880_AB_PRESET_BANK_SELECT_CC0 80
-char * jv880_ABPresets[] = {"Acoustic Piano 1","Acoustic Piano 2","Mellow Piano","Pop Piano 1","Pop Piano 2",
+const char* jv880_ABPresets[] = { "Acoustic Piano 1","Acoustic Piano 2","Mellow Piano","Pop Piano 1","Pop Piano 2",
 "Pop Piano 3","MIDIed Grand","Country Bar","Glist EPiano","MIDI EPiano",
 "SA Rhodes","Dig Rhodes 1","Dig Rhodes 2","Stiky Rhodes","Guitr Rhodes",
 "Nylon Rhodes","Clav 1","Clav 2","Marimba","Marimba SW",
@@ -92,12 +110,12 @@ char * jv880_ABPresets[] = {"Acoustic Piano 1","Acoustic Piano 2","Mellow Piano"
 "OverblownPan","Air Lead","Steel Drum","Log Drum","Box Lead",
 "Soft Lead","Whistle","Square Lead","Touch Lead","NightShade",
 "Pizza Hutt","EP+Exp Pad","JP-8 Pad","Puff","SpaciosSweep",
-"Big n Beefy","RevCymBend","Analog Seq"};
+"Big n Beefy","RevCymBend","Analog Seq" };
 
 
 // Bank select Control Change number for JV880 Internal Presets.  See JV880 Manual page 10-32
 #define JV880_INTERNAL_PRESET_BANK_SELECT_CC0 81
-char * jv880_InternalPresets[] = {"770 Grand 1","MIDI 3 Grand","Electric Grand 1","60s Electric Piano","Dyna Rhodes",
+const char* jv880_InternalPresets[] = { "770 Grand 1","MIDI 3 Grand","Electric Grand 1","60s Electric Piano","Dyna Rhodes",
 "Pop Rhodes","Beauty Rhodes","Airies Piano","Clav 1 x4","Wah Clav",
 "Housey Clavy","Ballad Org.1","Even Bars 1","Stereo Organ","Jazz Organ 3",
 "8ft. Stop","Brite Organ 1","Soft Organ","60s Organ x4","Pipe Organ 4",
@@ -109,7 +127,7 @@ char * jv880_InternalPresets[] = {"770 Grand 1","MIDI 3 Grand","Electric Grand 1
 "Pedal Steel","Banjo 1","Electric Sitar","Funk Guitar","Heavy Duty",
 "Lead Guitar 1","Lead Guitar 2","Lead Guitar 3","Pocket Rocket","Power Flange",
 "Bowed Guitar","Shakupeace","Cimbalon 1","Sanza 1","Shamisentur",
-"Praying Monk","Electric Koto","Ravi Sitar","Mystic Mount"};
+"Praying Monk","Electric Koto","Ravi Sitar","Mystic Mount" };
 
 
 void MIDI_PRESETS_Init() {
@@ -117,22 +135,25 @@ void MIDI_PRESETS_Init() {
    s32 valid = 0;
    // Set the expected serializedID in the supplied block.  Update this ID whenever the persisted structure changes.  
    presets.serializationID = 0x4D494401;   // 'MID1'
-   
+
    valid = PERSIST_ReadBlock(PERSIST_MIDI_PRESETS_BLOCK, (unsigned char*)&presets, sizeof(presets));
    if (valid < 0) {
       DEBUG_MSG("MIDI_PRESETS_Init:  PERSIST_ReadBlock return invalid.   Reinitializing EEPROM Block");
       // Set default presets
-      for (int i = 0;i < NUM_GEN_MIDI_PRESETS;i++) {
-         midi_preset_t* ptr = &presets.generalMidiPresets[i];
-         ptr->presetNumber = i + 1;
-         ptr->programNumber = defaultMIDIPresetProgramNumbers[i];
-         ptr->bankNumber = defaultMIDIPresetBankNumbers[i];
-         ptr->midiPorts = DEFAULT_PRESET_MIDI_PORTS;
-         ptr->midiChannel = DEFAULT_PRESET_MIDI_CHANNEL;
-         ptr->octave = defaultMIDIPresetOctaveNumbers[i];
+      for (int bank = 0;bank < MAX_NUM_GEN_MIDI_PRESET_BANKS;bank++) {
+         for (int i = 0;i < MAX_NUM_PRESETS_PER_BANK;i++) {
+
+            midi_preset_t* ptr = &presets.generalMidiPresets[bank][i];
+            ptr->programNumber = defaultGenMIDIPresetProgramNumbers[bank][i];
+            ptr->midiBankNumber = 0;
+            ptr->midiPorts = DEFAULT_PRESET_MIDI_PORTS;
+            ptr->midiChannel = DEFAULT_PRESET_MIDI_CHANNEL;
+            ptr->octave = defaultMIDIPresetOctaveNumbers[bank][i];
+         }
       }
       // Default to preset 1
-      presets.lastActivatedVoicePreset = 1;
+      presets.lastActivatedGenMIDIPresetNumber.bankNumber = 1;
+      presets.lastActivatedGenMIDIPresetNumber.bankIndex = 1;
       MIDI_PRESETS_PersistData();
    }
 
@@ -152,39 +173,65 @@ u8 MIDI_PRESETS_GetNumGenMIDIVoices() {
    return length;
 }
 
-/////////////////////////////////////////////////////////////////////////////
-// Activates a MIDI Preset.
-// presetNumber:  1 to NUM_GEN_MIDI_PRESETS
-// returns:  activated presetNumber on success, 0 on error.
-/////////////////////////////////////////////////////////////////////////////
-u8 MIDI_PRESETS_ActivateMIDIPreset(u8 presetNumber) {
-   if ((presetNumber == 0) || (presetNumber > NUM_GEN_MIDI_PRESETS)) {
-      DEBUG_MSG("MIDI_PRESET_ActivateMIDIPreset: Invalid presetNumber: %d", presetNumber);
-      return 0; // for error
-   }
-   midi_preset_t* gPtr = &presets.generalMidiPresets[presetNumber - 1];
+u8 MIDI_PRESETS_GetGenMidiPresetNumBanks() {
+   return MAX_NUM_GEN_MIDI_PRESET_BANKS;
+}
 
-   MIDI_PRESETS_ActivateMIDIVoice(gPtr->programNumber,gPtr->bankNumber,gPtr->midiPorts,gPtr->midiChannel);
+extern u8 MIDI_PRESETS_GetGenMidiPresetBankSize() {
+   return MAX_NUM_PRESETS_PER_BANK;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// Returns the name of the bank
+// bankNum:  number of the bank from 1 to MAX_NUM_GEN_MIDI_PRESET_BANKS
+/////////////////////////////////////////////////////////////////////////////
+extern const char * MIDI_PRESETS_GetGenMidiBankName(u8 bankNumber){
+      if ((bankNumber == 0) || (bankNumber > MAX_NUM_GEN_MIDI_PRESET_BANKS)) {
+      DEBUG_MSG("MIDI_PRESETS_GetGenMidiBankName: Invalid bankNumber: %d", bankNumber);
+      return NULL;
+   }
+   return defaultGenMIDIBankNames[bankNumber-1];
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+// Activates a general MIDI Preset.
+// presetNum:  pointer to presetNumber struct
+// returns:  pointer to activated presetNumber on success, NULL on error.
+/////////////////////////////////////////////////////////////////////////////
+const midi_preset_num_t* MIDI_PRESETS_ActivateGenMIDIPreset(const midi_preset_num_t* presetNum) {
+   if ((presetNum->bankNumber == 0) || (presetNum->bankNumber > MAX_NUM_GEN_MIDI_PRESET_BANKS)) {
+      DEBUG_MSG("MIDI_PRESETS_ActivateGenMIDIPreset: Invalid bankNumber: %d", presetNum->bankNumber);
+      return NULL;
+   }
+   if ((presetNum->bankIndex == 0) || (presetNum->bankIndex > MAX_NUM_PRESETS_PER_BANK)) {
+      DEBUG_MSG("MIDI_PRESETS_ActivateGenMIDIPreset: Invalid bankIndex: %d", presetNum->bankIndex);
+      return NULL;
+   }
+   midi_preset_t* ptr = &presets.generalMidiPresets[presetNum->bankNumber - 1][presetNum->bankIndex - 1];
+
+   MIDI_PRESETS_ActivateMIDIVoice(ptr->programNumber, ptr->midiBankNumber, ptr->midiPorts, ptr->midiChannel);
 
    // Set the octave
-   PEDALS_SetOctave(gPtr->octave);
+   PEDALS_SetOctave(ptr->octave);
 
    // Save last activate preset number
-   presets.lastActivatedVoicePreset = presetNumber;
+   presets.lastActivatedGenMIDIPresetNumber.bankNumber = presetNum->bankNumber;
+   presets.lastActivatedGenMIDIPresetNumber.bankIndex = presetNum->bankIndex;
    // And persist
    MIDI_PRESETS_PersistData();
 
-   return gPtr->presetNumber;  // for success
+   return presetNum; // for success
 }
 /////////////////////////////////////////////////////////////////////////////
 // Direct voice activation without preset
 // programNumber:  The General MIDI program number
-// bankNumber: General MIDI bank number
+// midiBankNumber: General MIDI bank number
 // midiPorts: MIDI hardware outputs
 // midiChannel:  MIDI channel
 // returns: pointer to updated preset on success, NULL on invalid preset data
 /////////////////////////////////////////////////////////////////////////////
-u8 MIDI_PRESETS_ActivateMIDIVoice(u8 programNumber, u8 bankNumber, u8 midiPorts, u8 midiChannel) {
+u8 MIDI_PRESETS_ActivateMIDIVoice(u8 programNumber, u8 midiBankNumber, u8 midiPorts, u8 midiChannel) {
    u16 mask = 1;
    for (int porti = 0; porti < 16; ++porti, mask <<= 1) {
       if (midiPorts & mask) {
@@ -192,9 +239,9 @@ u8 MIDI_PRESETS_ActivateMIDIVoice(u8 programNumber, u8 bankNumber, u8 midiPorts,
          mios32_midi_port_t port = 0x10 + ((porti & 0xc) << 2) + (porti & 3);
 
          //DEBUG_MSG("midi tx:  port=0x%x",port);
-         MIOS32_MIDI_SendProgramChange(port, midiChannel,programNumber);
-         // Send bankNumber if non-zero
-         if (bankNumber != 0){
+         MIOS32_MIDI_SendProgramChange(port, midiChannel, programNumber);
+         // Send midiBankNumber if non-zero
+         if (midiBankNumber != 0) {
             // TODO
          }
       }
@@ -203,71 +250,78 @@ u8 MIDI_PRESETS_ActivateMIDIVoice(u8 programNumber, u8 bankNumber, u8 midiPorts,
 }
 
 /////////////////////////////////////////////////////////////////////////////
-// Sets all parameters for a MIDI Preset.
-// presetNumber:  1 to NUM_GEN_MIDI_PRESETS
-// programNumber:  The General MIDI program number
-// bankNumber: General MIDI bank number
-// octave:  from 0 to 7
-// midiPorts: MIDI hardware outputs
-// midiChannel:  MIDI channel
+// Sets all parameters for a General MIDI Preset.
+// presetNum:  pointer to presetNumber struct
+// presetPtr:  point to client-side filled preset object which will be copied
+//             into persisted storage
+// bankNumber:  bank number from 1 to MAX_NUM_GEN_MIDI_PRESET_BANKS
+// bankIndex:  index of preset from 1 to MAX_NUM_PRESETS_PER_BANK
 // returns: pointer to updated preset on success, NULL on invalid preset data
 /////////////////////////////////////////////////////////////////////////////
-const midi_preset_t* MIDI_PRESETS_SetMIDIPreset(u8 presetNumber, u8 programNumber, u8 bankNumber, u8 octave, u8 midiPorts, u8 midiChannel) {
-   if ((presetNumber == 0) || (presetNumber > NUM_GEN_MIDI_PRESETS)) {
-      DEBUG_MSG("MIDI_PRESETS_SetMIDIPreset: Invalid presetNumber: %d", presetNumber);
+const midi_preset_t* MIDI_PRESETS_SetGenMIDIPreset(const midi_preset_num_t* presetNum, const midi_preset_t* setPresetPtr) {
+   if ((presetNum->bankNumber == 0) || (presetNum->bankNumber > MAX_NUM_GEN_MIDI_PRESET_BANKS)) {
+      DEBUG_MSG("MIDI_PRESETS_ActivateGenMIDIPreset: Invalid bankNumber: %d", presetNum->bankNumber);
       return NULL;
    }
-   midi_preset_t* gPtr = &presets.generalMidiPresets[presetNumber - 1];
-   // TODO:  Validate programNumber, bankNumber, etc.
-   gPtr->programNumber = programNumber;
-   gPtr->bankNumber = bankNumber;
-   gPtr->octave = octave;
-   gPtr->midiPorts = midiPorts;
-   gPtr->midiChannel = midiChannel;
+   if ((presetNum->bankIndex == 0) || (presetNum->bankIndex > MAX_NUM_PRESETS_PER_BANK)) {
+      DEBUG_MSG("MIDI_PRESETS_ActivateGenMIDIPreset: Invalid bankIndex: %d", presetNum->bankIndex);
+      return NULL;
+   }
+   midi_preset_t* ptr = &presets.generalMidiPresets[presetNum->bankNumber - 1][presetNum->bankIndex - 1];
+   // TODO:  Validate programNumber, midiBankNumber, etc.
+   ptr->programNumber = setPresetPtr->programNumber;
+   ptr->midiBankNumber = setPresetPtr->midiBankNumber;
+   ptr->octave = setPresetPtr->octave;
+   ptr->midiPorts = setPresetPtr->midiPorts;
+   ptr->midiChannel = setPresetPtr->midiChannel;
 
    // Update presets to E2
    MIDI_PRESETS_PersistData();
-   return gPtr;
+   return ptr;
 }
 
 
 /////////////////////////////////////////////////////////////////////////////
-// Returns the MIDI Preset.
-// presetNumber:  1 to NUM_GEN_MIDI_PRESETS
+// Returns a General MIDI Preset.
+// presetNum:  pointer to presetNumber struct
 // returns: pointer to updated preset on success, NULL on invalid presetNumber
 /////////////////////////////////////////////////////////////////////////////
-const midi_preset_t* MIDI_PRESETS_GetMidiPreset(u8 presetNumber) {
-   if ((presetNumber == 0) || (presetNumber > NUM_GEN_MIDI_PRESETS)) {
-      DEBUG_MSG("MIDI_PRESETS_GetMidiPreset: Invalid presetNumber: %d", presetNumber);
+const midi_preset_t* MIDI_PRESETS_GetGenMidiPreset(const midi_preset_num_t* presetNum) {
+   if ((presetNum->bankNumber == 0) || (presetNum->bankNumber > MAX_NUM_GEN_MIDI_PRESET_BANKS)) {
+      DEBUG_MSG("MIDI_PRESETS_ActivateGenMIDIPreset: Invalid bankNumber: %d", presetNum->bankNumber );
       return NULL;
    }
-   midi_preset_t* ptr = &presets.generalMidiPresets[presetNumber - 1];
+   if ((presetNum->bankIndex == 0) || (presetNum->bankIndex > MAX_NUM_PRESETS_PER_BANK)) {
+      DEBUG_MSG("MIDI_PRESETS_ActivateGenMIDIPreset: Invalid bankIndex: %d", presetNum->bankIndex );
+      return NULL;
+   }
+   midi_preset_t* ptr = &presets.generalMidiPresets[presetNum->bankNumber - 1][presetNum->bankIndex - 1];
 #ifdef DEBUG_ENABLED
-   DEBUG_MSG("MIDI_PRESETS_GetMidiPreset: preset#:%d, progNumber=%d", ptr->presetNumber, ptr->programNumber);
+   DEBUG_MSG("MIDI_PRESETS_GetMidiPreset: bank%d index%d progNumber=%d", presetNum->bankNumber, presetNum->bankIndex , ptr->programNumber);
 #endif
    return ptr;
 }
 
 
 /////////////////////////////////////////////////////////////////////////////
-// Returns the last activated MIDI preset
+// Returns the number of the last activated MIDI preset
 // returns: pointer to last activated preset.  Must be valid
 /////////////////////////////////////////////////////////////////////////////
-const midi_preset_t* MIDI_PRESETS_GetLastActivatedPreset() {
-   return MIDI_PRESETS_GetMidiPreset(presets.lastActivatedVoicePreset);
+const midi_preset_num_t* MIDI_PRESETS_GetLastActivatedGenMIDIPreset() {
+   return &presets.lastActivatedGenMIDIPresetNumber;
 }
 
 /////////////////////////////////////////////////////////////////////////////
 // Helper to store persisted data to EEPROM
 /////////////////////////////////////////////////////////////////////////////
-void MIDI_PRESETS_PersistData(){
-   #ifdef DEBUG_ENABLED
-      DEBUG_MSG("MIDI_PRESETS_PersistData: Writing persisted data:  sizeof(presets)=%d bytes",sizeof(presets));
-   #endif
-   s32 valid =PERSIST_StoreBlock(PERSIST_MIDI_PRESETS_BLOCK, (unsigned char*)&presets, sizeof(presets));
-      if (valid < 0){
-         DEBUG_MSG("MIDI_PRESETS_Init:  Error persisting setting to EEPROM");
-      }
+void MIDI_PRESETS_PersistData() {
+#ifdef DEBUG_ENABLED
+   DEBUG_MSG("MIDI_PRESETS_PersistData: Writing persisted data:  sizeof(presets)=%d bytes", sizeof(presets));
+#endif
+   s32 valid = PERSIST_StoreBlock(PERSIST_MIDI_PRESETS_BLOCK, (unsigned char*)&presets, sizeof(presets));
+   if (valid < 0) {
+      DEBUG_MSG("MIDI_PRESETS_Init:  Error persisting setting to EEPROM");
+   }
    return;
 }
 

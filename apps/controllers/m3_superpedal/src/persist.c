@@ -25,13 +25,12 @@
 #endif
 
 // Address for the blocks.  All in 16-bit word size
-#define GAP_SIZE 4
 
 #define PRESETS_ADDR_ROUTER_BEGIN 0
-#define MIDI_PRESETS_START_ADDR (PRESETS_ADDR_ROUTER_BEGIN+(MIDI_ROUTER_NUM_NODES*4)+GAP_SIZE)
-#define HMI_START_ADDR (MIDI_PRESETS_START_ADDR+sizeof(persisted_midi_presets_t)/2+GAP_SIZE)
-#define PEDALS_START_ADDR (HMI_START_ADDR+sizeof(persisted_hmi_settings_t)/2+GAP_SIZE)
-#define ARP_START_ADDR (PEDALS_START_ADDR+sizeof(persisted_pedal_confg_t)/2+GAP_SIZE)
+#define MIDI_PRESETS_START_ADDR (PRESETS_ADDR_ROUTER_BEGIN+(MIDI_ROUTER_NUM_NODES*4))
+#define HMI_START_ADDR (MIDI_PRESETS_START_ADDR+sizeof(persisted_midi_presets_t)/2)
+#define PEDALS_START_ADDR (HMI_START_ADDR+sizeof(persisted_hmi_settings_t)/2)
+#define ARP_START_ADDR (PEDALS_START_ADDR+sizeof(persisted_pedal_confg_t)/2)
 
 u16 PERSIST_Read16(u16 addr);
 u32 PERSIST_Read32(u16 addr);

@@ -93,10 +93,7 @@ s32 ARP_Init()
       arpSettings.ppqn = 384;
       arpSettings.bpm = 120.0;
 
-      valid = ARP_PersistData();
-      if (valid < 0) {
-         DEBUG_MSG("ARP_Init:  Error persisting settings to EEPROM");
-      }
+      ARP_PersistData();
 
       chordModeNote = 0;  // invalid, inactive
       chordModeNoteVelocity = 0;

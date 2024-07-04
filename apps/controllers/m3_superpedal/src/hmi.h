@@ -10,13 +10,15 @@
 #ifndef _HMI_H
 #define _HMI_H
 
-
 /////////////////////////////////////////////////////////////////////////////
 // Global definitions
 /////////////////////////////////////////////////////////////////////////////
 #define NUM_STOMP_SWITCHES 5
 #define NUM_TOE_SWITCHES 8
+#define NUM_TOE_PRESETS_PER_BANK 6
 #define DISPLAY_CHAR_WIDTH 20
+
+#define NUM_TOE_GEN_MIDI_PRESET_BANKS 4
 
 /////////////////////////////////////////////////////////////////////////////
 // Global Types
@@ -99,12 +101,13 @@ typedef struct {
    // The current mode of the toe switches
    toeSwitchMode_t toeSwitchMode;
 
-   // Last selected toe switch in each mode except for TOE_SWITCH_ARP_SETTINGS and TOE_SWITCH_OCTAVE
-   // that are not stored
-   u8 selectedToeIndicator[NUM_TOE_SWITCH_MODES-1];
+   u8 numToeSwitchGenMIDIPresetBanks;
 
+   // Banks start at 0.
+   u8 currentToeSwitchGenMIDIPresetBank;
+   
    // presetNumbers for toe switch gen MIDI presets. 0 is unset
-   u8 toeSwitchVoicePresetNumbers[NUM_TOE_SWITCHES];
+   u8 toeSwitchVoicePresetNumbers[NUM_TOE_GEN_MIDI_PRESET_BANKS][NUM_TOE_PRESETS_PER_BANK];
 
    // Last selected MIDI preset program number in the assignment dialog
    u8 lastSelectedMIDIProgNumber;

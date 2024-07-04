@@ -6,15 +6,19 @@
 #ifndef _MIDI_PRESETS_H
 #define _MIDI_PRESETS_H
 
-
 /////////////////////////////////////////////////////////////////////////////
 // Global definitions
 /////////////////////////////////////////////////////////////////////////////
 
-// Both of these defines are used in PERSIST.C to calculate the current 
-// size and make sure it is under the max
-#define NUM_GEN_MIDI_PRESETS 8
-#define NUM_PATTERN_PRESETS 8
+// Defines for maximum preset banks and presets / bank.  Used to set the
+// maximum size of the persisted_midi_presets_t structure
+#define MAX_NUM_GEN_MIDI_PRESET_BANKS 4
+#define MAX_NUM_PATTERN_PRESET_BANKS 1
+#define MAX_NUM_PRESETS_PER_BANK 6
+#define MAX_BANK_NAME_SIZE 10
+
+
+#define MAX_NUM_GEN_MIDI_PRESET_NUMBER (MAX_NUM_GEN_MIDI_PRESET_BANKS * MAX_NUM_PRESETS_PER_BANK)
 
 // OUT1 and USB
 #define DEFAULT_PRESET_MIDI_PORTS 0x0031
@@ -30,13 +34,18 @@ typedef enum {
    PATTERN_PRESET = 2
 } midi_preset_bank_t;
 
+typedef struct midi_preset_num_s {
+   // from 1..Number of Banks
+   u8 bankNumber;
+   // from 1..Number of Presets per Bank
+   u8 bankIndex;
+} midi_preset_num_t;
+
 typedef struct {   
-   // Preset #s start at 1
-   u8 presetNumber;
    // Per Gen MIDI 1 spec programNumbers 1-128
    u8 programNumber;
    // bankNumber is device specific.  For GenMIDI, set to 0.
-   u8 bankNumber;
+   u8 midiBankNumber;
    // midiPorts uses standard MIOS32 format
    u8 midiPorts;
    // midiChannel number common for all ports
@@ -47,13 +56,19 @@ typedef struct {
 } midi_preset_t;
 
 
-typedef struct {
+typedef struct persisted_midi_presets_s {
    // First 4 bytes must be serialization version ID. Little-endian order
    u32 serializationID;
 
-   midi_preset_t generalMidiPresets[NUM_GEN_MIDI_PRESETS];
-   u8 lastActivatedVoicePreset;
-   //  midi_preset_t patternPresets[NUM_PATTERN_PRESETS];   
+   char generalMIDIBankNames[MAX_NUM_GEN_MIDI_PRESET_BANKS][MAX_BANK_NAME_SIZE];
+
+   midi_preset_t generalMidiPresets[MAX_NUM_GEN_MIDI_PRESET_BANKS][MAX_NUM_PRESETS_PER_BANK];
+   
+   midi_preset_num_t lastActivatedGenMIDIPresetNumber;
+
+   midi_preset_t pattern[MAX_NUM_PATTERN_PRESET_BANKS][MAX_NUM_PRESETS_PER_BANK];
+   u8 lastActivatedPatternPresetNum;
+
 } persisted_midi_presets_t;
 
 /////////////////////////////////////////////////////////////////////////////
@@ -65,14 +80,17 @@ extern void MIDI_PRESETS_Init();
 extern const char * MIDI_PRESETS_GetGenMIDIVoiceName(u8 progNum);
 extern u8 MIDI_PRESETS_GetNumGenMIDIVoices();
 
-extern const midi_preset_t* MIDI_PRESETS_SetMIDIPreset(u8 presetNumber, u8 programNumber, u8 bankNumber, u8 octave,u8 midiPorts, u8 midiChannel);
+extern const midi_preset_t * MIDI_PRESETS_SetGenMIDIPreset(const midi_preset_num_t * presetNum,const midi_preset_t* setPresetPtr);
 
-extern u8 MIDI_PRESETS_ActivateMIDIPreset(u8 presetNumber);
+extern const midi_preset_num_t * MIDI_PRESETS_ActivateGenMIDIPreset(const midi_preset_num_t * presetNum);
 extern u8 MIDI_PRESETS_ActivateMIDIVoice(u8 programNumber, u8 bankNumber, u8 midiPorts, u8 midiChannel);
 
-extern const midi_preset_t * MIDI_PRESETS_GetMidiPreset(u8 presetNumber);
-extern const midi_preset_t* MIDI_PRESETS_GetLastActivatedPreset();
+extern const midi_preset_t* MIDI_PRESETS_GetGenMidiPreset(const midi_preset_num_t * presetNum);
+extern const midi_preset_num_t* MIDI_PRESETS_GetLastActivatedGenMIDIPreset();
 
+extern u8 MIDI_PRESETS_GetGenMidiPresetNumBanks();
+extern u8 MIDI_PRESETS_GetGenMidiPresetBankSize();
+extern const char * MIDI_PRESETS_GetGenMidiBankName(u8 bankNum);
 /////////////////////////////////////////////////////////////////////////////
 // Export global variables
 /////////////////////////////////////////////////////////////////////////////

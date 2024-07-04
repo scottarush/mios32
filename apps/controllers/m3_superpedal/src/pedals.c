@@ -115,10 +115,8 @@ void PEDALS_Init() {
       pc->volumeLevel = PEDALS_MAX_VOLUME;
       pc->left_pedal_note_number = 23;
 
-      valid = PERSIST_StoreBlock(PERSIST_PEDALS_BLOCK, (unsigned char*)&pedal_config, sizeof(pedal_config));
-      if (valid < 0) {
-         DEBUG_MSG("PEDALS_Init:  Error persisting setting to EEPROM");
-      }
+      // Persist defaults to EEPROM
+      PEDALS_PersistData();   
    }
    // Clear locals
    makePressed = 1;
