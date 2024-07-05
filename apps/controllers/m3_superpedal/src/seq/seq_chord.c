@@ -362,3 +362,16 @@ const char* SEQ_CHORD_NameGetByEnum(chord_type_t chord) {
    }
    return seq_chord_table[chordset][index].name;
 }
+
+/////////////////////////////////////////////////////////////////////////////
+// Added by Scott Rush to get the number of notes in the chord
+/////////////////////////////////////////////////////////////////////////////
+u8 SEQ_CHORD_GetNumNotesByEnum(chord_type_t chord) {
+   for(u8 num= 0;num < 6;num++){
+      s32 note = SEQ_CHORD_NoteGetByEnum(num,chord,0);
+      if (note < 0){
+         return num;
+      }
+   }
+   return 0;  // Can't happen for valid chord
+}

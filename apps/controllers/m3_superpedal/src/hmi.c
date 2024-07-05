@@ -848,8 +848,9 @@ void HMI_HomePage_UpdateDisplay() {
       HMI_RenderLine(2, lineBuffer, RENDER_LINE_CENTER);
       break;
    case TOE_SWITCH_CHORD:
-      // TODO line 2
-      HMI_ClearLine(2);
+      // Show Root and ModeScale 
+      snprintf(lineBuffer, DISPLAY_CHAR_WIDTH + 1, "%s %s",
+         ARP_MODES_GetNoteName(ARP_GetRootKey()), SEQ_SCALE_NameGet(ARP_GetModeScale()));
       break;      
    default:
 #ifdef DEBUG

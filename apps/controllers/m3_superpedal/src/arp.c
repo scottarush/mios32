@@ -299,19 +299,32 @@ s32 ARP_FillNoteStack() {
    DEBUG_MSG("ARP_FillNoteStack:  Filling stack for chord: %s, chordModeNote=%d octave=%d", SEQ_CHORD_NameGetByEnum(chord), chordModeNote, octave);
 #endif   
    // Push the keys one by one onto the note stack in the proper gen order
-   for (int count = 0; count < 6;count++) {
+   u8 numNotes = SEQ_CHORD_GetNumNotesByEnum(chord);
+   if (arpSettings.genOrder == ARP_GEN_ORDER_ASC_DESC){
+      // Fill notestack with 2x up and down arpeggios
+      numNotes = 2*numNotes;
+   }
+   for (u8 count = 0; count < numNotes;count++) {
       int keyNum = 0;
       switch (arpSettings.genOrder) {
       case ARP_GEN_ORDER_ASCENDING:
          keyNum = count;
          break;
       case ARP_GEN_ORDER_DESCENDING:
-         keyNum = 5 - count;
+         keyNum = numNotes - count;
          break;
       case ARP_GEN_ORDER_RANDOM:
          // TODO.  for now just do ascending
          keyNum = count;
          break;
+      case ARP_GEN_ORDER_ASC_DESC:
+         if (count < numNotes/2){
+            // We are ascending
+            keyNum = count;
+         }
+         else {
+            keyNum = numNotes-count-1;
+         }
       }
       s32 note = SEQ_CHORD_NoteGetByEnum(keyNum, chord, octave);
       if (note >= 0) {
@@ -347,7 +360,15 @@ s32 ARP_NotifyNoteOn(u8 note, u8 velocity)
          NOTESTACK_Clear(&notestack);
       }
       else {
-         // Save the root and verify that it has a valid chord in the current scale.
+         if (note != chordModeNote){
+            // Change of note, so turn off any keys that were on and clear notestack
+            ARP_PlayOffEvents();
+            NOTESTACK_Clear(&notestack);
+            // And save the note with velcoity
+            chordModeNote = note;
+            chordModeNoteVelocity = velocity;
+         }
+         // verify that the root is a valid chord in the current scale.
          // If not then just add it alone to the notestack.
          chord_type_t chord = ARP_MODES_GetModeChord(arpSettings.modeScale,
             arpSettings.chordExtension, arpSettings.rootKey, note);
@@ -359,8 +380,6 @@ s32 ARP_NotifyNoteOn(u8 note, u8 velocity)
          }
          else {
             // This is a valid root of a chord witin the scale so replace the root and refill the stack
-            chordModeNote = note;
-            chordModeNoteVelocity = velocity;
             ARP_FillNoteStack();
          }
       }
@@ -487,11 +506,12 @@ void ARP_SetArpMode(arp_mode_t mode) {
       return;
    }
    // Otherwise a mode change
-   switch (mode) {
+   arpSettings.arpMode = mode;
+   switch (arpSettings.arpMode ) {
    case ARP_MODE_KEYS:
    case ARP_MODE_CHORD_ARP:
-      // Just reset the ARP
-      ARP_Reset();
+      // reset the ARP
+      ARP_Reset();      
       break;
    case ARP_MODE_CHORD_PAD:
       // Play off events and stop the sequencer

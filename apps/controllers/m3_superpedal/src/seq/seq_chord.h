@@ -100,7 +100,7 @@ extern s32 SEQ_CHORD_NoteGet(u8 key_num, u8 chord_set, u8 chord);
 
 extern s32 SEQ_CHORD_NoteGetByEnum(u8 key_num, chord_type_t chord, s8 oct_transpose);
 extern const char * SEQ_CHORD_NameGetByEnum(chord_type_t chord);
-
+extern u8 SEQ_CHORD_GetNumNotesByEnum(chord_type_t chord);
 /////////////////////////////////////////////////////////////////////////////
 // Export global variables
 /////////////////////////////////////////////////////////////////////////////
