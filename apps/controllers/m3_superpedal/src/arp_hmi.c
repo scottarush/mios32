@@ -63,7 +63,7 @@ void ARP_HMI_SelectModeScaleCallback(u8 pedalNum);
 /////////////////////////////////////////////////////////////////////////////
 // Sets/updates the indicators for the current ARP_LIVE mode
 /////////////////////////////////////////////////////////////////////////////
-void ARP_HMI_SetArpSettingsIndicators() {
+void ARP_HMI_UpdateArpToeIndicators() {
    IND_ClearAll();
    if (ARP_GetEnabled() == 0) {
       return;  // Arp is disabled so leave all the indicators off
@@ -73,13 +73,13 @@ void ARP_HMI_SetArpSettingsIndicators() {
    // First the gen mode indicators
    switch (ARP_GetArpGenOrder()) {
    case ARP_GEN_ORDER_ASCENDING:
-      IND_SetBlipIndicator(ARP_LIVE_TOE_GEN_ORDER, 0, ARP_GetBPM() / 60);
+      IND_SetIndicatorState(ARP_LIVE_TOE_GEN_ORDER, IND_ON, 100,IND_RAMP_UP);
       break;
    case ARP_GEN_ORDER_DESCENDING:
-      IND_SetBlipIndicator(ARP_LIVE_TOE_GEN_ORDER, 1, ARP_GetBPM() / 60);
+      IND_SetIndicatorState(ARP_LIVE_TOE_GEN_ORDER, IND_ON, 100,IND_RAMP_DOWN);
       break;
    case ARP_GEN_ORDER_ASC_DESC:
-      // TODO
+      IND_SetIndicatorState(ARP_LIVE_TOE_GEN_ORDER, IND_ON, 100,IND_RAMP_UP_DOWN);
       break;
    case ARP_GEN_ORDER_RANDOM:
       // TODO
@@ -110,10 +110,11 @@ void ARP_HMI_HandleArpLiveToeToggle(u8 toeNum, u8 pressed) {
       case ARP_GEN_ORDER_RANDOM:
          ARP_SetArpGenOrder(ARP_GEN_ORDER_ASCENDING);
       }
+      ARP_HMI_UpdateArpToeIndicators();
       break;
    case ARP_LIVE_TOE_SELECT_KEY:
       /// Go to the dialog page
-      snprintf(dialogPageTitle, DISPLAY_CHAR_WIDTH + 1, "%s", "Set Arp Root Key");
+      snprintf(dialogPageTitle, DISPLAY_CHAR_WIDTH + 1, "%s", "SET ARP ROOT KEY");
       snprintf(dialogPageMessage1, DISPLAY_CHAR_WIDTH + 1, "%s", "Press Pedal to");
       snprintf(dialogPageMessage2, DISPLAY_CHAR_WIDTH + 1, "%s", "Select Key");
       dialogPage.pBackPage = currentPage;
@@ -127,7 +128,7 @@ void ARP_HMI_HandleArpLiveToeToggle(u8 toeNum, u8 pressed) {
       break;
    case ARP_LIVE_TOE_SELECT_MODAL_SCALE:
       // Go to the dialog page
-      snprintf(dialogPageTitle, DISPLAY_CHAR_WIDTH + 1, "%s", "Set Arp Modal Scale  ");
+      snprintf(dialogPageTitle, DISPLAY_CHAR_WIDTH + 1, "%s", "SET ARP MODAL SCALE");
       snprintf(dialogPageMessage1, DISPLAY_CHAR_WIDTH + 1, "%s", "Press Brown Pedal to");
       snprintf(dialogPageMessage2, DISPLAY_CHAR_WIDTH + 1, "%s", "Select Mode");
       dialogPage.pBackPage = currentPage;

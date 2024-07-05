@@ -28,7 +28,7 @@
 
 extern void HMI_Init(void);
 
-extern void ARP_HMI_SetArpSettingsIndicators();
+extern void ARP_HMI_UpdateArpToeIndicators();
 extern void ARP_HMI_HandleArpLiveToeToggle(u8, u8);
 
 /////////////////////////////////////////////////////////////////////////////

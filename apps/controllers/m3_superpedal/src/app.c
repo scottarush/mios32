@@ -258,17 +258,19 @@ void APP_MIDI_NotifyPackage(mios32_midi_port_t port, mios32_midi_package_t midi_
    MID_FILE_Receive(port, midi_package);
 
    //////////////////////////////////////////////////////
-   // Notifications to Sequencer
+   // Notifications to Arpeggiator from a remote 
+   // MIDI input. Note that PEDALS forwards local events
+   // directly.
    /////////////////////////////////////////////////////
      // Note On received
    if (midi_package.chn == Chn1 &&
       (midi_package.type == NoteOn || midi_package.type == NoteOff)) {
 
       // branch depending on Note On/Off event
-      if (midi_package.event == NoteOn && midi_package.velocity > 0)
+      if (midi_package.event == NoteOn)
          ARP_NotifyNoteOn(midi_package.note, midi_package.velocity);
       else
-         ARP_NotifyNoteOff(midi_package.note);
+         ARP_NotifyNoteOff(midi_package.note,midi_package.velocity);
    }
 }
 

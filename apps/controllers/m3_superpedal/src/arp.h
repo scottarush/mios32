@@ -71,7 +71,7 @@ extern s32 ARP_Handler(void);
 extern s32 ARP_NotifyNewNote(notestack_t *n);
 
 extern s32 ARP_NotifyNoteOn(u8 note, u8 velocity);
-extern s32 ARP_NotifyNoteOff(u8 note);
+extern s32 ARP_NotifyNoteOff(u8 note,u8 velocity);
 
 extern arp_gen_order_t ARP_GetArpGenOrder();
 extern u8 ARP_SetArpGenOrder(arp_gen_order_t mode);

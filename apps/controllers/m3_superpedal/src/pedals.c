@@ -271,7 +271,7 @@ s32 PEDALS_SendNote(u8 note_number, u8 velocity, u8 pressed) {
    #endif   
    u8 arpConsumed = 0;
    if (!pressed){
-      arpConsumed = ARP_NotifyNoteOff(note_number);
+      arpConsumed = ARP_NotifyNoteOff(note_number,scaledVelocity);
    }
    else{
       arpConsumed = ARP_NotifyNoteOn(note_number, scaledVelocity);

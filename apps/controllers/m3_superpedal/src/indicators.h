@@ -28,8 +28,15 @@ typedef enum {
    IND_FLASH_SLOW = 3,
    IND_FLASH_BLIP = 4,
    IND_FLASH_INVERSE_BLIP = 5,
-   IND_FLASH_FAST = 6,
+   IND_FLASH_FAST = 6
 } indicator_state_t;
+
+typedef enum indicator_ramp_e {
+   IND_RAMP_NONE = 0,
+   IND_RAMP_UP = 1,
+   IND_RAMP_DOWN = 2,
+   IND_RAMP_UP_DOWN = 3
+} indicator_ramp_t;
 
 /////////////////////////////////////////////////////////////////////////////
 // Prototypes
@@ -38,11 +45,11 @@ extern void IND_Init(void);
 
 extern void IND_1msTick();
 
-extern void IND_SetIndicatorState(u8 indicatorNum,indicator_state_t state);
-extern void IND_SetBlipIndicator(u8 indicatorNum,u8 inverse,float frequency);
-extern void IND_SetFlashIndicator(u8 indicatorNum,float frequency);
+extern void IND_SetIndicatorState(u8 indicatorNum, indicator_state_t state, u8 brightness,indicator_ramp_t rampMode);
+extern void IND_SetBlipIndicator(u8 indicatorNum,u8 inverse,float frequency,u8 brightness);
+extern void IND_SetFlashIndicator(u8 indicatorNum,float frequency,u8 brightness);
 
-extern void IND_SetTempIndicatorState(u8 indicatorNum,indicator_state_t tempState,u16 duration_ms,indicator_state_t targetState);
+extern void IND_SetTempIndicatorState(u8 indicatorNum, indicator_state_t tempState, u16 duration_ms, indicator_state_t targetState,u8 brightness);
 
 extern void IND_ClearAll();
 
