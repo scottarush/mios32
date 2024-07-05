@@ -73,13 +73,14 @@ void ARP_HMI_UpdateArpToeIndicators() {
    // First the gen mode indicators
    switch (ARP_GetArpGenOrder()) {
    case ARP_GEN_ORDER_ASCENDING:
-      IND_SetIndicatorState(ARP_LIVE_TOE_GEN_ORDER, IND_ON, 100,IND_RAMP_UP);
+      IND_SetIndicatorState(ARP_LIVE_TOE_GEN_ORDER, IND_ON, 100, IND_RAMP_UP);
       break;
    case ARP_GEN_ORDER_DESCENDING:
-      IND_SetIndicatorState(ARP_LIVE_TOE_GEN_ORDER, IND_ON, 100,IND_RAMP_DOWN);
+      IND_SetIndicatorState(ARP_LIVE_TOE_GEN_ORDER, IND_ON, 100, IND_RAMP_DOWN);
       break;
    case ARP_GEN_ORDER_ASC_DESC:
-      IND_SetIndicatorState(ARP_LIVE_TOE_GEN_ORDER, IND_ON, 100,IND_RAMP_UP_DOWN);
+   case ARP_GEN_ORDER_ASC_DESC_SKIP_ENDS:
+      IND_SetIndicatorState(ARP_LIVE_TOE_GEN_ORDER, IND_ON, 100, IND_RAMP_UP_DOWN);
       break;
    case ARP_GEN_ORDER_RANDOM:
       // TODO
@@ -87,6 +88,25 @@ void ARP_HMI_UpdateArpToeIndicators() {
    }
    // TODO the rest
    // IND_SetIndicatorState(1, IND_FLASH_BLIP);
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// Helper provides text for gen order
+/////////////////////////////////////////////////////////////////////////////
+const char* ARP_HMI_GetArpGenOrderText() {
+   switch (ARP_GetArpGenOrder()) {
+   case ARP_GEN_ORDER_ASCENDING:
+      return "_/";
+   case ARP_GEN_ORDER_DESCENDING:
+      return "-_";
+   case ARP_GEN_ORDER_ASC_DESC:
+      return "_/-_";
+   case ARP_GEN_ORDER_ASC_DESC_SKIP_ENDS:
+      return "/- ";
+   case ARP_GEN_ORDER_RANDOM:
+      return "RND";
+   }
+   return "ERR";
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -105,6 +125,8 @@ void ARP_HMI_HandleArpLiveToeToggle(u8 toeNum, u8 pressed) {
          ARP_SetArpGenOrder(ARP_GEN_ORDER_ASC_DESC);
          break;
       case ARP_GEN_ORDER_ASC_DESC:
+         ARP_SetArpGenOrder(ARP_GEN_ORDER_ASC_DESC_SKIP_ENDS);
+      case ARP_GEN_ORDER_ASC_DESC_SKIP_ENDS:
          ARP_SetArpGenOrder(ARP_GEN_ORDER_RANDOM);
          break;
       case ARP_GEN_ORDER_RANDOM:

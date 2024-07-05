@@ -819,8 +819,8 @@ void HMI_HomePage_UpdateDisplay() {
       memcpy(scratchBuffer, scaleName, truncLength);
       scratchBuffer[truncLength] = '\0';
 
-      snprintf(lineBuffer, DISPLAY_CHAR_WIDTH + 1, "%s %s %d BPM",
-         ARP_MODES_GetNoteName(ARP_GetRootKey()), scratchBuffer, bpm);
+      snprintf(lineBuffer, DISPLAY_CHAR_WIDTH + 1, "%s %s %s %d",
+         ARP_MODES_GetNoteName(ARP_GetRootKey()), scratchBuffer, ARP_HMI_GetArpGenOrderText(), bpm);
       HMI_RenderLine(2, lineBuffer, RENDER_LINE_CENTER);
       break;
    case TOE_SWITCH_CHORD:

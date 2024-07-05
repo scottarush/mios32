@@ -31,7 +31,8 @@ THUMB_SOURCE    = src/app.c \
 		  src/seq/seq.c \
 		  src/seq/seq_chord.c \
 		  src/seq/seq_scale.c \
-		  src/seq/seq_core.c
+		  src/seq/seq_core.c \
+		  src/seq/notestack.c
 
 #		  src/shell.c \
 
@@ -91,7 +92,8 @@ include $(MIOS32_PATH)/modules/uip_task_standard/uip_task_standard.mk
 include $(MIOS32_PATH)/modules/eeprom/eeprom.mk
 
 # Notestack functions for arpeggiator/sequencer
-include $(MIOS32_PATH)/modules/notestack/notestack.mk
+# Can't use the module for up/down arpeggiation.  See local copy in seq/notestack.c for details.
+#include $(MIOS32_PATH)/modules/notestack/notestack.mk
 
 # Use platform sequence BPM and MidiOut functions
 include $(MIOS32_PATH)/modules/sequencer/sequencer.mk

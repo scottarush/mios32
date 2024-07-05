@@ -27,7 +27,8 @@ typedef enum arp_gen_order_e {
    ARP_GEN_ORDER_ASCENDING = 0,
    ARP_GEN_ORDER_DESCENDING = 1,
    ARP_GEN_ORDER_ASC_DESC = 2,
-   ARP_GEN_ORDER_RANDOM = 3
+   ARP_GEN_ORDER_ASC_DESC_SKIP_ENDS = 3,
+   ARP_GEN_ORDER_RANDOM = 4
 } arp_gen_order_t;
 
 typedef enum arp_mode_e {
