@@ -23,7 +23,7 @@
 /////////////////////////////////////////////////////////////////////////////
 // Global Types
 /////////////////////////////////////////////////////////////////////////////
-typedef enum arp_gen_ordere {
+typedef enum arp_gen_order_e {
    ARP_GEN_ORDER_ASCENDING = 0,
    ARP_GEN_ORDER_DESCENDING = 1,
    ARP_GEN_ORDER_ASC_DESC = 2,
@@ -31,10 +31,12 @@ typedef enum arp_gen_ordere {
 } arp_gen_order_t;
 
 typedef enum arp_mode_e {
-   // Depressed keys only
-   ARP_MODE_KEYS = 0,
-   // Single key/pedal press arpeggiates a chord from the root.
-   ARP_MODE_CHORD = 1
+   // Arppegiates from multiple press keys.  Not very usable with pedal board
+   ARP_MODE_KEYS = 1,
+   // arpeggiates a chord from single root note key/pedal press
+   ARP_MODE_CHORD_ARP = 2,
+   // plays modal chord from single root note key/pedal press
+   ARP_MODE_CHORD_PAD = 3 
 } arp_mode_t;
 
 /////////////////////////////////////////////////////////////////////////////
@@ -47,6 +49,7 @@ typedef struct persisted_arp_data_s {
    arp_gen_order_t genOrder;
    arp_mode_t arpMode;
    u16 midi_ports;
+   u8 midiChannel;
    key_t rootKey;
    scale_t modeScale;
    chord_extension_t chordExtension;
@@ -73,8 +76,13 @@ extern s32 ARP_NotifyNoteOff(u8 note);
 extern arp_gen_order_t ARP_GetArpGenOrder();
 extern u8 ARP_SetArpGenOrder(arp_gen_order_t mode);
 
+extern void ARP_SetArpMode(arp_mode_t mode);
+extern const arp_mode_t ARP_GetArpMode();
+
 extern void ARP_SetEnabled(u8 enabled);
 extern u8 ARP_GetEnabled();
+extern const char * ARP_GetArpStateText();
+
 
 extern float ARP_GetBPM();
 extern void ARP_SetBPM(u16 bpm);

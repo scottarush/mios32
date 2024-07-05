@@ -18,7 +18,7 @@
 #include "pedals.h"
 #include "hmi.h" 
 
-#undef DEBUG_ENABLED
+#undef DEBUG
 
 #ifndef DEBUG_MSG
 # define DEBUG_MSG MIOS32_MIDI_SendDebugMessage
@@ -48,14 +48,14 @@ s32 PERSIST_Init(u32 mode) {
 
    // init EEPROM emulation
    if ((status = EEPROM_Init(mode)) < 0) {
-#ifdef DEBUG_ENABLED
+#ifdef DEBUG
       DEBUG_MSG("PERSIST_Init: EEPROM initialisation failed with status %d!\n", status);
 #endif
 
       /**
            // Reformat
            if ((status = EEPROM_Init(1)) < 0) {
-     #ifdef DEBUG_ENABLED
+     #ifdef DEBUG
               DEBUG_MSG("[PRESETS] EEPROM reformatting failed with status %d!\n", status);
      #endif
            }
@@ -119,7 +119,7 @@ s32 PERSIST_StoreBlock(persist_block_t blockType, const unsigned char* pData, u1
    u16 wordAddress = PERSIST_GetStartAddress(blockType);
 
 
-#ifdef DEBUG_ENABLED
+#ifdef DEBUG
    DEBUG_MSG("PERSIST_StoreBlock called:  blockType %d, length %d, startAddr=%d", blockType, length, wordAddress);
 #endif
    // Get serializationID and write out with the helper. It has to write out big-endian. Rest goes out
@@ -140,8 +140,13 @@ s32 PERSIST_StoreBlock(persist_block_t blockType, const unsigned char* pData, u1
       word |= (0x00FF & lower);
       byteOffset++;
 
-      status = PERSIST_Write16(wordAddress, word);
-      /* #ifdef DEBUG_ENABLED
+      // Do a read and only write the word if different
+      u16 readWord = PERSIST_Read16(wordAddress);
+      status = 0;
+      if (readWord != word){
+         status = PERSIST_Write16(wordAddress, word);
+      }
+      /* #ifdef DEBUG
             u16 readBackWord = 0;
             readBackWord = PERSIST_Read16(wordAddress);
             DEBUG_MSG("PERSIST_StoreBlock:  Writing word %d to address %d, readBackWord=%d", word, wordAddress, readBackWord);
@@ -152,8 +157,8 @@ s32 PERSIST_StoreBlock(persist_block_t blockType, const unsigned char* pData, u1
       }
       wordAddress++;
    }
-   /* #ifdef DEBUG_ENABLED
-      // Do a readback check if DEBUG_ENABLED
+   /* #ifdef DEBUG
+      // Do a readback check if DEBUG
       unsigned char checkDataBuffer[length];
       // Copy in the serialization ID
       for(int i=0;i <= 3;i++){
@@ -206,7 +211,7 @@ u32 PERSIST_ParseSerializationID(const unsigned char* pData) {
       serializationID |= (0x000000FF & byte);
       if (i > 0)
          serializationID <<= 8;
-#ifdef DEBUG_ENABLED
+#ifdef DEBUG
       DEBUG_MSG("PERSIST_ParseSerializationID: forming byte=%u serializationID=0x%X", byte, serializationID);
 #endif
    }

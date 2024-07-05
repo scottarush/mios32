@@ -92,8 +92,8 @@ struct page_s editPatternPresetPage;
 // Toe Switch types and non-persisted variables
 //----------------------------------------------------------------------------
 
-// Text for the toe switch
-static const char* pToeSwitchModeTitles[] = { "OCTAVE","VOLUME","MIDI PST","PATT PST","ARP" };
+// Text for the toe switch index by toeSwitchMode_e
+static const char* pToeSwitchModeTitles[] = { "OCTAVE","VOLUME","VOICE PST","PATT PST","ARP","CHORD" };
 
 typedef struct switchState_s {
    u8 switchState;
@@ -181,11 +181,11 @@ void HMI_Init(void) {
       DEBUG_MSG("HMI_Init:  PERSIST_ReadBlock return invalid. Re-initing persisted settings to defaults");
 
       // stomp switch settings
-      hmiSettings.stompSwitchSetting[4] = STOMP_SWITCH_OCTAVE;
-      hmiSettings.stompSwitchSetting[3] = STOMP_SWITCH_VOLUME;
-      hmiSettings.stompSwitchSetting[2] = STOMP_SWITCH_VOICE_PRESETS;
-      hmiSettings.stompSwitchSetting[1] = STOMP_SWITCH_PATTERN_PRESETS;
-      hmiSettings.stompSwitchSetting[0] = STOMP_SWITCH_ARPEGGIATOR;
+      hmiSettings.stompSwitchSetting[4] = STOMP_SWITCH_OCTAVE_VOLUME;
+      hmiSettings.stompSwitchSetting[3] = STOMP_SWITCH_ARPEGGIATOR;
+      hmiSettings.stompSwitchSetting[2] = STOMP_SWITCH_CHORD_PAD;
+      hmiSettings.stompSwitchSetting[1] = STOMP_SWITCH_VOICE_PRESETS;
+      hmiSettings.stompSwitchSetting[0] = STOMP_SWITCH_PATTERN_PRESETS;
 
       // Set deefault TOE mode
       hmiSettings.toeSwitchMode = TOE_SWITCH_OCTAVE;
@@ -450,10 +450,20 @@ void HMI_NotifyStompToggle(u8 stompNum, u8 pressed, s32 timestamp) {
    if (pressed) {
       return;
    }
-
+   // Process the change according to the current switch setting
    switch (hmiSettings.stompSwitchSetting[stompNum - 1]) {
-   case STOMP_SWITCH_OCTAVE:
-      hmiSettings.toeSwitchMode = TOE_SWITCH_OCTAVE;
+   case STOMP_SWITCH_OCTAVE_VOLUME:
+      // On first press go to Octave.  On subsequent presses, alternate
+      // between OCTAVE and VOLUME toe switches.
+      switch (hmiSettings.toeSwitchMode) {
+      case TOE_SWITCH_VOLUME:
+         hmiSettings.toeSwitchMode = TOE_SWITCH_OCTAVE;
+         break;
+      case TOE_SWITCH_OCTAVE:
+      default:
+         hmiSettings.toeSwitchMode = TOE_SWITCH_OCTAVE;
+         break;
+      }
       break;
    case STOMP_SWITCH_VOICE_PRESETS:
       if (hmiSettings.toeSwitchMode == TOE_SWITCH_VOICE_PRESETS) {
@@ -472,26 +482,32 @@ void HMI_NotifyStompToggle(u8 stompNum, u8 pressed, s32 timestamp) {
       hmiSettings.toeSwitchMode = TOE_SWITCH_PATTERN_PRESETS;
       break;
    case STOMP_SWITCH_ARPEGGIATOR:
-      if (hmiSettings.toeSwitchMode == TOE_SWITCH_ARP) {
-         // This is a second press so toggle the state of the Arpeggiator
-         if (ARP_GetEnabled() == 0) {
-            // Turn on the Arpeggiator
-            ARP_SetEnabled(1);
-         }
-         else {
-            // Turn it off
-            ARP_SetEnabled(0);
-         }
+      if (ARP_GetArpMode() != ARP_MODE_CHORD_ARP){
+         ARP_SetArpMode(ARP_MODE_CHORD_ARP);
+         // And turn on Arpeggiator
+         ARP_SetEnabled(1);
       }
-      else {
-         // This is a first press, so just go to the page
-         hmiSettings.toeSwitchMode = TOE_SWITCH_ARP;
+      else{
+         // Toggle the run state
+         ARP_SetEnabled(!ARP_GetEnabled());
       }
+      hmiSettings.toeSwitchMode = TOE_SWITCH_ARP;
       // Set to home page
       currentPage = &homePage;
       break;
-   case STOMP_SWITCH_VOLUME:
-      hmiSettings.toeSwitchMode = TOE_SWITCH_VOLUME;
+   case STOMP_SWITCH_CHORD_PAD:
+      // Got to Chord Pad mode.  If already there then toggle the enable state
+      if (ARP_GetArpMode() != ARP_MODE_CHORD_PAD) {
+         ARP_SetArpMode(ARP_MODE_CHORD_PAD);
+         ARP_SetEnabled(1);
+      }
+      else {
+         // Toggle the ARP on/off
+         ARP_SetEnabled(!ARP_GetEnabled());
+      }
+      hmiSettings.toeSwitchMode = TOE_SWITCH_CHORD;
+      // Set to home page
+      currentPage = &homePage;
       break;
    default:
       // Invalid.  Just return;
@@ -546,6 +562,9 @@ void HMI_UpdateIndicators() {
          // Call separate function in ARP_HMI to handle indicators 2-7
          ARP_HMI_SetArpSettingsIndicators();
       }
+      break;
+   case TOE_SWITCH_CHORD:
+      // TODO
       break;
    case TOE_SWITCH_VOICE_PRESETS:
       // Set the indicator for the bank index + 1 of the last activated presetNum if we 
@@ -780,7 +799,8 @@ void HMI_HomePage_UpdateDisplay() {
       HMI_RenderLine(0, lineBuffer, RENDER_LINE_CENTER);
       break;
    case TOE_SWITCH_ARP:
-      // Mode and preset name since preset can't be displayed on line 2
+   case TOE_SWITCH_CHORD:
+      // Toeswitchmode and preset name since preset can't be displayed on line 2
       snprintf(lineBuffer, DISPLAY_CHAR_WIDTH + 1, "%s:%s",
          pToeSwitchModeTitles[hmiSettings.toeSwitchMode], presetName);
       HMI_RenderLine(0, lineBuffer, RENDER_LINE_CENTER);
@@ -792,7 +812,7 @@ void HMI_HomePage_UpdateDisplay() {
    HMI_RenderLine(1, "--------------------", RENDER_LINE_LEFT);
    // Current octave, arp state, and volume always go on line 3
    snprintf(lineBuffer, DISPLAY_CHAR_WIDTH + 1, "Oct:%d V:%d Arp:%s",
-      PEDALS_GetOctave(), HMI_GetToeVolumeIndex(), (ARP_GetEnabled() ? "RUN" : "STOP"));
+      PEDALS_GetOctave(), HMI_GetToeVolumeIndex(), ARP_GetArpStateText());
    HMI_RenderLine(3, lineBuffer, RENDER_LINE_CENTER);
 
    ///////////////////////////////////////
@@ -827,6 +847,10 @@ void HMI_HomePage_UpdateDisplay() {
          ARP_MODES_GetNoteName(ARP_GetRootKey()), scratchBuffer, bpm);
       HMI_RenderLine(2, lineBuffer, RENDER_LINE_CENTER);
       break;
+   case TOE_SWITCH_CHORD:
+      // TODO line 2
+      HMI_ClearLine(2);
+      break;      
    default:
 #ifdef DEBUG
       DEBUG_MSG("HMI_UpdateDisplay: Invalid toeSwitchMode=%d", hmiSettings.toeSwitchMode);

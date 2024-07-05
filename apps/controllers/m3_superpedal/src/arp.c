@@ -41,6 +41,7 @@ static s32 ARP_Tick(u32 bpm_tick);
 
 static s32 ARP_PersistData();
 static s32 ARP_FillNoteStack();
+static void ARP_SendChordNoteOnOffs(u8 noteOn);
 
 /////////////////////////////////////////////////////////////////////////////
 // Local variables
@@ -55,10 +56,7 @@ static u8 chordModeNote;
 // velocity for root note
 static u8 chordModeNoteVelocity;
 
-// pause mode (will be controlled from user interface)
-static u8 arpPause = 0;
-
-// Enables/disables arpeggiator.
+// enables/disables arp
 static u8 arpEnabled = 0;
 
 // notestack
@@ -86,13 +84,14 @@ s32 ARP_Init()
    if (valid < 0) {
       DEBUG_MSG("ARP_Init:  PERSIST_ReadBlock return invalid. Re-initing persisted settings to defaults");
       arpSettings.genOrder = ARP_GEN_ORDER_ASCENDING;
-      arpSettings.arpMode = ARP_MODE_CHORD;
-      arpSettings.rootKey = KEY_C;
+      arpSettings.arpMode = ARP_MODE_CHORD_ARP;
+      arpSettings.rootKey = KEY_A;
       arpSettings.modeScale = SCALE_AEOLIAN;
       arpSettings.chordExtension = CHORD_EXT_SEVENTH;
       arpSettings.ppqn = 384;
       arpSettings.bpm = 120.0;
-      arpSettings.midi_ports = 0x0031;     // OUT1 and USB
+      arpSettings.midi_ports = 0x0031;     // OUT1, OUT2, and USB
+      arpSettings.midiChannel = 1;
 
       ARP_PersistData();
 
@@ -134,12 +133,13 @@ s32 ARP_PersistData() {
 
 
 /////////////////////////////////////////////////////////////////////////////
-// this  handler is called periodically from the TASK_ARP in app.c
+// this  handler is called periodically from the 1ms TASK_ARP in app.c
 // to check for new requests from BPM generator.
 /////////////////////////////////////////////////////////////////////////////
 s32 ARP_Handler(void)
 {
-   if (arpEnabled == 0) {
+   if (((!arpEnabled)) ||
+      (arpSettings.arpMode == ARP_MODE_CHORD_PAD)) {
       return 0;
    }
    // handle requests
@@ -157,7 +157,8 @@ s32 ARP_Handler(void)
 
       if (SEQ_BPM_ChkReqCont()) {
          // release pause mode
-         arpPause = 0;
+//         arpPause = 0
+         arpEnabled = 0;
       }
 
       if (SEQ_BPM_ChkReqStart()) {
@@ -184,10 +185,15 @@ s32 ARP_Handler(void)
 /////////////////////////////////////////////////////////////////////////////
 // This function plays all "off" events
 // Should be called on sequencer reset/restart/pause to avoid hanging notes
+// Also used for chord pad mode to send explict NoteOffs.
 /////////////////////////////////////////////////////////////////////////////
 static s32 ARP_PlayOffEvents(void)
 {
-   // play "off events"
+   if (arpSettings.arpMode == ARP_MODE_CHORD_PAD) {
+      ARP_SendChordNoteOnOffs(0);
+      return 0;
+   }
+   // Otherwise, it is a sequence mode, so flush the queue to play the "off events
    SEQ_MIDI_OUT_FlushQueue();
 
    // here you could send additional events, e.g. "All Notes Off" CC
@@ -201,12 +207,9 @@ static s32 ARP_PlayOffEvents(void)
 /////////////////////////////////////////////////////////////////////////////
 s32 ARP_Reset(void)
 {
-   // since timebase has been changed, ensure that Off-Events are played 
+   // timebase may have changed, ensure that Off-Events are played 
    // (otherwise they will be played much later...)
    ARP_PlayOffEvents();
-
-   // release pause mode
-   arpPause = 0;
 
    // reset BPM tick
    SEQ_BPM_TickSet(0);
@@ -269,7 +272,7 @@ static s32 ARP_Tick(u32 bpm_tick)
    return 0; // no error
 }
 /////////////////////////////////////////////////////////////////////////////
-// Called to (re)fill the note stack in Root mode.
+// Called to fill the note stack.
 /////////////////////////////////////////////////////////////////////////////
 s32 ARP_FillNoteStack() {
 
@@ -298,7 +301,7 @@ s32 ARP_FillNoteStack() {
    // Push the keys one by one onto the note stack in the proper gen order
    for (int count = 0; count < 6;count++) {
       int keyNum = 0;
-      switch (arpSettings.arpMode) {
+      switch (arpSettings.genOrder) {
       case ARP_GEN_ORDER_ASCENDING:
          keyNum = count;
          break;
@@ -322,21 +325,26 @@ s32 ARP_FillNoteStack() {
 }
 
 /////////////////////////////////////////////////////////////////////////////
-// Should be called whenever a Note event has been received 
+// Called when Note event has been received 
 // If velocity is 0 then this is a note off event.
+// For velocity > 0 PEDALS has already applied velocity scaling
 // Returns 1 if consumed by arpeggiator, 0 is arpeggiator inactive and event
 // not consumed.
 /////////////////////////////////////////////////////////////////////////////
 s32 ARP_NotifyNoteOn(u8 note, u8 velocity)
 {
    if (!arpEnabled) {
-      return 0;   // Not consumed
+      return 0;   // Note consumed
    }
-   u8 clear_stack = 0;
-   if (arpSettings.arpMode == ARP_MODE_CHORD) {
+   switch (arpSettings.arpMode) {
+   case ARP_MODE_CHORD_ARP:
+   case ARP_MODE_CHORD_PAD:
+
       if (velocity == 0) {
-         // It's a release, fall through to clear the stack
-         clear_stack = 1;
+         // It's a release, send off events and then clear the stack
+         ARP_PlayOffEvents();
+
+         NOTESTACK_Clear(&notestack);
       }
       else {
          // Save the root and verify that it has a valid chord in the current scale.
@@ -356,8 +364,8 @@ s32 ARP_NotifyNoteOn(u8 note, u8 velocity)
             ARP_FillNoteStack();
          }
       }
-   }
-   else if (arpSettings.arpMode == ARP_MODE_KEYS) {
+      break;
+   case ARP_MODE_KEYS:
       if (velocity) {
          // push note into note stack
          NOTESTACK_Push(&notestack, note, velocity);
@@ -365,21 +373,26 @@ s32 ARP_NotifyNoteOn(u8 note, u8 velocity)
       else {
          // remove note from note stack
          // function returns 2 if no note played anymore (all keys depressed)
-         if (NOTESTACK_Pop(&notestack, note) == 2)
-            clear_stack = 1;
+         if (NOTESTACK_Pop(&notestack, note) == 2) {
+            NOTESTACK_Clear(&notestack);
+
+         }
       }
+      break;
+   }
+   if (arpSettings.arpMode == ARP_MODE_CHORD_PAD) {
+      // Note stack filled above so send the note ons for the chord
+      ARP_SendChordNoteOnOffs(1);
    }
 
-   // At least one note played?
-   if (!clear_stack && notestack.len > 0) {
+
+   // Start/Stop sequencer depending upon notestack
+   if (notestack.len > 0) {
       // start sequencer if it isn't already running
       if (!SEQ_BPM_IsRunning())
          SEQ_BPM_Start();
    }
    else {
-      // clear stack
-      NOTESTACK_Clear(&notestack);
-
       // no key is pressed anymore: stop sequencer
       SEQ_BPM_Stop();
    }
@@ -412,6 +425,38 @@ arp_gen_order_t ARP_GetArpGenOrder() {
 }
 
 /////////////////////////////////////////////////////////////////////////////
+// Sends NoteOns/Offs for for a chord in the notestack.
+// sendOn:  if > 0 then note On.  == 0 for NoteOffs
+/////////////////////////////////////////////////////////////////////////////
+void ARP_SendChordNoteOnOffs(u8 sendOn) {
+   for (u8 count = 0;count < notestack.len;count++) {
+      // get note/velocity/length from notestack
+      u8 note = notestack_items[count].note;
+      u8 velocity = notestack_items[count].tag;
+      u8 length = 72; // always the same, could be varied, e.g. via CC
+
+      // put note into queue if all values are != 0
+      if (note && velocity && length) {
+         // Play note the enabled ports.
+         int i;
+         u16 mask = 1;
+         for (i = 0; i < 16; ++i, mask <<= 1) {
+            if (arpSettings.midi_ports & mask) {
+               // USB0/1/2/3, UART0/1/2/3, IIC0/1/2/3, OSC0/1/2/3
+               mios32_midi_port_t port = 0x10 + ((i & 0xc) << 2) + (i & 3);
+               if (sendOn) {
+                  MIOS32_MIDI_SendNoteOn(port, arpSettings.midiChannel - 1, note, velocity);
+               }
+               else {
+                  MIOS32_MIDI_SendNoteOff(port, arpSettings.midiChannel - 1, note, velocity);
+               }
+            }
+         }
+      }
+   }
+}
+
+/////////////////////////////////////////////////////////////////////////////
 // Sets the ArpGenMode.  On a change, the notestack order will be changed
 // at the next bar.
 /////////////////////////////////////////////////////////////////////////////
@@ -434,27 +479,76 @@ u8 ARP_SetArpGenOrder(arp_gen_order_t genOrder) {
 
 
 /////////////////////////////////////////////////////////////////////////////
-// Enables/Disables Arpeggiator.
+// Sets the ARP operating mode.
+// mode:  arp_mode_t
+/////////////////////////////////////////////////////////////////////////////
+void ARP_SetArpMode(arp_mode_t mode) {
+   if (mode == arpSettings.arpMode) {
+      return;
+   }
+   // Otherwise a mode change
+   switch (mode) {
+   case ARP_MODE_KEYS:
+   case ARP_MODE_CHORD_ARP:
+      // Just reset the ARP
+      ARP_Reset();
+      break;
+   case ARP_MODE_CHORD_PAD:
+      // Play off events and stop the sequencer
+      ARP_PlayOffEvents();
+      SEQ_BPM_Stop();
+      break;
+   }
+   // Save the mode change to EE
+   ARP_PersistData();
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// Enables/Disables arp
 /////////////////////////////////////////////////////////////////////////////
 void ARP_SetEnabled(u8 enabled) {
-   if (arpEnabled == 0) {
-      if (enabled) {
-         arpEnabled = 1;
-         ARP_Reset();
-      }
+   if (arpEnabled == enabled) {
+      return;
    }
-   else {
-      // Disable Arp
-      arpEnabled = 0;
-      // Play Off Events to release all the notes
+   arpEnabled = enabled;
+   if (!arpEnabled) {
+      // Disable arp
       ARP_PlayOffEvents();
+      SEQ_BPM_Stop();
+   }
+   else{
+      // start SEQ
+      SEQ_BPM_Start();
    }
 }
 /////////////////////////////////////////////////////////////////////////////
-// Returrns enabled/disable state of Arpeggiator
+// Returns arp enable status
 /////////////////////////////////////////////////////////////////////////////
 u8 ARP_GetEnabled() {
    return arpEnabled;
+}
+/////////////////////////////////////////////////////////////////////////////
+// Returns current arp mode
+/////////////////////////////////////////////////////////////////////////////
+const arp_mode_t ARP_GetArpMode() {
+   return arpSettings.arpMode;
+}
+/////////////////////////////////////////////////////////////////////////////
+// Returns text of current arp state for display
+/////////////////////////////////////////////////////////////////////////////
+const char * ARP_GetArpStateText() {
+   if (!arpEnabled){
+      return "STOP";
+   }
+   switch(arpSettings.arpMode){
+      case ARP_MODE_CHORD_ARP:
+         return "CHRD";
+      case ARP_MODE_CHORD_PAD:
+         return "PAD";
+      case ARP_MODE_KEYS:
+         return "KEYS";
+   }
+   return "ERR!";
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -471,8 +565,9 @@ void ARP_SetBPM(u16 bpm) {
       return;
    }
    arpSettings.bpm = bpm;
-   ARP_PersistData();
    SEQ_BPM_Set(bpm);
+   // And persist the change
+   ARP_PersistData();
 }
 /////////////////////////////////////////////////////////////////////////////
 // Returns current root key from 0-11
