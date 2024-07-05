@@ -413,6 +413,19 @@ void HMI_NotifyToeToggle(u8 toeNum, u8 pressed, s32 timestamp) {
          ARP_HMI_HandleArpLiveToeToggle(toeNum, pressed);
       }
       break;
+   case TOE_SWITCH_CHORD:
+      switch (toeNum) {
+      case 1:
+         // Toe 1 decrements
+         PEDALS_SetOctave(PEDALS_GetOctave() - 1);
+         break;
+      case 8:
+         // Toe3 increments
+         PEDALS_SetOctave(PEDALS_GetOctave() + 1);
+         break;
+      default:
+         // switches 2-7TODO
+      }
    break;  default:
    }
 }
