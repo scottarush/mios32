@@ -102,7 +102,7 @@ const char* ARP_HMI_GetArpGenOrderText() {
    case ARP_GEN_ORDER_ASC_DESC:
       return "_/-_";
    case ARP_GEN_ORDER_ASC_DESC_SKIP_ENDS:
-      return "/- ";
+      return "/-";
    case ARP_GEN_ORDER_RANDOM:
       return "RND";
    }
@@ -126,6 +126,7 @@ void ARP_HMI_HandleArpLiveToeToggle(u8 toeNum, u8 pressed) {
          break;
       case ARP_GEN_ORDER_ASC_DESC:
          ARP_SetArpGenOrder(ARP_GEN_ORDER_ASC_DESC_SKIP_ENDS);
+         break;
       case ARP_GEN_ORDER_ASC_DESC_SKIP_ENDS:
          ARP_SetArpGenOrder(ARP_GEN_ORDER_RANDOM);
          break;

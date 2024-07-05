@@ -354,7 +354,7 @@ s32 ARP_FillNoteStack() {
          break;
       }
       if (!skip) {
-         s32 note = SEQ_CHORD_NoteGetByEnum(keyNum, chord, octave);
+         s32 note = SEQ_CHORD_NoteGetByEnum(keyNum, chord, outputOctave);
 #ifdef DEBUG
    DEBUG_MSG("ARP_FillNoteStack: Pushing note %d keyNum=%d",note,keyNum);
 #endif
