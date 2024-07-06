@@ -797,7 +797,7 @@ void HMI_HomePage_UpdateDisplay() {
    // Current octave, arp state, and volume always go on line 3
    snprintf(lineBuffer, DISPLAY_CHAR_WIDTH + 1, "Oct:%d V:%d Arp:%s",
       PEDALS_GetOctave(), HMI_GetToeVolumeIndex(), ARP_GetArpStateText());
-   HMI_RenderLine(3, lineBuffer, RENDER_LINE_CENTER);
+   HMI_RenderLine(3, lineBuffer, RENDER_LINE_LEFT);
 
    ///////////////////////////////////////
    // Render line 2 based on the current toe switch mode
@@ -806,7 +806,7 @@ void HMI_HomePage_UpdateDisplay() {
    case TOE_SWITCH_VOLUME:
    case TOE_SWITCH_VOICE_PRESETS:
       // Preset name on line 2
-      HMI_RenderLine(2, presetName, RENDER_LINE_CENTER);
+      HMI_RenderLine(2, presetName, RENDER_LINE_LEFT);
       break;
    case TOE_SWITCH_PATTERN_PRESETS:
       // TODO - Render the pattern preset line
@@ -829,7 +829,7 @@ void HMI_HomePage_UpdateDisplay() {
 
       snprintf(lineBuffer, DISPLAY_CHAR_WIDTH + 1, "%s %s %s %d",
          ARP_MODES_GetNoteName(ARP_GetRootKey()), scratchBuffer, ARP_HMI_GetArpGenOrderText(), bpm);
-      HMI_RenderLine(2, lineBuffer, RENDER_LINE_CENTER);
+      HMI_RenderLine(2, lineBuffer, RENDER_LINE_LEFT);
       break;
    case TOE_SWITCH_CHORD:
       // Show Root and ModeScale 
@@ -896,8 +896,10 @@ void HMI_DialogPage_UpdateDisplay() {
    HMI_RenderLine(0, dialogPageTitle, RENDER_LINE_CENTER);
 
    HMI_RenderLine(1, "--------------------", RENDER_LINE_LEFT);
-   HMI_RenderLine(2, dialogPageMessage1, RENDER_LINE_CENTER);
-   HMI_RenderLine(3, dialogPageMessage2, RENDER_LINE_CENTER);
+   // Render the message lines left so that if used for setting values from the encoder
+   // the display doesn't flicker as much.
+   HMI_RenderLine(2, dialogPageMessage1, RENDER_LINE_LEFT);
+   HMI_RenderLine(3, dialogPageMessage2, RENDER_LINE_LEFT);
 }
 
 

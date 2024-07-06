@@ -17,7 +17,7 @@
 #include <mios32.h>
 #include "indicators.h"
 
-#undef DEBUG
+#define DEBUG
 #define DEBUG_MSG MIOS32_MIDI_SendDebugMessage
 
 #define NUM_LED_INDICATORS 8
@@ -28,8 +28,8 @@
 #define DEFAULT_FLASH_BLIP_FREQ 2
 #define FLASH_BLIP_PERCENT_DUTY_CYCLE 10
 
-#define BRIGHTNESS_PWM_FREQUENCY 100
-#define BRIGHTNESS_RAMP_PERCENT_DELTA 2
+#define BRIGHTNESS_PWM_FREQUENCY 50
+#define BRIGHTNESS_RAMP_PERCENT_DELTA 1
 
 #define BRIGHTNESS_RAMP_TIME_MS 1000
 
@@ -77,8 +77,9 @@ typedef struct indicator_fullstate_s {
    /**
     * current ramp timer.  Set to 0 if not enabled.
     * 32 bits for intermediate precision needed in update function.
+    * signed to detect underflow
    */
-   u32 ramp_timer_ms;
+   s32 ramp_timer_ms;
 
    /**
     * Current ramp direction.  0=down, 1=up
@@ -109,7 +110,7 @@ typedef struct indicator_fullstate_s {
    /*
    * brightness during ramping
    */
-   u8 outputBrightness;
+   u8 rampBrightness;
 
    /*
    * target Brightness during ramping
@@ -122,7 +123,6 @@ typedef struct indicator_fullstate_s {
    u8 brightnessOutputState;
 
 } indicator_fullstate_t;
-
 
 /////////////////////////////////////////////////////////////////////////////
 // Local prototypes
@@ -223,18 +223,18 @@ void IND_UpdateBrightnessTimer(indicator_fullstate_t* ptr) {
       return;
    }
    // Otherwise drive the brightness PWM onto the output
-   if (ptr->brightness_timer_ms == 1) {
+   if (ptr->brightness_timer_ms <= 1) {
       // Timer expired.  Reset to new value base on outputState
       if (ptr->brightnessOutputState == 0) {
          // Transition to the on state
          ptr->brightnessOutputState = 1;
-         ptr->brightness_timer_ms = (1000 * ptr->outputBrightness) / (BRIGHTNESS_PWM_FREQUENCY * 100) + 1;
+         ptr->brightness_timer_ms = (1000 * ptr->rampBrightness) / (BRIGHTNESS_PWM_FREQUENCY * 100) + 1;
 
       }
       else {
          // Transition to the off state
          ptr->brightnessOutputState = 0;
-         ptr->brightness_timer_ms = (1000 * (100 - ptr->outputBrightness)) / (BRIGHTNESS_PWM_FREQUENCY * 100) + 1;
+         ptr->brightness_timer_ms = (1000 * (100 - ptr->rampBrightness)) / (BRIGHTNESS_PWM_FREQUENCY * 100) + 1;
       }
    }
    else {
@@ -247,68 +247,68 @@ void IND_UpdateBrightnessTimer(indicator_fullstate_t* ptr) {
 // Helper to update the brightness ramp timer and brightness value
 ///////////////////////////////////////////////////////////////////////////
 void IND_UpdateRampTimer(indicator_fullstate_t* ptr) {
+   if (ptr->rampMode == IND_RAMP_NONE) {
+      // Just return;
+      return;
+   }
 
    if (ptr->ramp_timer_ms <= 1) {
       // Timer expired.  increment or decrement brightness
-      s32 increment = BRIGHTNESS_RAMP_PERCENT_DELTA;
-      if (!ptr->rampDirection) {
-         // Ramping down so increment is negative.
-         increment = -increment;
-      }
+      s32 increment = ptr->rampDirection > 0 ? BRIGHTNESS_RAMP_PERCENT_DELTA : -BRIGHTNESS_RAMP_PERCENT_DELTA;
       // Apply the delta
-      ptr->outputBrightness += increment;
+      ptr->rampBrightness += increment;
       // Limit to 0..100
-      if (ptr->outputBrightness < 0) {
-         ptr->outputBrightness = 0;
+      if (ptr->rampBrightness < 0) {
+         ptr->rampBrightness = 0;
       }
-      else if (ptr->outputBrightness > 100) {
-         ptr->outputBrightness = 100;
+      else if (ptr->rampBrightness > 100) {
+         ptr->rampBrightness = 100;
       }
       // Check if we are at the endpoints of the brightness ramp and reset
       // everything the other way.
       switch (ptr->rampMode) {
       case IND_RAMP_UP:
-         if (ptr->outputBrightness >= ptr->targetBrightness) {
+         if (ptr->rampBrightness >= ptr->targetBrightness) {
             // Restart ascending sawtooth
             ptr->targetBrightness = ptr->brightness;
-            ptr->outputBrightness = 0;
+            ptr->rampBrightness = 0;
          }
          break;
       case IND_RAMP_DOWN:
-         if (ptr->outputBrightness <= ptr->targetBrightness) {
+         if (ptr->rampBrightness <= ptr->targetBrightness) {
             // restart descending sawtooth
-            ptr->outputBrightness = ptr->brightness;
+            ptr->rampBrightness = ptr->brightness;
             ptr->targetBrightness = 0;
          }
          break;
       case IND_RAMP_UP_DOWN:
          if (ptr->rampDirection) {
             // We were going up.
-            if (ptr->outputBrightness >= ptr->targetBrightness) {
+            if (ptr->rampBrightness >= ptr->targetBrightness) {
                // Now go down
                ptr->rampDirection = 0;
                ptr->targetBrightness = 0;
-               ptr->outputBrightness = ptr->brightness;
+               ptr->rampBrightness = ptr->brightness;
             }
          }
          else {
             // We are going down
-            if (ptr->outputBrightness == 0) {
+            if (ptr->rampBrightness == 0) {
                // go back up
                ptr->rampDirection = 1;
                ptr->targetBrightness = ptr->brightness;
             }
             break;
-
          }
+
       }
       // Reset the ramp_timer until the next delta
-      u8 numSteps = ptr->brightness/BRIGHTNESS_RAMP_PERCENT_DELTA;
-      if (numSteps == 0){
+      u8 numSteps = ptr->brightness / BRIGHTNESS_RAMP_PERCENT_DELTA;
+      if (numSteps == 0) {
          numSteps = 1;
       }
       ptr->ramp_timer_ms = BRIGHTNESS_RAMP_TIME_MS / numSteps;
-    //  DEBUG_MSG("IND_UpdateRampTimer:  brightness=%d timer=%d numSteps=%d",ptr->outputBrightness,ptr->ramp_timer_ms,numSteps);
+
    }
 
    else {
@@ -436,32 +436,34 @@ void IND_SetFullIndicatorState(u8 indicatorNum, indicator_state_t state, u8 brig
 #endif
    indicator_fullstate_t* ptr = &indicator_states[indicatorNum - 1];
 
+   // Transfer call values
    ptr->state = state;
+   ptr->brightness = brightness;
    ptr->flash_timer_freq = flashFreq;
    ptr->flash_timer_duty_cycle_percent = flashDutyCycle;
-   ptr->targetBrightness = brightness;
-   // Set current to percent and target for now.  Will be overwrriten if we are ramping.
-   ptr->outputBrightness = brightness;
    ptr->rampMode = rampMode;
 
-   // set the output states to zero.  They will get set correctly in the UpdateXXXTimer calls below.
+   // Initialize the output states to zero.  They will get set correctly in the UpdateXXXTimer calls below.
    ptr->flashOutputState = 0;
    ptr->brightnessOutputState = 0;
 
-   // Now set initial brightness states if ramping
+   // Default rampBrightness to brightness 
+   ptr->rampBrightness = ptr->brightness;
+
+   // Init the ramp direction according to the ramp mode
    switch (ptr->rampMode) {
-   case IND_RAMP_DOWN:
-      ptr->targetBrightness = 0;
-      ptr->outputBrightness = ptr->brightness;
-      break;
    case IND_RAMP_UP:
+      ptr->rampDirection = 1;
+      break;
+   case IND_RAMP_DOWN:
+      ptr->rampDirection = 0;
+      break;
    case IND_RAMP_UP_DOWN:
-      ptr->targetBrightness = ptr->brightness;
-      ptr->outputBrightness = 0;
+      // Init down as it will get turned to up on first call to Update
+      ptr->rampDirection = 0;
       break;
    }
-
-   //  expire the timers to trigger proper output values in the Update calls below
+   //  expire the timers to trigger proper calculated values in the calls below
    ptr->flash_timer_ms = 1;
    ptr->ramp_timer_ms = 1;
    ptr->brightness_timer_ms = 1;

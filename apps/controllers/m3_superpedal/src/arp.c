@@ -490,7 +490,7 @@ arp_gen_order_t ARP_GetArpGenOrder() {
 // sendOn:  if > 0 then note On.  == 0 for NoteOffs
 /////////////////////////////////////////////////////////////////////////////
 void ARP_SendChordNoteOnOffs(u8 sendOn, u8 velocity) {
-   //DEBUG_MSG("ARP_SendChordNoteOnOffs: sendOn=%d notestack.len=%d",sendOn,notestack.len);
+ //  DEBUG_MSG("ARP_SendChordNoteOnOffs: sendOn=%d notestack.len=%d",sendOn,notestack.len);
    for (u8 count = 0;count < notestack.len;count++) {
       // get note/velocity/length from notestack
       u8 note = notestack_items[count].note;      
