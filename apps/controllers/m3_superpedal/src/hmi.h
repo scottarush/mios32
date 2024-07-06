@@ -78,9 +78,8 @@ typedef enum renderline_justify_e {
 extern struct page_s midiProgramSelectPage;
 extern struct page_s homePage;
 extern struct page_s dialogPage;
-extern struct page_s* currentPage;
-extern struct page_s* lastPage;
-
+extern struct page_s* pCurrentPage;
+extern struct page_s arpSettingsPage;
 
 // Buffer for dialog Page Title
 extern char dialogPageTitle[DISPLAY_CHAR_WIDTH + 1];
@@ -128,7 +127,7 @@ typedef struct {
 // Prototypes
 /////////////////////////////////////////////////////////////////////////////
 
-extern void HMI_Init(void);
+extern void HMI_Init();
 extern void HMI_NotifyStompToggle(u8 stompNum,u8 pressed,s32 timestamp);
 extern void HMI_NotifyToeToggle(u8 stompNum,u8 pressed,s32 timestamp);
 extern void HMI_NotifyBackToggle(u8 pressed,s32 timestamp);
@@ -138,6 +137,7 @@ extern void HMI_NotifyOctaveChange(u8 octave);
 extern void HMI_DialogPage_UpdateDisplay();
 extern void HMI_UpdateIndicators();
 extern void HMI_RenderLine(u8, const char*, renderline_justify_t);
+extern void HMI_ClearLine(u8 lineNum);
 
 /////////////////////////////////////////////////////////////////////////////
 // Export global variables

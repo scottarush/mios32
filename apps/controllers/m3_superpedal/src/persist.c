@@ -17,6 +17,8 @@
 #include "midi_presets.h"
 #include "pedals.h"
 #include "hmi.h" 
+#include "arp.h"
+#include "arp_hmi.h"
 
 #undef DEBUG
 
@@ -31,6 +33,7 @@
 #define HMI_START_ADDR (MIDI_PRESETS_START_ADDR+sizeof(persisted_midi_presets_t)/2)
 #define PEDALS_START_ADDR (HMI_START_ADDR+sizeof(persisted_hmi_settings_t)/2)
 #define ARP_START_ADDR (PEDALS_START_ADDR+sizeof(persisted_pedal_confg_t)/2)
+#define ARP_HMI_START_ADDR (ARP_START_ADDR+sizeof(persisted_arp_data_t)/2)
 
 u16 PERSIST_Read16(u16 addr);
 u32 PERSIST_Read32(u16 addr);
@@ -61,16 +64,16 @@ s32 PERSIST_Init(u32 mode) {
            }
         **/
    }
-   else if (mode > 0){
+   else if (mode > 0) {
       // E2 just got reformatted, write the MidiRouter settings
-      PERSIST_StoreMIDIRouter(); 
+      PERSIST_StoreMIDIRouter();
    }
-   else{
+   else {
       // Restore midi_router settings.  Need to call from here to avoid modifying the midi_router
       // module that doesn't support persist.c
       PERSIST_RestoreMidiRouter();
    }
-  
+
    return status;
 }
 
@@ -143,7 +146,7 @@ s32 PERSIST_StoreBlock(persist_block_t blockType, const unsigned char* pData, u1
       // Do a read and only write the word if different
       u16 readWord = PERSIST_Read16(wordAddress);
       status = 0;
-      if (readWord != word){
+      if (readWord != word) {
          status = PERSIST_Write16(wordAddress, word);
       }
       /* #ifdef DEBUG
@@ -195,6 +198,9 @@ u16 PERSIST_GetStartAddress(persist_block_t blockType) {
       break;
    case PERSIST_ARP_BLOCK:
       startAddress = ARP_START_ADDR;
+      break;
+   case PERSIST_ARP_HMI_BLOCK:
+      startAddress = ARP_HMI_START_ADDR;
       break;
    default:
       DEBUG_MSG("Invalid block type:%d", blockType);

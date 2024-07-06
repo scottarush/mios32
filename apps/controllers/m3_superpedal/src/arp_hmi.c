@@ -52,13 +52,172 @@ typedef enum arp_live_toe_functions_e {
 } arp_live_toe_functions_t;
 
 
+typedef enum arp_settings_entries_e {
+   ARP_SETTINGS_MIDI_CHANNEL = 0,
+   ARP_SETTINGS_CLOCK_MODE = 1
+} arp_settings_entries_t;
+
+const char * arpSettingsPageEntryTitles[] = {"Set Midi Out Channel","Set Clock Mode"};
+#define ARP_SETTINGS_PAGE_NUM_ENTRIES 2
+
 //----------------------------------------------------------------------------
 // Local prototypes
 //----------------------------------------------------------------------------
 
 void ARP_HMI_SelectRootKeyCallback(u8 pedalNum);
 void ARP_HMI_SelectModeScaleCallback(u8 pedalNum);
+const char * ARP_HMI_GetClockModeText(arp_clock_mode_t mode);
+void ARP_HMI_ARPSettingsValues_RotaryEncoderChanged(s8 increment);
 
+
+//----------------------------------------------------------------------------
+// Local variables
+//----------------------------------------------------------------------------
+persisted_arp_hmi_data_t arpHMISettings;
+
+
+
+/////////////////////////////////////////////////////////////////////////////
+// Initialisation
+/////////////////////////////////////////////////////////////////////////////
+s32 ARP_HMI_Init()
+{
+   // Set the expected serializedID in the supplied block.  Update this ID whenever the persisted structure changes.  
+   arpHMISettings.serializationID = 0x41484D31;   // 'AHM1'
+
+   s32 valid = PERSIST_ReadBlock(PERSIST_ARP_HMI_BLOCK, (unsigned char*)&arpHMISettings, sizeof(persisted_arp_hmi_data_t));
+   if (valid < 0) {
+      DEBUG_MSG("ARP_HMI_Init:  PERSIST_ReadBlock return invalid. Re-initing persisted settings to defaults");
+
+      arpHMISettings.lastArpSettingsPageIndex = 0;
+
+      ARP_HMI_PersistData();
+   }
+
+   return 0; // no error
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// Global function to store persisted arpeggiator data
+/////////////////////////////////////////////////////////////////////////////
+s32 ARP_HMI_PersistData() {
+#ifdef DEBUG
+   DEBUG_MSG("ARP_HMI_PersistData: Writing persisted data:  sizeof(presets)=%d bytes", sizeof(persisted_arp_hmi_data_t));
+#endif
+   s32 valid = PERSIST_StoreBlock(PERSIST_ARP_HMI_BLOCK, (unsigned char*)&arpHMISettings, sizeof(persisted_arp_hmi_data_t));
+   if (valid < 0) {
+      DEBUG_MSG("ARP_HMI_PersistData:  Error persisting setting to EEPROM");
+   }
+   return valid;
+}
+
+////////////////////////////////////////////////////////////////////////////
+// Callback to update the display on the MIDIProgramSelectPage
+////////////////////////////////////////////////////////////////////////////
+void ARP_HMI_ARPSettings_UpdateDisplay() {
+   HMI_RenderLine(0,arpSettingsPage.pPageTitle,RENDER_LINE_CENTER);
+      // Spacer on line 1
+   HMI_RenderLine(1, "--------------------", RENDER_LINE_LEFT);
+
+   // Print up to 2 entries with current selection on line 2
+
+   // Selected entry on line 2
+   HMI_RenderLine(2, arpSettingsPageEntryTitles[arpHMISettings.lastArpSettingsPageIndex], RENDER_LINE_SELECT);
+   if (arpHMISettings.lastArpSettingsPageIndex == ARP_SETTINGS_PAGE_NUM_ENTRIES - 1) {
+      // At the end, clear line 3
+      HMI_ClearLine(3);
+   }
+   else {
+      // Print next item on line 3
+      HMI_RenderLine(3, arpSettingsPageEntryTitles[arpHMISettings.lastArpSettingsPageIndex+1], RENDER_LINE_CENTER);
+   }
+}
+/////////////////////////////////////////////////////////////////////////////
+// Callback for rotary encoder change on arp settings page
+/////////////////////////////////////////////////////////////////////////////
+void ARP_HMI_ARPSettingsPage_RotaryEncoderChanged(s8 increment) {
+   arpHMISettings.lastArpSettingsPageIndex += increment;
+   if (arpHMISettings.lastArpSettingsPageIndex < 0){
+      arpHMISettings.lastArpSettingsPageIndex = 0;
+   }
+   else if (arpHMISettings.lastArpSettingsPageIndex >= ARP_SETTINGS_PAGE_NUM_ENTRIES){
+      arpHMISettings.lastArpSettingsPageIndex = ARP_SETTINGS_PAGE_NUM_ENTRIES-1;
+   }
+   // force an update to the current page display
+   pCurrentPage->pUpdateDisplayCallback();
+}
+/////////////////////////////////////////////////////////////////////////////
+// Callback for rotary encoder select on gen MIDI select page
+/////////////////////////////////////////////////////////////////////////////
+void ARP_HMI_ARPSettingsPage_RotaryEncoderSelected() {
+   switch(arpHMISettings.lastArpSettingsPageIndex){
+      case ARP_SETTINGS_MIDI_CHANNEL:
+         snprintf(dialogPageTitle,DISPLAY_CHAR_WIDTH,"SELECT MIDI CHANNEL");
+
+         snprintf(dialogPageMessage1,DISPLAY_CHAR_WIDTH,"Channel: %d",ARP_GetMIDIChannel());
+         dialogPageMessage2[0] = '\0';
+         dialogPage.pBackPage = pCurrentPage;
+         dialogPage.pRotaryEncoderChangedCallback = ARP_HMI_ARPSettingsValues_RotaryEncoderChanged;
+         dialogPage.pBackButtonCallback = NULL;         
+         break;
+      case ARP_SETTINGS_CLOCK_MODE:
+         snprintf(dialogPageTitle,DISPLAY_CHAR_WIDTH,"SELECT CLOCK MODE");
+         snprintf(dialogPageMessage1,DISPLAY_CHAR_WIDTH,"Clock Mode: %s",ARP_HMI_GetClockModeText(ARP_GetClockMode()));
+         dialogPageMessage2[0] = '\0';
+         dialogPage.pRotaryEncoderChangedCallback = ARP_HMI_ARPSettingsValues_RotaryEncoderChanged;
+         dialogPage.pBackPage = pCurrentPage;
+         dialogPage.pBackButtonCallback = NULL;         
+         break;         
+   }
+   pCurrentPage = &dialogPage;
+   // And force an update to the current page display
+   pCurrentPage->pUpdateDisplayCallback();
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// Callback for rotary encoder changes on the ARP Settings subpages.
+/////////////////////////////////////////////////////////////////////////////
+void ARP_HMI_ARPSettingsValues_RotaryEncoderChanged(s8 increment) {
+      switch(arpHMISettings.lastArpSettingsPageIndex){
+      case ARP_SETTINGS_MIDI_CHANNEL:
+         u8 channel = ARP_GetMIDIChannel();
+         channel += increment;
+         if (channel > 16){
+            channel = 16;
+         }
+         else if (channel < 1){
+            channel = 1;
+         }
+         ARP_SetMIDIChannel(channel);
+         snprintf(dialogPageMessage1,DISPLAY_CHAR_WIDTH,"Channel: %d",ARP_GetMIDIChannel());      
+         break;
+      case ARP_SETTINGS_CLOCK_MODE:
+         arp_clock_mode_t mode = ARP_GetClockMode();
+         mode += increment;
+         if (mode < 0){
+            mode = 0;
+         }
+         if (mode > ARP_CLOCK_MODE_SLAVE){
+            mode = ARP_CLOCK_MODE_SLAVE;
+         }
+         ARP_SetClockMode(mode);
+         snprintf(dialogPageMessage1,DISPLAY_CHAR_WIDTH,"Clock Mode: %s",ARP_HMI_GetClockModeText(ARP_GetClockMode()));    
+         break;         
+   }
+   pCurrentPage->pUpdateDisplayCallback();
+}
+/////////////////////////////////////////////////////////////////////////////
+// Helper for Clock Mode text
+/////////////////////////////////////////////////////////////////////////////
+const char * ARP_HMI_GetClockModeText(arp_clock_mode_t mode) {
+   switch(mode){
+      case ARP_CLOCK_MODE_MASTER:
+      return "Master";
+      case ARP_CLOCK_MODE_SLAVE:
+      return "Slave";
+   }
+   return "ERR!";
+}
 
 /////////////////////////////////////////////////////////////////////////////
 // Sets/updates the indicators for the current ARP_LIVE mode
@@ -96,13 +255,13 @@ void ARP_HMI_UpdateArpToeIndicators() {
 const char* ARP_HMI_GetArpGenOrderText() {
    switch (ARP_GetArpGenOrder()) {
    case ARP_GEN_ORDER_ASCENDING:
-      return "_/";
+      return "_-";
    case ARP_GEN_ORDER_DESCENDING:
       return "-_";
    case ARP_GEN_ORDER_ASC_DESC:
-      return "_/-_";
+      return "_^_";
    case ARP_GEN_ORDER_ASC_DESC_SKIP_ENDS:
-      return "/-";
+      return "^";
    case ARP_GEN_ORDER_RANDOM:
       return "RND";
    }
@@ -140,9 +299,9 @@ void ARP_HMI_HandleArpLiveToeToggle(u8 toeNum, u8 pressed) {
       snprintf(dialogPageTitle, DISPLAY_CHAR_WIDTH + 1, "%s", "SET ARP ROOT KEY");
       snprintf(dialogPageMessage1, DISPLAY_CHAR_WIDTH + 1, "%s", "Press Pedal to");
       snprintf(dialogPageMessage2, DISPLAY_CHAR_WIDTH + 1, "%s", "Select Key");
-      dialogPage.pBackPage = currentPage;
-      currentPage = &dialogPage;
-      currentPage->pUpdateDisplayCallback();
+      dialogPage.pBackPage = pCurrentPage;
+      pCurrentPage = &dialogPage;
+      pCurrentPage->pUpdateDisplayCallback();
 
       // Flash the indicators
       IND_FlashAll(0);
@@ -154,9 +313,9 @@ void ARP_HMI_HandleArpLiveToeToggle(u8 toeNum, u8 pressed) {
       snprintf(dialogPageTitle, DISPLAY_CHAR_WIDTH + 1, "%s", "SET ARP MODAL SCALE");
       snprintf(dialogPageMessage1, DISPLAY_CHAR_WIDTH + 1, "%s", "Press Brown Pedal to");
       snprintf(dialogPageMessage2, DISPLAY_CHAR_WIDTH + 1, "%s", "Select Mode");
-      dialogPage.pBackPage = currentPage;
-      currentPage = &dialogPage;
-      currentPage->pUpdateDisplayCallback();
+      dialogPage.pBackPage = pCurrentPage;
+      pCurrentPage = &dialogPage;
+      pCurrentPage->pUpdateDisplayCallback();
 
       IND_FlashAll(0);
 
@@ -175,7 +334,7 @@ void ARP_HMI_HandleArpLiveToeToggle(u8 toeNum, u8 pressed) {
       break;
    }
    // Update the current display to reflect any content change
-   currentPage->pUpdateDisplayCallback();
+   pCurrentPage->pUpdateDisplayCallback();
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -184,9 +343,9 @@ void ARP_HMI_HandleArpLiveToeToggle(u8 toeNum, u8 pressed) {
 void ARP_HMI_SelectRootKeyCallback(u8 pedalNum) {
    ARP_SetRootKey(pedalNum - 1);
    // go back to last page and refresh displays
-   currentPage = &homePage;
+   pCurrentPage = &homePage;
    HMI_UpdateIndicators();
-   currentPage->pUpdateDisplayCallback();
+   pCurrentPage->pUpdateDisplayCallback();
 }
 
 
@@ -231,7 +390,7 @@ void ARP_HMI_SelectModeScaleCallback(u8 pedalNum) {
       ARP_SetModeScale(mode);
    }
    // go back to home page and refresh displays
-   currentPage = &homePage;
+   pCurrentPage = &homePage;
    HMI_UpdateIndicators();
-   currentPage->pUpdateDisplayCallback();
+   pCurrentPage->pUpdateDisplayCallback();
 }

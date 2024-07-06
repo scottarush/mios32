@@ -40,6 +40,11 @@ typedef enum arp_mode_e {
    ARP_MODE_CHORD_PAD = 3 
 } arp_mode_t;
 
+typedef enum arp_clock_mode_e {
+   ARP_CLOCK_MODE_MASTER = 0,
+   ARP_CLOCK_MODE_SLAVE = 1
+} arp_clock_mode_t;
+
 /////////////////////////////////////////////////////////////////////////////
 // Persisted Arpeggiatordata to E2 .
 /////////////////////////////////////////////////////////////////////////////
@@ -51,6 +56,7 @@ typedef struct persisted_arp_data_s {
    arp_mode_t arpMode;
    u16 midi_ports;
    u8 midiChannel;
+   arp_clock_mode_t clockMode;
    key_t rootKey;
    scale_t modeScale;
    chord_extension_t chordExtension;
@@ -94,6 +100,11 @@ extern u8 ARP_GetRootKey();
 extern void ARP_SetModeScale(scale_t scale);
 extern scale_t ARP_GetModeScale();
 
+extern arp_clock_mode_t ARP_GetClockMode();
+extern void ARP_SetClockMode(arp_clock_mode_t mode);
+
+extern void ARP_SetMIDIChannel(u8 channel);
+u8 ARP_GetMIDIChannel();
 /////////////////////////////////////////////////////////////////////////////
 // Export global variables
 /////////////////////////////////////////////////////////////////////////////

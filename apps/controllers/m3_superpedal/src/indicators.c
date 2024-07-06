@@ -29,7 +29,7 @@
 #define FLASH_BLIP_PERCENT_DUTY_CYCLE 10
 
 #define BRIGHTNESS_PWM_FREQUENCY 100
-#define BRIGHTNESS_RAMP_PERCENT_DELTA 5
+#define BRIGHTNESS_RAMP_PERCENT_DELTA 2
 
 #define BRIGHTNESS_RAMP_TIME_MS 1000
 
@@ -252,11 +252,11 @@ void IND_UpdateRampTimer(indicator_fullstate_t* ptr) {
       // Timer expired.  increment or decrement brightness
       s32 increment = BRIGHTNESS_RAMP_PERCENT_DELTA;
       if (!ptr->rampDirection) {
+         // Ramping down so increment is negative.
          increment = -increment;
       }
-      else {
-         ptr->outputBrightness += increment;
-      }
+      // Apply the delta
+      ptr->outputBrightness += increment;
       // Limit to 0..100
       if (ptr->outputBrightness < 0) {
          ptr->outputBrightness = 0;
@@ -264,7 +264,8 @@ void IND_UpdateRampTimer(indicator_fullstate_t* ptr) {
       else if (ptr->outputBrightness > 100) {
          ptr->outputBrightness = 100;
       }
-      // Reset brightness targets depending on the ramp mode 
+      // Check if we are at the endpoints of the brightness ramp and reset
+      // everything the other way.
       switch (ptr->rampMode) {
       case IND_RAMP_UP:
          if (ptr->outputBrightness >= ptr->targetBrightness) {
@@ -301,8 +302,11 @@ void IND_UpdateRampTimer(indicator_fullstate_t* ptr) {
 
          }
       }
-      // Reset the ramp_timer
+      // Reset the ramp_timer until the next delta
       u8 numSteps = ptr->brightness/BRIGHTNESS_RAMP_PERCENT_DELTA;
+      if (numSteps == 0){
+         numSteps = 1;
+      }
       ptr->ramp_timer_ms = BRIGHTNESS_RAMP_TIME_MS / numSteps;
     //  DEBUG_MSG("IND_UpdateRampTimer:  brightness=%d timer=%d numSteps=%d",ptr->outputBrightness,ptr->ramp_timer_ms,numSteps);
    }

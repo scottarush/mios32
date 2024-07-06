@@ -45,10 +45,11 @@
 //----------------------------------------------------------------------------
 // Global display Page variable declarations
 //----------------------------------------------------------------------------
-struct page_s midiProgramSelectPage;
 struct page_s homePage;
+struct page_s midiProgramSelectPage;
+struct page_s arpSettingsPage;
 struct page_s dialogPage;
-struct page_s* currentPage;
+struct page_s* pCurrentPage;
 
 
 // Buffer for dialog Page Title
@@ -106,9 +107,7 @@ static persisted_hmi_settings_t hmiSettings;
 //----------------------------------------------------------------------------
 // Local prototypes
 //----------------------------------------------------------------------------
-void HMI_ClearLine(u8);
 void HMI_InitPages();
-
 
 void HMI_HomePage_UpdateDisplay();
 void HMI_HomePage_RotaryEncoderChanged(s8);
@@ -150,7 +149,7 @@ void HMI_Init(void) {
 
    lastSelectedEditVoicePresetPageEntry = EDIT_VOICE_PRESET_PAGE_ENTRY_PROGRAM_NUMBER;
 
-   currentPage = &homePage;
+   pCurrentPage = &homePage;
 
    // Restore settings from E^2 if they exist.  If not then initialize to defaults
    s32 valid = 0;
@@ -212,7 +211,7 @@ void HMI_Init(void) {
 void HMI_InitPages() {
    homePage.pageID = PAGE_HOME;
 
-   char* pHomeTitle = { "---M3 SuperPedal---" };
+   char* pHomeTitle = { "---M3 SUPERPEDAL---" };
    homePage.pPageTitle = pHomeTitle;
    homePage.pUpdateDisplayCallback = HMI_HomePage_UpdateDisplay;
    homePage.pRotaryEncoderChangedCallback = HMI_HomePage_RotaryEncoderChanged;
@@ -222,7 +221,7 @@ void HMI_InitPages() {
    homePage.pBackPage = NULL;
 
    editVoicePresetPage.pageID = PAGE_EDIT_VOICE_PRESET;
-   char* editVoicePresetTitle = { "Edit Toe Voice Pset" };
+   char* editVoicePresetTitle = { "EDIT VOICE PRESET" };
    editVoicePresetPage.pPageTitle = editVoicePresetTitle;
    editVoicePresetPage.pUpdateDisplayCallback = HMI_EditVoicePresetPage_UpdateDisplay;
    editVoicePresetPage.pRotaryEncoderChangedCallback = HMI_EditVoicePresetPage_RotaryEncoderChanged;
@@ -232,7 +231,7 @@ void HMI_InitPages() {
    editVoicePresetPage.pBackPage = &homePage;
 
    editPatternPresetPage.pageID = PAGE_EDIT_PATTERN_PRESET;
-   char* patternPresetTitle = { "Edit Toe Ptrn Pset" };
+   char* patternPresetTitle = { "EDIT PATTERN PRESET" };
    editPatternPresetPage.pPageTitle = patternPresetTitle;
    // TODO - add callback functions below and replace dummy home page one
    editPatternPresetPage.pUpdateDisplayCallback = HMI_HomePage_UpdateDisplay;
@@ -244,7 +243,7 @@ void HMI_InitPages() {
 
 
    midiProgramSelectPage.pageID = PAGE_MIDI_PROGRAM_SELECT;
-   char* selectPresetTitle = { "Select MIDI Program" };
+   char* selectPresetTitle = { "SELECT MIDI PROGRAM" };
    midiProgramSelectPage.pPageTitle = selectPresetTitle;
    midiProgramSelectPage.pUpdateDisplayCallback = HMI_MIDIProgramSelectPage_UpdateDisplay;
    midiProgramSelectPage.pRotaryEncoderChangedCallback = HMI_MIDIProgramSelectPage_RotaryEncoderChanged;
@@ -252,6 +251,16 @@ void HMI_InitPages() {
    midiProgramSelectPage.pPedalSelectedCallback = NULL;
    midiProgramSelectPage.pBackButtonCallback = HMI_MIDIProgramSelectPage_BackButtonCallback;
    midiProgramSelectPage.pBackPage = &editVoicePresetPage;
+
+   arpSettingsPage.pageID = PAGE_ARP_SETTINGS;
+   char* arpSettingsTitle = { "ARP SETTINGS" };
+   arpSettingsPage.pPageTitle = arpSettingsTitle;
+   arpSettingsPage.pUpdateDisplayCallback = ARP_HMI_ARPSettings_UpdateDisplay;
+   arpSettingsPage.pRotaryEncoderChangedCallback = ARP_HMI_ARPSettingsPage_RotaryEncoderChanged;
+   arpSettingsPage.pRotaryEncoderSelectCallback = ARP_HMI_ARPSettingsPage_RotaryEncoderSelected;
+   arpSettingsPage.pPedalSelectedCallback = NULL;
+   arpSettingsPage.pBackButtonCallback = NULL;
+   arpSettingsPage.pBackPage = &homePage;
 
    dialogPage.pageID = PAGE_DIALOG;
    dialogPage.pPageTitle = dialogPageTitle;
@@ -333,7 +342,7 @@ void HMI_NotifyToeToggle(u8 toeNum, u8 pressed, s32 timestamp) {
       // Update the indicators
       HMI_UpdateIndicators();
       // And update the current page display
-      currentPage->pUpdateDisplayCallback();
+      pCurrentPage->pUpdateDisplayCallback();
       break;
    case TOE_SWITCH_VOICE_PRESETS:
       switch (toeNum) {
@@ -357,7 +366,7 @@ void HMI_NotifyToeToggle(u8 toeNum, u8 pressed, s32 timestamp) {
             // Update the indicators
             HMI_UpdateIndicators();
             // And update the current page display
-            currentPage->pUpdateDisplayCallback();
+            pCurrentPage->pUpdateDisplayCallback();
          }
          else {
             // Invalid preset.  Flash and then off
@@ -447,7 +456,7 @@ void HMI_NotifyStompToggle(u8 stompNum, u8 pressed, s32 timestamp) {
          break;
       case TOE_SWITCH_OCTAVE:
       default:
-         hmiSettings.toeSwitchMode = TOE_SWITCH_OCTAVE;
+         hmiSettings.toeSwitchMode = TOE_SWITCH_VOLUME;
          break;
       }
       break;
@@ -479,7 +488,7 @@ void HMI_NotifyStompToggle(u8 stompNum, u8 pressed, s32 timestamp) {
       }
       hmiSettings.toeSwitchMode = TOE_SWITCH_ARP;
       // Set to home page
-      currentPage = &homePage;
+      pCurrentPage = &homePage;
       break;
    case STOMP_SWITCH_CHORD_PAD:
       // Got to Chord Pad mode.  If already there then toggle the enable state
@@ -493,7 +502,7 @@ void HMI_NotifyStompToggle(u8 stompNum, u8 pressed, s32 timestamp) {
       }
       hmiSettings.toeSwitchMode = TOE_SWITCH_CHORD;
       // Set to home page
-      currentPage = &homePage;
+      pCurrentPage = &homePage;
       break;
    default:
       // Invalid.  Just return;
@@ -507,7 +516,7 @@ void HMI_NotifyStompToggle(u8 stompNum, u8 pressed, s32 timestamp) {
    HMI_PersistData();
 
    // update the current page display
-   currentPage->pUpdateDisplayCallback();
+   pCurrentPage->pUpdateDisplayCallback();
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -579,8 +588,8 @@ void HMI_NotifyEncoderChange(s32 incrementer) {
 #endif
 
    // Send the encoder to the page if the callback is non-null 
-   if (currentPage->pRotaryEncoderChangedCallback != NULL) {
-      currentPage->pRotaryEncoderChangedCallback(incrementer);
+   if (pCurrentPage->pRotaryEncoderChangedCallback != NULL) {
+      pCurrentPage->pRotaryEncoderChangedCallback(incrementer);
    }
 
 }
@@ -610,8 +619,8 @@ void HMI_NotifyEncoderSwitchToggle(u8 pressed, s32 timestamp) {
 
    encoderSwitchState.handled = 1;
    // Send the encoder press to the page if the callback is non-null
-   if (currentPage->pRotaryEncoderSelectCallback != NULL) {
-      currentPage->pRotaryEncoderSelectCallback();
+   if (pCurrentPage->pRotaryEncoderSelectCallback != NULL) {
+      pCurrentPage->pRotaryEncoderSelectCallback();
    }
 
 }
@@ -653,28 +662,27 @@ void HMI_NotifyBackToggle(u8 pressed, s32 timestamp) {
          return;
       }
    }
-
    if (longPress && !backSwitchState.handled) {
       // Go back to home page 
-      currentPage = &homePage;
+      pCurrentPage = &homePage;
       // And force an update to the current page display
-      currentPage->pUpdateDisplayCallback();
-      // Set handled to ignore the release
+      pCurrentPage->pUpdateDisplayCallback();
+      // Set handled to ignore the pending release
       backSwitchState.handled = 1;
       return;
    }
 
    // Otherwise, on a release, check if there is a registered handler.  If so call it 
-   if (currentPage->pBackButtonCallback != NULL) {
-      currentPage->pBackButtonCallback();
+   if (pCurrentPage->pBackButtonCallback != NULL) {
+      pCurrentPage->pBackButtonCallback();
    }
    // If the back page is non-null then transition to that page.
-   if (currentPage->pBackPage != NULL) {
-      currentPage = currentPage->pBackPage;
+   if (pCurrentPage->pBackPage != NULL) {
+      pCurrentPage = pCurrentPage->pBackPage;
       // Update indicators in case they are different now
       HMI_UpdateIndicators();
       // And force an update to the current page display
-      currentPage->pUpdateDisplayCallback();
+      pCurrentPage->pUpdateDisplayCallback();
    }
 }
 
@@ -843,11 +851,12 @@ void HMI_HomePage_RotaryEncoderChanged(s8 increment) {
    switch (hmiSettings.toeSwitchMode) {
    case TOE_SWITCH_VOICE_PRESETS:
       // Go MIDI program number page
-      currentPage = &midiProgramSelectPage;
+      midiProgramSelectPage.pBackPage = pCurrentPage;
+      pCurrentPage = &midiProgramSelectPage;
       break;
    case TOE_SWITCH_ARP:
-      // Got to ARP Settings page
-      // TODO
+      arpSettingsPage.pBackPage = pCurrentPage;
+      pCurrentPage = &arpSettingsPage;
       return;
    case TOE_SWITCH_PATTERN_PRESETS:
       // Goto Pattern select page
@@ -865,7 +874,7 @@ void HMI_HomePage_RotaryEncoderChanged(s8 increment) {
       return;
    }
    // update the current page display
-   currentPage->pUpdateDisplayCallback();
+   pCurrentPage->pUpdateDisplayCallback();
 }
 /////////////////////////////////////////////////////////////////////////////
 // Callback for rotary encoder select on home page
@@ -875,9 +884,9 @@ void HMI_HomePage_RotaryEncoderSelect() {
    snprintf(dialogPageMessage1, DISPLAY_CHAR_WIDTH + 1, "%s", M3_SUPERPEDAL_VERSION);
    snprintf(dialogPageMessage2, DISPLAY_CHAR_WIDTH + 1, "%s", M3_SUPERPEDAL_VERSION_DATE);
 
-   dialogPage.pBackPage = currentPage;
-   currentPage = &dialogPage;
-   currentPage->pUpdateDisplayCallback();
+   dialogPage.pBackPage = pCurrentPage;
+   pCurrentPage = &dialogPage;
+   pCurrentPage->pUpdateDisplayCallback();
 }
 ////////////////////////////////////////////////////////////////////////////
 // Callback to update the display on the Dialog page.
@@ -898,7 +907,7 @@ void HMI_DialogPage_UpdateDisplay() {
 void HMI_EditVoicePresetPage_UpdateDisplay() {
 
    MIOS32_LCD_CursorSet(0, 0);
-   MIOS32_LCD_PrintString(currentPage->pPageTitle);
+   MIOS32_LCD_PrintString(pCurrentPage->pPageTitle);
 
    // Selected entry on line 2
    HMI_RenderLine(2, editVoicePageEntries[lastSelectedEditVoicePresetPageEntry], RENDER_LINE_SELECT);
@@ -934,7 +943,7 @@ void HMI_EditVoicePresetPage_RotaryEncoderChanged(s8 increment) {
    // Otherwise, at least one more detent either way so update.
    lastSelectedEditVoicePresetPageEntry += increment;
    // And force an update to the current page display
-   currentPage->pUpdateDisplayCallback();
+   pCurrentPage->pUpdateDisplayCallback();
 }
 /////////////////////////////////////////////////////////////////////////////
 // Callback for rotary encoder select on Edit Voice Preset Page
@@ -942,8 +951,8 @@ void HMI_EditVoicePresetPage_RotaryEncoderChanged(s8 increment) {
 void HMI_EditVoicePresetPage_RotaryEncoderSelected() {
    switch (lastSelectedEditVoicePresetPageEntry) {
    case EDIT_VOICE_PRESET_PAGE_ENTRY_PROGRAM_NUMBER:
-      editVoicePresetPage.pBackPage = currentPage;
-      currentPage = &midiProgramSelectPage;
+      editVoicePresetPage.pBackPage = pCurrentPage;
+      pCurrentPage = &midiProgramSelectPage;
       break;
    case EDIT_VOICE_PRESET_PAGE_ENTRY_OCTAVE:
       // TODO
@@ -958,14 +967,14 @@ void HMI_EditVoicePresetPage_RotaryEncoderSelected() {
       return;
    }
    // And force an update to the current page display
-   currentPage->pUpdateDisplayCallback();
+   pCurrentPage->pUpdateDisplayCallback();
 }
 ////////////////////////////////////////////////////////////////////////////
 // Callback to update the display on the MIDIProgramSelectPage
 ////////////////////////////////////////////////////////////////////////////
 void HMI_MIDIProgramSelectPage_UpdateDisplay() {
    MIOS32_LCD_CursorSet(0, 0);
-   MIOS32_LCD_PrintString(currentPage->pPageTitle);
+   MIOS32_LCD_PrintString(pCurrentPage->pPageTitle);
 
    // Print 3 presets centered around the current selection.
 
@@ -1007,7 +1016,7 @@ void HMI_MIDIProgramSelectPage_RotaryEncoderChanged(s8 increment) {
       // TODO handle bankNumber too
       MIDI_PRESETS_ActivateMIDIVoice(progNumber, 0, preset->midiPorts, preset->midiChannel);
       // And force an update to the current page display
-      currentPage->pUpdateDisplayCallback();
+      pCurrentPage->pUpdateDisplayCallback();
    }
 }
 /////////////////////////////////////////////////////////////////////////////
@@ -1040,9 +1049,9 @@ void HMI_MIDIProgramSelectPage_RotaryEncoderSelected() {
    }
 
    // Go back to the home page 
-   currentPage = &homePage;
+   pCurrentPage = &homePage;
    // And force an update to the current page display
-   currentPage->pUpdateDisplayCallback();
+   pCurrentPage->pUpdateDisplayCallback();
    // And send out the preset change
 }
 
@@ -1076,7 +1085,7 @@ void HMI_NotifyOctaveChange(u8 octave) {
    // Update the Indicators and the current display
    HMI_UpdateIndicators();
    // And update the current display in case it is showing Octave
-   currentPage->pUpdateDisplayCallback();
+   pCurrentPage->pUpdateDisplayCallback();
 }
 
 // Helper computes the volume level from 1 to 8 for both display and

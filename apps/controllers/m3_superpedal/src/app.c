@@ -33,6 +33,7 @@
 #include "midio_file.h"
 #include "file.h"
 #include "arp.h"
+#include "arp_hmi.h"
 #include "app.h"
 #include "hmi.h"
 #include "pedals.h"
@@ -157,8 +158,9 @@ void APP_Init(void) {
    // initialize MIDI handler for Sequencer used by Arpeggiator
    SEQ_MIDI_OUT_Init(0);
 
-   // initialize Arpeggiator
-   ARP_Init(0);
+   // initialize Arpeggiator and HMI
+   ARP_Init();
+   ARP_HMI_Init();
 
    // init terminal
    TERMINAL_Init(0);

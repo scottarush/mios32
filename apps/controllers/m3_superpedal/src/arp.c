@@ -356,7 +356,7 @@ s32 ARP_FillNoteStack() {
       if (!skip) {
          s32 note = SEQ_CHORD_NoteGetByEnum(keyNum, chord, outputOctave);
 #ifdef DEBUG
-   DEBUG_MSG("ARP_FillNoteStack: Pushing note %d keyNum=%d",note,keyNum);
+   //DEBUG_MSG("ARP_FillNoteStack: Pushing note %d keyNum=%d",note,keyNum);
 #endif
          if (note >= 0) {
             // add offset for the chordPlayedNote
@@ -626,6 +626,43 @@ void ARP_SetBPM(u16 bpm) {
    arpSettings.bpm = bpm;
    SEQ_BPM_Set(bpm);
    // And persist the change
+   ARP_PersistData();
+}
+/////////////////////////////////////////////////////////////////////////////
+// gets clock mode
+/////////////////////////////////////////////////////////////////////////////
+arp_clock_mode_t ARP_GetClockMode() {
+   return arpSettings.clockMode;
+}
+/////////////////////////////////////////////////////////////////////////////
+// Sets the clock mode
+/////////////////////////////////////////////////////////////////////////////
+void ARP_SetClockMode(arp_clock_mode_t mode) {
+   if (arpSettings.clockMode == mode){
+      return;
+   }
+   arpSettings.clockMode = mode;
+   
+   ARP_Reset();
+   // persist the change
+   ARP_PersistData();
+}
+/////////////////////////////////////////////////////////////////////////////
+// gets the midi channel
+/////////////////////////////////////////////////////////////////////////////
+u8 ARP_GetMIDIChannel() {
+   return arpSettings.midiChannel;
+}
+/////////////////////////////////////////////////////////////////////////////
+// Sets the midi channel
+/////////////////////////////////////////////////////////////////////////////
+void ARP_SetMIDIChannel(u8 channel) {
+   if (arpSettings.midiChannel == channel){
+      return;
+   }
+   arpSettings.midiChannel = channel;
+   
+   // persist the change
    ARP_PersistData();
 }
 /////////////////////////////////////////////////////////////////////////////

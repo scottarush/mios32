@@ -12,7 +12,7 @@
 
 // Version string
 #define M3_SUPERPEDAL_VERSION "Version: 1.0"
-#define M3_SUPERPEDAL_VERSION_DATE "04JUL2024"
+#define M3_SUPERPEDAL_VERSION_DATE "05JUL2024"
 
 // This disables the boot message to the LCD display (still goes to the terminal)
 // Otherwise it overwrites the one in the call trace from APP_Init() since APP_Init is

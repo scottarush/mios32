@@ -21,16 +21,33 @@
 // Global Types
 /////////////////////////////////////////////////////////////////////////////
 
+/////////////////////////////////////////////////////////////////////////////
+// Persisted ARP HMI data to E2 .
+/////////////////////////////////////////////////////////////////////////////
+
+typedef struct persisted_arp_hmi_data_s {
+   // First 4 bytes must be serialization version ID.  Big-ended order
+   u32 serializationID;
+
+   u8 lastArpSettingsPageIndex;
+
+} persisted_arp_hmi_data_t;
+
 
 /////////////////////////////////////////////////////////////////////////////
 // Prototypes
 /////////////////////////////////////////////////////////////////////////////
 
-extern void HMI_Init(void);
+extern s32 ARP_HMI_Init();
 
 extern void ARP_HMI_UpdateArpToeIndicators();
+extern void ARP_HMI_ARPSettings_UpdateDisplay();
 extern void ARP_HMI_HandleArpLiveToeToggle(u8, u8);
 extern const char* ARP_HMI_GetArpGenOrderText();
+extern s32 ARP_HMI_PersistData();
+extern void ARP_HMI_ARPSettingsPage_RotaryEncoderChanged(s8 increment);
+extern void ARP_HMI_ARPSettingsPage_RotaryEncoderSelected();
+
 
 /////////////////////////////////////////////////////////////////////////////
 // Export global variables
