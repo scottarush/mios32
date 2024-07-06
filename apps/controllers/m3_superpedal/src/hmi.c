@@ -835,6 +835,7 @@ void HMI_HomePage_UpdateDisplay() {
       // Show Root and ModeScale 
       snprintf(lineBuffer, DISPLAY_CHAR_WIDTH + 1, "%s %s",
          ARP_MODES_GetNoteName(ARP_GetRootKey()), SEQ_SCALE_NameGet(ARP_GetModeScale()));
+      HMI_RenderLine(2, lineBuffer, RENDER_LINE_LEFT);
       break;
    default:
 #ifdef DEBUG
