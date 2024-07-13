@@ -530,6 +530,9 @@ void HMI_UpdateIndicators() {
    switch (hmiSettings.toeSwitchMode) {
    case TOE_SWITCH_VOLUME:
       IND_SetIndicatorState(HMI_GetToeVolumeIndex(), IND_ON,100,IND_RAMP_NONE);
+      // Now set the stomp indicator to Green
+      IND_SetIndicatorColor(IND_STOMP_1,IND_COLOR_GREEN);
+      IND_SetIndicatorState(IND_STOMP_1,IND_ON,100,IND_RAMP_NONE);
       break;
    case TOE_SWITCH_OCTAVE:
       // For Octave, pedals 1 and 8 increment/decrement and indicators 2-7 are fixed starting
@@ -545,6 +548,9 @@ void HMI_UpdateIndicators() {
          // Indicators 2 through 7 show direct octave.
          IND_SetIndicatorState(octave - MIN_DIRECT_OCTAVE_NUMBER + 2, IND_ON,100,IND_RAMP_NONE);
       }
+      // Now set the stomp indicator to Red
+      IND_SetIndicatorColor(IND_STOMP_1,IND_COLOR_RED);
+      IND_SetIndicatorState(IND_STOMP_1,IND_ON,100,IND_RAMP_NONE);
       break;
    case TOE_SWITCH_ARP:
       if (octave < MIN_DIRECT_OCTAVE_NUMBER - 1) {
@@ -554,8 +560,8 @@ void HMI_UpdateIndicators() {
          IND_SetBlipIndicator(8, 0, 2.0,100);
       }
       else {
-         // Call separate function in ARP_HMI to handle indicators 2-7
-         ARP_HMI_UpdateArpToeIndicators();
+         // Call separate function in ARP_HMI to handle toe indicators 2-7 and stomp indicator
+         ARP_HMI_UpdateArpIndicators();
       }
       break;
    case TOE_SWITCH_CHORD:

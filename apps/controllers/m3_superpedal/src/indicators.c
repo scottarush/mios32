@@ -20,8 +20,6 @@
 #define DEBUG
 #define DEBUG_MSG MIOS32_MIDI_SendDebugMessage
 
-#define NUM_LED_INDICATORS 8
-
 #define FLASH_FAST_FREQ 5
 #define FLASH_SLOW_FREQ 2
 
@@ -41,11 +39,17 @@
  * Total indicator state is represented by the following struct.
 */
 typedef struct indicator_fullstate_s {
-   indicator_state_t state;
+   indicator_states_t state;
    /*
    * state transitions to target_state after timer_ms expires
    */
-   indicator_state_t target_state;
+   indicator_states_t target_state;
+
+   /*
+   * indicator color, if multi-color
+   */
+   indicator_color_t color;
+
    /*
    * If timer_ms != 0, then the current 'state' is temporary and will transition to
    * the target_state once timer_ms decrements to 0.
@@ -127,12 +131,12 @@ typedef struct indicator_fullstate_s {
 /////////////////////////////////////////////////////////////////////////////
 // Local prototypes
 /////////////////////////////////////////////////////////////////////////////
-u8 IND_GetLEDPin(u8 indicatorNum);
+static u8 IND_GetJ10Pin(indicator_id_t indicatorNum, indicator_color_t color);
 static void IND_UpdateFlashTimer(indicator_fullstate_t* ptr);
 static void IND_UpdateRampTimer(indicator_fullstate_t* ptr);
 void IND_UpdateBrightnessTimer(indicator_fullstate_t* ptr);
 
-static void IND_SetFullIndicatorState(u8 indicatorNum, indicator_state_t state, u8 brightness, float flashFreq, u8 flashDutyCycle, indicator_ramp_t rampMode);
+static void IND_SetFullIndicatorState(indicator_id_t indicatorNum, indicator_states_t state, u8 brightness, float flashFreq, u8 flashDutyCycle, indicator_ramp_t rampMode);
 
 /////////////////////////////////////////////////////////////////////////////
 // Local variables
@@ -144,14 +148,23 @@ static indicator_fullstate_t indicator_states[NUM_LED_INDICATORS];
 /////////////////////////////////////////////////////////////////////////////
 void IND_Init() {
 
-   // Set LED outputs to push-pull on J10B and init all states to OFF
-   for (int i = 0;i < NUM_LED_INDICATORS;i++) {
+   // Set all outputs to push-pull on J10
+   for (int i = 0;i < 16;i++) {
       MIOS32_BOARD_J10_PinInit(i, MIOS32_BOARD_PIN_MODE_OUTPUT_PP);
+   }
+   // Set outputs A6 and A7 on J5 as well
+   MIOS32_BOARD_J5_PinInit(6, MIOS32_BOARD_PIN_MODE_OUTPUT_PP);
+   MIOS32_BOARD_J5_PinInit(7, MIOS32_BOARD_PIN_MODE_OUTPUT_PP);
+
+
+   for (int i = 0;i < NUM_LED_INDICATORS;i++) {
       indicator_fullstate_t* ptr = &indicator_states[i];
       ptr->state = IND_OFF;
+      ptr->color = IND_COLOR_RED;  // Default or ignored      
    }
-   // Set all LEDs to off in the upper 8 bits of J10.
+   // Set all LEDs to off
    MIOS32_BOARD_J10_Set(0);
+
 }
 
 ///////////////////////////////////////////////////////////////////////////
@@ -176,7 +189,7 @@ void IND_1msTick() {
          ptr->timer_ms--;
       }
       // Update the pin in case it changed
-      u8 pinNum = IND_GetLEDPin(i + 1);
+      u8 pinNum = IND_GetJ10Pin(i + 1, ptr->color);
       // And the two outputs
       u8 outputState = ptr->flashOutputState & ptr->brightnessOutputState;
       MIOS32_BOARD_J10_PinSet(pinNum, outputState);
@@ -328,6 +341,7 @@ void IND_ClearAll() {
       ptr->flashOutputState = 0;
    }
    MIOS32_BOARD_J10_Set(0);
+   MIOS32_BOARD_J5_Set(0);
 }
 
 ///////////////////////////////////////////////////////////////////////////
@@ -391,7 +405,7 @@ void IND_SetFlashIndicator(u8 indicatorNum, float frequency, u8 brightness) {
 // state to set the indicator to.
 //
 /////////////////////////////////////////////////////////////////////////////
-void IND_SetIndicatorState(u8 indicatorNum, indicator_state_t state, u8 brightness, indicator_ramp_t rampMode) {
+void IND_SetIndicatorState(u8 indicatorNum, indicator_states_t state, u8 brightness, indicator_ramp_t rampMode) {
    // set the output pin and init the flash timer
    switch (state) {
    case IND_FLASH_FAST:
@@ -417,6 +431,20 @@ void IND_SetIndicatorState(u8 indicatorNum, indicator_state_t state, u8 brightne
    }
 }
 
+
+///////////////////////////////////////////////////////////////////////////
+// Public function sets the indicator color (if multi-colored, otherwise
+// has no effect).
+// indicatorNum:  Number of led starting from left with indicator 1.
+// state to set the indicator to.
+//
+/////////////////////////////////////////////////////////////////////////////
+void IND_SetIndicatorColor(indicator_id_t indicatorNum, indicator_color_t color) {
+   indicator_fullstate_t* ptr = &indicator_states[indicatorNum - 1];
+   ptr->color = color;
+}
+
+
 ///////////////////////////////////////////////////////////////////////////
 // Internal helper function sets the indicator state.
 // indicatorNum:  Number of led starting from left with indicator 1.
@@ -426,7 +454,7 @@ void IND_SetIndicatorState(u8 indicatorNum, indicator_state_t state, u8 brightne
 // flashFreq:  flash frequency in Hz
 // flashDutyCycle: flash duty cycle
 /////////////////////////////////////////////////////////////////////////////
-void IND_SetFullIndicatorState(u8 indicatorNum, indicator_state_t state, u8 brightness, float flashFreq, u8 flashDutyCycle, indicator_ramp_t rampMode) {
+void IND_SetFullIndicatorState(indicator_id_t indicatorNum, indicator_states_t state, u8 brightness, float flashFreq, u8 flashDutyCycle, indicator_ramp_t rampMode) {
    if (indicatorNum > 8) {
       DEBUG_MSG("Invalid indicator number=%d", indicatorNum);
       return;
@@ -473,7 +501,35 @@ void IND_SetFullIndicatorState(u8 indicatorNum, indicator_state_t state, u8 brig
    IND_UpdateRampTimer(ptr);
    // And the two outputs to set the initial state
    u8 outputState = ptr->flashOutputState & ptr->brightnessOutputState;
-   MIOS32_BOARD_J10_PinSet(IND_GetLEDPin(indicatorNum), outputState);
+
+   // Set the output pin in J10 unless its the last two in J5
+   indicator_color_t setColor = ptr->color;
+   if (setColor == IND_COLOR_YELLOW) {
+      setColor = IND_COLOR_RED;  // Set the RED one first
+   }
+   if (indicatorNum <= IND_STOMP_4) {
+      MIOS32_BOARD_J10_PinSet(IND_GetJ10Pin(indicatorNum, setColor), outputState);
+   }
+   else {
+      if (setColor == IND_COLOR_RED) {
+         // Stomp 5 RED on A6
+         MIOS32_BOARD_J5_PinSet(6, outputState);
+      }
+      else if (setColor == IND_COLOR_GREEN){
+         // Stomp 5 Green on A7
+         MIOS32_BOARD_J5_PinSet(7, outputState);         
+      }
+   }
+   // Now set the Green one too if the color is yellow.
+   if (ptr->color == IND_COLOR_YELLOW) {
+      if (indicatorNum <= IND_STOMP_4) {
+         MIOS32_BOARD_J10_PinSet(IND_GetJ10Pin(indicatorNum, IND_COLOR_GREEN), outputState);
+      }
+      else {
+         // Stomp 5 Green on A7
+         MIOS32_BOARD_J5_PinSet(7, outputState);
+      }
+   }
 }
 ///////////////////////////////////////////////////////////////////////////
 // function to change the indicator state temporarily
@@ -482,7 +538,7 @@ void IND_SetFullIndicatorState(u8 indicatorNum, indicator_state_t state, u8 brig
 // duration_ms:  duration of the state in milliseconds
 // targetState:  state to set at the end.
 /////////////////////////////////////////////////////////////////////////////
-void IND_SetTempIndicatorState(u8 indicatorNum, indicator_state_t tempState, u16 duration_ms, indicator_state_t targetState, u8 brightness) {
+void IND_SetTempIndicatorState(u8 indicatorNum, indicator_states_t tempState, u16 duration_ms, indicator_states_t targetState, u8 brightness) {
    if (indicatorNum > 8) {
 
       DEBUG_MSG("Invalid indicator number=%d", indicatorNum);
@@ -506,7 +562,7 @@ void IND_SetTempIndicatorState(u8 indicatorNum, indicator_state_t tempState, u16
 // indicatorNum:  Number of led starting from left with indicator 1.
 // returns 0 for off, 1 for on
 /////////////////////////////////////////////////////////////////////////////
-indicator_state_t IND_GetIndicatorState(u8 indicatorNum) {
+indicator_states_t IND_GetIndicatorState(u8 indicatorNum) {
    if (indicatorNum > NUM_LED_INDICATORS) {
       DEBUG_MSG("Invalid indicator number: %d", indicatorNum);
       return 0;
@@ -521,25 +577,55 @@ indicator_state_t IND_GetIndicatorState(u8 indicatorNum) {
 // Helper function returns the pin for a sepcific indicator
 // indicatorNum:  Number of led starting from left with indicator 1.
 // returns pin number on J10.
+// color: for multi-color indicators to disambiguate the pin
 //////////////////////////////////////////////////////////////////////////
-u8 IND_GetLEDPin(u8 indicatorNum) {
+u8 IND_GetJ10Pin(indicator_id_t indicatorNum, indicator_color_t color) {
    switch (indicatorNum) {
-   case 1:
+   case IND_TOE_1:
       return 15;
-   case 2:
+   case IND_TOE_2:
       return 13;
-   case 3:
+   case IND_TOE_3:
       return 11;
-   case 4:
+   case IND_TOE_4:
       return 9;
-   case 5:
+   case IND_TOE_5:
       return 14;
-   case 6:
+   case IND_TOE_6:
       return 12;
-   case 7:
+   case IND_TOE_7:
       return 10;
-   case 8:
+   case IND_TOE_8:
       return 8;
+   case IND_STOMP_1:
+      if (color == IND_COLOR_RED) {
+         return 0;
+      }
+      else {
+         return 2;
+      }
+   case IND_STOMP_2:
+      if (color == IND_COLOR_RED) {
+         return 4;
+      }
+      else {
+         return 6;
+      }
+   case IND_STOMP_3:
+      if (color == IND_COLOR_RED) {
+         return 1;
+      }
+      else {
+         return 3;
+      }
+   case IND_STOMP_4:
+      if (color == IND_COLOR_RED) {
+         return 5;
+      }
+      else {
+         return 7;
+      }
+   default:
+      return 255;  // Invalid, but cannot happen
    }
-   return 255;  // Invalid, but cannot happen
 }
