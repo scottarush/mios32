@@ -345,11 +345,11 @@ void IND_ClearAll() {
 }
 
 ///////////////////////////////////////////////////////////////////////////
-// Sets all Indicators to Flash.
+// Sets all to Indicators to Flash.
 // flashFast flag:  0 = flash slow, 1 flash fast
 ///////////////////////////////////////////////////////////////////////////
 void IND_FlashAll(u8 flashFast) {
-   for (int i = 0;i < NUM_LED_INDICATORS;i++) {
+   for (int i = 0;i < 8;i++) {
       indicator_fullstate_t* ptr = &indicator_states[i];
       ptr->flash_timer_duty_cycle_percent = 50;
 
@@ -455,8 +455,8 @@ void IND_SetIndicatorColor(indicator_id_t indicatorNum, indicator_color_t color)
 // flashDutyCycle: flash duty cycle
 /////////////////////////////////////////////////////////////////////////////
 void IND_SetFullIndicatorState(indicator_id_t indicatorNum, indicator_states_t state, u8 brightness, float flashFreq, u8 flashDutyCycle, indicator_ramp_t rampMode) {
-   if (indicatorNum > 8) {
-      DEBUG_MSG("Invalid indicator number=%d", indicatorNum);
+   if (indicatorNum > NUM_LED_INDICATORS) {
+      DEBUG_MSG("Invalid indicator id=%d", indicatorNum);
       return;
    }
 #ifdef DEBUG
@@ -538,10 +538,10 @@ void IND_SetFullIndicatorState(indicator_id_t indicatorNum, indicator_states_t s
 // duration_ms:  duration of the state in milliseconds
 // targetState:  state to set at the end.
 /////////////////////////////////////////////////////////////////////////////
-void IND_SetTempIndicatorState(u8 indicatorNum, indicator_states_t tempState, u16 duration_ms, indicator_states_t targetState, u8 brightness) {
-   if (indicatorNum > 8) {
+void IND_SetTempIndicatorState(indicator_id_t indicatorNum, indicator_states_t tempState, u16 duration_ms, indicator_states_t targetState, u8 brightness) {
+   if (indicatorNum > NUM_LED_INDICATORS) {
 
-      DEBUG_MSG("Invalid indicator number=%d", indicatorNum);
+      DEBUG_MSG("Invalid indicator id=%d", indicatorNum);
       return;
    }
 #ifdef DEBUG
