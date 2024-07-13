@@ -358,7 +358,7 @@ void HMI_NotifyToeToggle(u8 toeNum, u8 pressed, s32 timestamp) {
          // Toe switch numbers 2 through 7 are presets
          const midi_preset_num_t presetNum = {
             .bankNumber = hmiSettings.currentToeSwitchGenMIDIPresetBank,
-            .bankIndex = toeNum - 1 };
+            .presetBankIndex = toeNum - 1 };
 
          const midi_preset_num_t* ptr = MIDI_PRESETS_ActivateGenMIDIPreset(&presetNum);
          if (ptr != NULL) {
@@ -531,8 +531,8 @@ void HMI_UpdateIndicators() {
    case TOE_SWITCH_VOLUME:
       IND_SetIndicatorState(HMI_GetToeVolumeIndex(), IND_ON,100,IND_RAMP_NONE);
       // Now set the stomp indicator to Green
-      IND_SetIndicatorColor(IND_STOMP_1,IND_COLOR_GREEN);
-      IND_SetIndicatorState(IND_STOMP_1,IND_ON,100,IND_RAMP_NONE);
+      IND_SetIndicatorColor(IND_STOMP_5,IND_COLOR_GREEN);
+      IND_SetIndicatorState(IND_STOMP_5,IND_ON,100,IND_RAMP_NONE);
       break;
    case TOE_SWITCH_OCTAVE:
       // For Octave, pedals 1 and 8 increment/decrement and indicators 2-7 are fixed starting
@@ -548,9 +548,9 @@ void HMI_UpdateIndicators() {
          // Indicators 2 through 7 show direct octave.
          IND_SetIndicatorState(octave - MIN_DIRECT_OCTAVE_NUMBER + 2, IND_ON,100,IND_RAMP_NONE);
       }
-      // Now set the stomp indicator to Yellow
-      IND_SetIndicatorColor(IND_STOMP_1,IND_COLOR_YELLOW);
-      IND_SetIndicatorState(IND_STOMP_1,IND_ON,100,IND_RAMP_NONE);
+      // Now set the stomp indicator to RED
+      IND_SetIndicatorColor(IND_STOMP_5,IND_COLOR_RED);
+      IND_SetIndicatorState(IND_STOMP_5,IND_ON,100,IND_RAMP_NONE);
       break;
    case TOE_SWITCH_ARP:
       if (octave < MIN_DIRECT_OCTAVE_NUMBER - 1) {
@@ -572,11 +572,33 @@ void HMI_UpdateIndicators() {
       // are currently on that bank.
       const midi_preset_num_t* presetNum = MIDI_PRESETS_GetLastActivatedGenMIDIPreset();
       if (presetNum->bankNumber == hmiSettings.currentToeSwitchGenMIDIPresetBank) {
-         IND_SetIndicatorState(presetNum->bankIndex + 1, IND_ON,100,IND_RAMP_NONE);
+         IND_SetIndicatorState(presetNum->presetBankIndex + 1, IND_ON,100,IND_RAMP_NONE);
       }
+      // And set the color of the stomp indicator according to the bank for additional visibility
+      // Flash the 4th bank since we only have 3 colors
+      indicator_color_t color = IND_COLOR_RED;
+      indicator_states_t state = IND_ON;
+      switch(hmiSettings.currentToeSwitchGenMIDIPresetBank){
+         case 1:  
+         color = IND_COLOR_RED;
+         break;
+         case 2:
+         color = IND_COLOR_YELLOW;
+         break;
+         case 3:
+         color = IND_COLOR_GREEN;
+         break;
+         case 4:
+         color = IND_COLOR_GREEN;
+         state = IND_FLASH_SLOW;
+         break;
+      }
+      IND_SetIndicatorColor(IND_STOMP_2,color);
+      IND_SetIndicatorState(IND_STOMP_2,state,100,IND_RAMP_NONE);
       break;
    case TOE_SWITCH_PATTERN_PRESETS:
-      // TODO;
+      IND_SetIndicatorColor(IND_STOMP_1,IND_COLOR_YELLOW);
+      IND_SetIndicatorState(IND_STOMP_1,IND_ON,100,IND_RAMP_NONE);
       break;
    }
 
@@ -1053,7 +1075,7 @@ void HMI_MIDIProgramSelectPage_RotaryEncoderSelected() {
       // Update the indicators
       HMI_UpdateIndicators();
       // And then flash the newly replaced preset
-      IND_SetTempIndicatorState(presetNum->bankIndex + 1, IND_FLASH_FAST, 
+      IND_SetTempIndicatorState(presetNum->presetBankIndex + 1, IND_FLASH_FAST, 
          IND_TEMP_FLASH_STATE_DEFAULT_DURATION, IND_ON,100);
    }
 

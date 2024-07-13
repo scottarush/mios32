@@ -102,7 +102,7 @@ typedef struct {
 
    u8 numToeSwitchGenMIDIPresetBanks;
 
-   // Banks start at 0.
+   // Banks start at 1.
    u8 currentToeSwitchGenMIDIPresetBank;
    
    // presetNumbers for toe switch gen MIDI presets. 0 is unset

@@ -38,7 +38,7 @@ typedef struct midi_preset_num_s {
    // from 1..Number of Banks
    u8 bankNumber;
    // from 1..Number of Presets per Bank
-   u8 bankIndex;
+   u8 presetBankIndex;
 } midi_preset_num_t;
 
 typedef struct {   

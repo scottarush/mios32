@@ -152,9 +152,10 @@ void IND_Init() {
    for (int i = 0;i < 16;i++) {
       MIOS32_BOARD_J10_PinInit(i, MIOS32_BOARD_PIN_MODE_OUTPUT_PP);
    }
-   // Set outputs A6 and A7 on J5 as well
-   MIOS32_BOARD_J5_PinInit(6, MIOS32_BOARD_PIN_MODE_OUTPUT_PP);
-   MIOS32_BOARD_J5_PinInit(7, MIOS32_BOARD_PIN_MODE_OUTPUT_PP);
+   // Set J5A and B all to push-pull even though we only need J5B A7 and A6
+   for (int i = 0;i < 8;i++) {
+      MIOS32_BOARD_J5_PinInit(i, MIOS32_BOARD_PIN_MODE_OUTPUT_PP);
+   }
 
 
    for (int i = 0;i < NUM_LED_INDICATORS;i++) {
@@ -164,7 +165,7 @@ void IND_Init() {
    }
    // Set all LEDs to off
    MIOS32_BOARD_J10_Set(0);
-
+   MIOS32_BOARD_J5_Set(0);
 }
 
 ///////////////////////////////////////////////////////////////////////////
@@ -378,7 +379,7 @@ void IND_FlashAll(u8 flashFast) {
 // indicatorNum:  Number of led starting from left with indicator 1.
 //
 /////////////////////////////////////////////////////////////////////////////
-void IND_SetBlipIndicator(u8 indicatorNum, u8 inverse, float frequency, u8 brightness) {
+void IND_SetBlipIndicator(indicator_id_t indicatorNum, u8 inverse, float frequency, u8 brightness) {
    if (inverse) {
       IND_SetFullIndicatorState(indicatorNum,
          IND_FLASH_INVERSE_BLIP, brightness,
@@ -508,26 +509,32 @@ void IND_SetFullIndicatorState(indicator_id_t indicatorNum, indicator_states_t s
    if (setColor == IND_COLOR_YELLOW) {
       setColor = IND_COLOR_RED;  // Set the RED one first
    }
-   if (indicatorNum <= IND_STOMP_4) {
-      MIOS32_BOARD_J10_PinSet(IND_GetJ10Pin(indicatorNum, setColor), outputState);
-   }
-   else {
+   if (indicatorNum == IND_STOMP_1){
+      // STOMP_1 is on J5
       if (setColor == IND_COLOR_RED) {
-         // Stomp 5 RED on A6
+         // Stomp 1 RED on A6
          MIOS32_BOARD_J5_PinSet(6, outputState);
       }
-      else if (setColor == IND_COLOR_GREEN){
-         // Stomp 5 Green on A7
-         MIOS32_BOARD_J5_PinSet(7, outputState);         
+      else {
+         // Stomp 1 Green on A7
+         s32 error = MIOS32_BOARD_J5_PinSet(7, outputState);         
+#ifdef DEBUG
+         s32 pinState = MIOS32_BOARD_J5_PinGet(7);
+         DEBUG_MSG("IND_SetFullIndicatorState:  Set A7 to %d, read state %d, error=%d",outputState,pinState,error);
+#endif
       }
+   }
+   else {
+      // The rest are on J10
+      MIOS32_BOARD_J10_PinSet(IND_GetJ10Pin(indicatorNum, setColor), outputState);
    }
    // Now set the Green one too if the color is yellow.
    if (ptr->color == IND_COLOR_YELLOW) {
-      if (indicatorNum <= IND_STOMP_4) {
+      if (indicatorNum != IND_STOMP_1) {
          MIOS32_BOARD_J10_PinSet(IND_GetJ10Pin(indicatorNum, IND_COLOR_GREEN), outputState);
       }
       else {
-         // Stomp 5 Green on A7
+         // Stomp 1 Green on A7
          MIOS32_BOARD_J5_PinSet(7, outputState);
       }
    }
@@ -598,19 +605,12 @@ u8 IND_GetJ10Pin(indicator_id_t indicatorNum, indicator_color_t color) {
       return 10;
    case IND_TOE_8:
       return 8;
-   case IND_STOMP_1:
-      if (color == IND_COLOR_RED) {
-         return 0;
-      }
-      else {
-         return 2;
-      }
    case IND_STOMP_2:
       if (color == IND_COLOR_RED) {
-         return 4;
+         return 5;
       }
       else {
-         return 6;
+         return 7;
       }
    case IND_STOMP_3:
       if (color == IND_COLOR_RED) {
@@ -621,10 +621,17 @@ u8 IND_GetJ10Pin(indicator_id_t indicatorNum, indicator_color_t color) {
       }
    case IND_STOMP_4:
       if (color == IND_COLOR_RED) {
-         return 5;
+         return 4;
       }
       else {
-         return 7;
+         return 6;
+      }
+   case IND_STOMP_5:
+      if (color == IND_COLOR_RED) {
+         return 0;
+      }
+      else {
+         return 2;
       }
    default:
       return 255;  // Invalid, but cannot happen

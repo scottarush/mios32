@@ -244,8 +244,8 @@ void ARP_HMI_UpdateArpIndicators() {
    if (ARP_GetEnabled()) {
       color = IND_COLOR_RED;
    }
-   IND_SetIndicatorColor(IND_STOMP_2, color);
-   IND_SetIndicatorState(IND_STOMP_2, IND_ON, 100, IND_RAMP_NONE);
+   IND_SetIndicatorColor(IND_STOMP_4, color);
+   IND_SetIndicatorState(IND_STOMP_4, IND_ON, 100, IND_RAMP_NONE);
 
    // TODO the rest
    // IND_SetIndicatorState(1, IND_FLASH_BLIP);

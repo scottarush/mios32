@@ -153,7 +153,7 @@ void MIDI_PRESETS_Init() {
       }
       // Default to preset 1
       presets.lastActivatedGenMIDIPresetNumber.bankNumber = 1;
-      presets.lastActivatedGenMIDIPresetNumber.bankIndex = 1;
+      presets.lastActivatedGenMIDIPresetNumber.presetBankIndex = 1;
       MIDI_PRESETS_PersistData();
    }
 
@@ -204,11 +204,11 @@ const midi_preset_num_t* MIDI_PRESETS_ActivateGenMIDIPreset(const midi_preset_nu
       DEBUG_MSG("MIDI_PRESETS_ActivateGenMIDIPreset: Invalid bankNumber: %d", presetNum->bankNumber);
       return NULL;
    }
-   if ((presetNum->bankIndex == 0) || (presetNum->bankIndex > MAX_NUM_PRESETS_PER_BANK)) {
-      DEBUG_MSG("MIDI_PRESETS_ActivateGenMIDIPreset: Invalid bankIndex: %d", presetNum->bankIndex);
+   if ((presetNum->presetBankIndex == 0) || (presetNum->presetBankIndex > MAX_NUM_PRESETS_PER_BANK)) {
+      DEBUG_MSG("MIDI_PRESETS_ActivateGenMIDIPreset: Invalid presetBankIndex: %d", presetNum->presetBankIndex);
       return NULL;
    }
-   midi_preset_t* ptr = &presets.generalMidiPresets[presetNum->bankNumber - 1][presetNum->bankIndex - 1];
+   midi_preset_t* ptr = &presets.generalMidiPresets[presetNum->bankNumber - 1][presetNum->presetBankIndex - 1];
 
    MIDI_PRESETS_ActivateMIDIVoice(ptr->programNumber, ptr->midiBankNumber, ptr->midiPorts, ptr->midiChannel);
 
@@ -217,7 +217,7 @@ const midi_preset_num_t* MIDI_PRESETS_ActivateGenMIDIPreset(const midi_preset_nu
 
    // Save last activate preset number
    presets.lastActivatedGenMIDIPresetNumber.bankNumber = presetNum->bankNumber;
-   presets.lastActivatedGenMIDIPresetNumber.bankIndex = presetNum->bankIndex;
+   presets.lastActivatedGenMIDIPresetNumber.presetBankIndex = presetNum->presetBankIndex;
    // And persist
    MIDI_PRESETS_PersistData();
 
@@ -255,7 +255,7 @@ u8 MIDI_PRESETS_ActivateMIDIVoice(u8 programNumber, u8 midiBankNumber, u8 midiPo
 // presetPtr:  point to client-side filled preset object which will be copied
 //             into persisted storage
 // bankNumber:  bank number from 1 to MAX_NUM_GEN_MIDI_PRESET_BANKS
-// bankIndex:  index of preset from 1 to MAX_NUM_PRESETS_PER_BANK
+// presetBankIndex:  index of preset from 1 to MAX_NUM_PRESETS_PER_BANK
 // returns: pointer to updated preset on success, NULL on invalid preset data
 /////////////////////////////////////////////////////////////////////////////
 const midi_preset_t* MIDI_PRESETS_SetGenMIDIPreset(const midi_preset_num_t* presetNum, const midi_preset_t* setPresetPtr) {
@@ -263,11 +263,11 @@ const midi_preset_t* MIDI_PRESETS_SetGenMIDIPreset(const midi_preset_num_t* pres
       DEBUG_MSG("MIDI_PRESETS_ActivateGenMIDIPreset: Invalid bankNumber: %d", presetNum->bankNumber);
       return NULL;
    }
-   if ((presetNum->bankIndex == 0) || (presetNum->bankIndex > MAX_NUM_PRESETS_PER_BANK)) {
-      DEBUG_MSG("MIDI_PRESETS_ActivateGenMIDIPreset: Invalid bankIndex: %d", presetNum->bankIndex);
+   if ((presetNum->presetBankIndex == 0) || (presetNum->presetBankIndex > MAX_NUM_PRESETS_PER_BANK)) {
+      DEBUG_MSG("MIDI_PRESETS_ActivateGenMIDIPreset: Invalid presetBankIndex: %d", presetNum->presetBankIndex);
       return NULL;
    }
-   midi_preset_t* ptr = &presets.generalMidiPresets[presetNum->bankNumber - 1][presetNum->bankIndex - 1];
+   midi_preset_t* ptr = &presets.generalMidiPresets[presetNum->bankNumber - 1][presetNum->presetBankIndex - 1];
    // TODO:  Validate programNumber, midiBankNumber, etc.
    ptr->programNumber = setPresetPtr->programNumber;
    ptr->midiBankNumber = setPresetPtr->midiBankNumber;
@@ -291,13 +291,13 @@ const midi_preset_t* MIDI_PRESETS_GetGenMidiPreset(const midi_preset_num_t* pres
       DEBUG_MSG("MIDI_PRESETS_ActivateGenMIDIPreset: Invalid bankNumber: %d", presetNum->bankNumber );
       return NULL;
    }
-   if ((presetNum->bankIndex == 0) || (presetNum->bankIndex > MAX_NUM_PRESETS_PER_BANK)) {
-      DEBUG_MSG("MIDI_PRESETS_ActivateGenMIDIPreset: Invalid bankIndex: %d", presetNum->bankIndex );
+   if ((presetNum->presetBankIndex == 0) || (presetNum->presetBankIndex > MAX_NUM_PRESETS_PER_BANK)) {
+      DEBUG_MSG("MIDI_PRESETS_ActivateGenMIDIPreset: Invalid presetBankIndex: %d", presetNum->presetBankIndex );
       return NULL;
    }
-   midi_preset_t* ptr = &presets.generalMidiPresets[presetNum->bankNumber - 1][presetNum->bankIndex - 1];
+   midi_preset_t* ptr = &presets.generalMidiPresets[presetNum->bankNumber - 1][presetNum->presetBankIndex - 1];
 #ifdef DEBUG
-   DEBUG_MSG("MIDI_PRESETS_GetMidiPreset: bank%d index%d progNumber=%d", presetNum->bankNumber, presetNum->bankIndex , ptr->programNumber);
+   DEBUG_MSG("MIDI_PRESETS_GetMidiPreset: bank%d index%d progNumber=%d", presetNum->bankNumber, presetNum->presetBankIndex , ptr->programNumber);
 #endif
    return ptr;
 }
