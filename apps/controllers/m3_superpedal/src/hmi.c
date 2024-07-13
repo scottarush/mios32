@@ -28,7 +28,7 @@
 #include "persist.h"
 
 #define DEBUG_MSG MIOS32_MIDI_SendDebugMessage
-#define DEBUG
+#undef DEBUG
 #undef HW_DEBUG
 
 //----------------------------------------------------------------------------
@@ -125,6 +125,8 @@ void HMI_MIDIProgramSelectPage_BackButtonCallback();
 s32 HMI_PersistData();
 void HMI_UpdateOctaveIncDecIndicators();
 u8 HMI_GetToeVolumeIndex();
+
+void HMI_HandleVoicePresetsToeToggle(u8 toeNum);
 
 /////////////////////////////////////////////////////////////////////////////
 // called at Init to initialize the HMI
@@ -338,43 +340,14 @@ void HMI_NotifyToeToggle(u8 toeNum, u8 pressed, s32 timestamp) {
       // Get the volumeLevel corresponding to the pressed switch
       u8 volumeLevel = toeVolumeLevels[toeNum - 1];
       // Set the volume in PEDALS
-      PEDALS_SetVolume(volumeLevel);
+      PEDALS_SetVelocity(volumeLevel);
       // Update the indicators
       HMI_UpdateIndicators();
       // And update the current page display
       pCurrentPage->pUpdateDisplayCallback();
       break;
    case TOE_SWITCH_VOICE_PRESETS:
-      switch (toeNum) {
-      case 1:
-         // Toe 1 decrements octave
-         PEDALS_SetOctave(PEDALS_GetOctave() - 1);
-         break;
-      case 8:
-         // Toenum 8 always increments
-         PEDALS_SetOctave(PEDALS_GetOctave() + 1);
-         break;
-      default:
-         // Toe switch numbers 2 through 7 are presets
-         const midi_preset_num_t presetNum = {
-            .bankNumber = hmiSettings.currentToeSwitchGenMIDIPresetBank,
-            .presetBankIndex = toeNum - 1 };
-
-         const midi_preset_num_t* ptr = MIDI_PRESETS_ActivateGenMIDIPreset(&presetNum);
-         if (ptr != NULL) {
-            //  IND_SetTempIndicatorState(toeNum, IND_FLASH_FAST, IND_TEMP_FLASH_STATE_DEFAULT_DURATION, IND_ON);
-            // Update the indicators
-            HMI_UpdateIndicators();
-            // And update the current page display
-            pCurrentPage->pUpdateDisplayCallback();
-         }
-         else {
-            // Invalid preset.  Flash and then off
-            IND_SetTempIndicatorState(toeNum, IND_FLASH_FAST, 
-               IND_TEMP_FLASH_STATE_DEFAULT_DURATION, IND_OFF,100);
-         }
-         break;
-      }
+      HMI_HandleVoicePresetsToeToggle(toeNum);
       break;
    case TOE_SWITCH_PATTERN_PRESETS:
 
@@ -469,7 +442,7 @@ void HMI_NotifyStompToggle(u8 stompNum, u8 pressed, s32 timestamp) {
          }
       }
       else {
-         // switch into preset mode
+         // just switch into preset mode
          hmiSettings.toeSwitchMode = TOE_SWITCH_VOICE_PRESETS;
       }
       break;
@@ -477,14 +450,17 @@ void HMI_NotifyStompToggle(u8 stompNum, u8 pressed, s32 timestamp) {
       hmiSettings.toeSwitchMode = TOE_SWITCH_PATTERN_PRESETS;
       break;
    case STOMP_SWITCH_ARPEGGIATOR:
-      if (ARP_GetArpMode() != ARP_MODE_CHORD_ARP) {
-         ARP_SetArpMode(ARP_MODE_CHORD_ARP);
-         // And turn on Arpeggiator
-         ARP_SetEnabled(1);
-      }
-      else {
-         // Toggle the run state
-         ARP_SetEnabled(!ARP_GetEnabled());
+      if (hmiSettings.toeSwitchMode == TOE_SWITCH_ARP) {
+         // Already selected toe mode so toggle it
+         if (ARP_GetArpMode() != ARP_MODE_CHORD_ARP) {
+            ARP_SetArpMode(ARP_MODE_CHORD_ARP);
+            // And turn on Arpeggiator
+            ARP_SetEnabled(1);
+         }
+         else {
+            // Toggle the run state
+            ARP_SetEnabled(!ARP_GetEnabled());
+         }
       }
       hmiSettings.toeSwitchMode = TOE_SWITCH_ARP;
       // Set to home page
@@ -492,13 +468,16 @@ void HMI_NotifyStompToggle(u8 stompNum, u8 pressed, s32 timestamp) {
       break;
    case STOMP_SWITCH_CHORD_PAD:
       // Got to Chord Pad mode.  If already there then toggle the enable state
-      if (ARP_GetArpMode() != ARP_MODE_CHORD_PAD) {
-         ARP_SetArpMode(ARP_MODE_CHORD_PAD);
-         ARP_SetEnabled(1);
-      }
-      else {
-         // Toggle the ARP on/off
-         ARP_SetEnabled(!ARP_GetEnabled());
+      if (hmiSettings.toeSwitchMode == TOE_SWITCH_CHORD) {
+
+         if (ARP_GetArpMode() != ARP_MODE_CHORD_PAD) {
+            ARP_SetArpMode(ARP_MODE_CHORD_PAD);
+            ARP_SetEnabled(1);
+         }
+         else {
+            // Toggle the ARP on/off
+            ARP_SetEnabled(!ARP_GetEnabled());
+         }
       }
       hmiSettings.toeSwitchMode = TOE_SWITCH_CHORD;
       // Set to home page
@@ -518,7 +497,66 @@ void HMI_NotifyStompToggle(u8 stompNum, u8 pressed, s32 timestamp) {
    // update the current page display
    pCurrentPage->pUpdateDisplayCallback();
 }
+/////////////////////////////////////////////////////////////////////////////
+// Helper to process a toe switch preset when in voice presets mode.
+/////////////////////////////////////////////////////////////////////////////
+void HMI_HandleVoicePresetsToeToggle(u8 toeNum) {
+   switch (toeNum) {
+   case 1:
+      // Toe 1 decrements octave
+      PEDALS_SetOctave(PEDALS_GetOctave() - 1);
+      break;
+   case 8:
+      // Toenum 8 always increments
+      PEDALS_SetOctave(PEDALS_GetOctave() + 1);
+      break;
+   default:
+      // Toe switch numbers 2 through 7 are presets
 
+      // Get the current preset and check if it is already selected or a change
+      const midi_preset_num_t presetNum = {
+         .bankNumber = hmiSettings.currentToeSwitchGenMIDIPresetBank,
+         .presetBankIndex = toeNum - 1 };
+      const midi_preset_num_t* presetNumPtr = MIDI_PRESETS_GetLastActivatedGenMIDIPreset();
+      if ((presetNum.bankNumber == presetNumPtr->bankNumber) && (presetNum.presetBankIndex == presetNumPtr->presetBankIndex)) {
+         // This is the same one so just update the preset with the current octave and volume setting
+         midi_preset_t curPreset;
+         if (MIDI_PRESETS_CopyPreset(presetNumPtr, &curPreset) == NULL) {
+            DEBUG_MSG("HMI_NotifyToeToggle:  Invalid presetNum in call to MIDI_PRESETS_CopyPreset");
+         }
+         else {
+            // Update the preset with octave and volume
+            curPreset.octave = PEDALS_GetOctave();
+            curPreset.velocity = PEDALS_GetVolume();
+            MIDI_PRESETS_SetGenMIDIPreset(presetNumPtr, &curPreset);
+            // Temporarily flash the updated one
+            IND_SetTempIndicatorState(toeNum, IND_FLASH_FAST, IND_TEMP_FLASH_STATE_DEFAULT_DURATION, IND_ON, 100);
+         }
+      }
+      else {
+         // Preset is a different one so activate it
+         const midi_preset_num_t* ptr = MIDI_PRESETS_ActivateGenMIDIPreset(&presetNum);
+
+         if (ptr != NULL) {
+            // Update the volume and octave to this preset
+            PEDALS_SetOctave(MIDI_PRESETS_GetGenMidiPreset(ptr)->octave);
+            PEDALS_SetVelocity(MIDI_PRESETS_GetGenMidiPreset(ptr)->velocity);
+            // Update the indicators
+            HMI_UpdateIndicators();
+            // And update the current page display
+            pCurrentPage->pUpdateDisplayCallback();
+            // And set the current program number so a rotation of the encoder starts at this one
+            hmiSettings.lastSelectedMIDIProgNumber = MIDI_PRESETS_GetGenMidiPreset(ptr)->programNumber;
+         }
+         else {
+            // Invalid preset.  Flash and then off
+            IND_SetTempIndicatorState(toeNum, IND_FLASH_FAST,
+               IND_TEMP_FLASH_STATE_DEFAULT_DURATION, IND_OFF, 100);
+         }
+      }
+      break;
+   }
+}
 /////////////////////////////////////////////////////////////////////////////
 // Helper to restore the indicators based on the toe switch mode.
 /////////////////////////////////////////////////////////////////////////////
@@ -529,35 +567,35 @@ void HMI_UpdateIndicators() {
    s8 octave = PEDALS_GetOctave();
    switch (hmiSettings.toeSwitchMode) {
    case TOE_SWITCH_VOLUME:
-      IND_SetIndicatorState(HMI_GetToeVolumeIndex(), IND_ON,100,IND_RAMP_NONE);
+      IND_SetIndicatorState(HMI_GetToeVolumeIndex(), IND_ON, 100, IND_RAMP_NONE);
       // Now set the stomp indicator to Green
-      IND_SetIndicatorColor(IND_STOMP_5,IND_COLOR_GREEN);
-      IND_SetIndicatorState(IND_STOMP_5,IND_ON,100,IND_RAMP_NONE);
+      IND_SetIndicatorColor(IND_STOMP_5, IND_COLOR_GREEN);
+      IND_SetIndicatorState(IND_STOMP_5, IND_ON, 100, IND_RAMP_NONE);
       break;
    case TOE_SWITCH_OCTAVE:
       // For Octave, pedals 1 and 8 increment/decrement and indicators 2-7 are fixed starting
       // at MIN_DIRECT_OCTAVE_NUMBER.  On the first click below this, indicator 1 is solid,
       // one more click down it blips.  Same behavior on the top side with indicator 8.
       if (octave < MIN_DIRECT_OCTAVE_NUMBER - 1) {
-         IND_SetBlipIndicator(1, 0, 2.0,100);
+         IND_SetBlipIndicator(1, 0, 2.0, 100);
       }
       else if (octave > MIN_DIRECT_OCTAVE_NUMBER + 6) {
-         IND_SetBlipIndicator(8, 0, 2.0,100);
+         IND_SetBlipIndicator(8, 0, 2.0, 100);
       }
       else {
          // Indicators 2 through 7 show direct octave.
-         IND_SetIndicatorState(octave - MIN_DIRECT_OCTAVE_NUMBER + 2, IND_ON,100,IND_RAMP_NONE);
+         IND_SetIndicatorState(octave - MIN_DIRECT_OCTAVE_NUMBER + 2, IND_ON, 100, IND_RAMP_NONE);
       }
       // Now set the stomp indicator to RED
-      IND_SetIndicatorColor(IND_STOMP_5,IND_COLOR_RED);
-      IND_SetIndicatorState(IND_STOMP_5,IND_ON,100,IND_RAMP_NONE);
+      IND_SetIndicatorColor(IND_STOMP_5, IND_COLOR_RED);
+      IND_SetIndicatorState(IND_STOMP_5, IND_ON, 100, IND_RAMP_NONE);
       break;
    case TOE_SWITCH_ARP:
       if (octave < MIN_DIRECT_OCTAVE_NUMBER - 1) {
-         IND_SetBlipIndicator(1, 0, 2.0,100);
+         IND_SetBlipIndicator(1, 0, 2.0, 100);
       }
       else if (octave > MIN_DIRECT_OCTAVE_NUMBER + 6) {
-         IND_SetBlipIndicator(8, 0, 2.0,100);
+         IND_SetBlipIndicator(8, 0, 2.0, 100);
       }
       else {
          // Call separate function in ARP_HMI to handle toe indicators 2-7 and stomp indicator
@@ -572,33 +610,33 @@ void HMI_UpdateIndicators() {
       // are currently on that bank.
       const midi_preset_num_t* presetNum = MIDI_PRESETS_GetLastActivatedGenMIDIPreset();
       if (presetNum->bankNumber == hmiSettings.currentToeSwitchGenMIDIPresetBank) {
-         IND_SetIndicatorState(presetNum->presetBankIndex + 1, IND_ON,100,IND_RAMP_NONE);
+         IND_SetIndicatorState(presetNum->presetBankIndex + 1, IND_ON, 100, IND_RAMP_NONE);
       }
       // And set the color of the stomp indicator according to the bank for additional visibility
       // Flash the 4th bank since we only have 3 colors
       indicator_color_t color = IND_COLOR_RED;
       indicator_states_t state = IND_ON;
-      switch(hmiSettings.currentToeSwitchGenMIDIPresetBank){
-         case 1:  
+      switch (hmiSettings.currentToeSwitchGenMIDIPresetBank) {
+      case 1:
          color = IND_COLOR_RED;
          break;
-         case 2:
+      case 2:
          color = IND_COLOR_YELLOW;
          break;
-         case 3:
+      case 3:
          color = IND_COLOR_GREEN;
          break;
-         case 4:
+      case 4:
          color = IND_COLOR_GREEN;
          state = IND_FLASH_SLOW;
          break;
       }
-      IND_SetIndicatorColor(IND_STOMP_2,color);
-      IND_SetIndicatorState(IND_STOMP_2,state,100,IND_RAMP_NONE);
+      IND_SetIndicatorColor(IND_STOMP_2, color);
+      IND_SetIndicatorState(IND_STOMP_2, state, 100, IND_RAMP_NONE);
       break;
    case TOE_SWITCH_PATTERN_PRESETS:
-      IND_SetIndicatorColor(IND_STOMP_1,IND_COLOR_YELLOW);
-      IND_SetIndicatorState(IND_STOMP_1,IND_ON,100,IND_RAMP_NONE);
+      IND_SetIndicatorColor(IND_STOMP_1, IND_COLOR_YELLOW);
+      IND_SetIndicatorState(IND_STOMP_1, IND_ON, 100, IND_RAMP_NONE);
       break;
    }
 
@@ -897,7 +935,7 @@ void HMI_HomePage_RotaryEncoderChanged(s8 increment) {
       break;
    case TOE_SWITCH_VOLUME:
       // Change the volume directly
-      PEDALS_SetVolume(PEDALS_GetVolume() + increment);
+      PEDALS_SetVelocity(PEDALS_GetVolume() + increment);
       break;
    default:
       return;
@@ -1075,8 +1113,8 @@ void HMI_MIDIProgramSelectPage_RotaryEncoderSelected() {
       // Update the indicators
       HMI_UpdateIndicators();
       // And then flash the newly replaced preset
-      IND_SetTempIndicatorState(presetNum->presetBankIndex + 1, IND_FLASH_FAST, 
-         IND_TEMP_FLASH_STATE_DEFAULT_DURATION, IND_ON,100);
+      IND_SetTempIndicatorState(presetNum->presetBankIndex + 1, IND_FLASH_FAST,
+         IND_TEMP_FLASH_STATE_DEFAULT_DURATION, IND_ON, 100);
    }
 
    // Go back to the home page 
@@ -1094,6 +1132,8 @@ void HMI_MIDIProgramSelectPage_BackButtonCallback() {
    // last one.
    const midi_preset_num_t* preset = MIDI_PRESETS_GetLastActivatedGenMIDIPreset();
    MIDI_PRESETS_ActivateGenMIDIPreset(preset);
+   // And restore the pointer in the program number to the preset
+   hmiSettings.lastSelectedMIDIProgNumber = MIDI_PRESETS_GetGenMidiPreset(preset)->programNumber;
 }
 
 /////////////////////////////////////////////////////////////////////////////

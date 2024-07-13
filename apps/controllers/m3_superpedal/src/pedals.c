@@ -382,7 +382,7 @@ s8 PEDALS_GetOctave() {
 // The E2 block will be updated automatically on change.
 // volumeLevel:  from 1 to PEDALS_MAX_VOLUME
 /////////////////////////////////////////////////////////////////////////////
-void PEDALS_SetVolume(u8 volumeLevel) {
+void PEDALS_SetVelocity(u8 volumeLevel) {
    if (pedal_config.volumeLevel != volumeLevel) {
       pedal_config.volumeLevel = volumeLevel;
       PEDALS_PersistData();

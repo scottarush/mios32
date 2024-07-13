@@ -17,7 +17,7 @@
 #include <mios32.h>
 #include "indicators.h"
 
-#define DEBUG
+#undef DEBUG
 #define DEBUG_MSG MIOS32_MIDI_SendDebugMessage
 
 #define FLASH_FAST_FREQ 5
@@ -517,7 +517,7 @@ void IND_SetFullIndicatorState(indicator_id_t indicatorNum, indicator_states_t s
       }
       else {
          // Stomp 1 Green on A7
-         s32 error = MIOS32_BOARD_J5_PinSet(7, outputState);         
+         MIOS32_BOARD_J5_PinSet(7, outputState);         
 #ifdef DEBUG
          s32 pinState = MIOS32_BOARD_J5_PinGet(7);
          DEBUG_MSG("IND_SetFullIndicatorState:  Set A7 to %d, read state %d, error=%d",outputState,pinState,error);

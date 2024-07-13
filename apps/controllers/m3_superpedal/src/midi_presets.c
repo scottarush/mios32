@@ -149,6 +149,7 @@ void MIDI_PRESETS_Init() {
             ptr->midiPorts = DEFAULT_PRESET_MIDI_PORTS;
             ptr->midiChannel = DEFAULT_PRESET_MIDI_CHANNEL;
             ptr->octave = defaultMIDIPresetOctaveNumbers[bank][i];
+            ptr->velocity = 127;
          }
       }
       // Default to preset 1
@@ -274,12 +275,36 @@ const midi_preset_t* MIDI_PRESETS_SetGenMIDIPreset(const midi_preset_num_t* pres
    ptr->octave = setPresetPtr->octave;
    ptr->midiPorts = setPresetPtr->midiPorts;
    ptr->midiChannel = setPresetPtr->midiChannel;
+   ptr->velocity = setPresetPtr->velocity;
 
    // Update presets to E2
    MIDI_PRESETS_PersistData();
    return ptr;
 }
 
+/////////////////////////////////////////////////////////////////////////////
+// Utility copies preset parameters to a supplied pointer.  For use
+// in updating preset params on an existing preset before calling SetGenMIDIPreset
+// Returns supplied pointer with updated params, NULL if presetNum is invalid
+/////////////////////////////////////////////////////////////////////////////
+midi_preset_t * MIDI_PRESETS_CopyPreset(const midi_preset_num_t* presetNum, midi_preset_t * ptr) {
+      if ((presetNum->bankNumber == 0) || (presetNum->bankNumber > MAX_NUM_GEN_MIDI_PRESET_BANKS)) {
+      DEBUG_MSG("MIDI_PRESETS_CopyPresetParams: Invalid bankNumber: %d", presetNum->bankNumber);
+      return NULL;
+   }
+   if ((presetNum->presetBankIndex == 0) || (presetNum->presetBankIndex > MAX_NUM_PRESETS_PER_BANK)) {
+      DEBUG_MSG("MIDI_PRESETS_CopyPresetParams: Invalid presetBankIndex: %d", presetNum->presetBankIndex);
+      return NULL;
+   }
+   midi_preset_t* presetPtr = &presets.generalMidiPresets[presetNum->bankNumber - 1][presetNum->presetBankIndex - 1];
+   ptr->programNumber = presetPtr->programNumber;
+   ptr->midiBankNumber = presetPtr->midiBankNumber;
+   ptr->octave = presetPtr->octave;
+   ptr->midiPorts = presetPtr->midiPorts;
+   ptr->midiChannel = presetPtr->midiChannel;
+   ptr->velocity = presetPtr->velocity;
+   return ptr;
+}
 
 /////////////////////////////////////////////////////////////////////////////
 // Returns a General MIDI Preset.

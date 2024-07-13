@@ -52,7 +52,8 @@ typedef struct {
    u8 midiChannel;
    // octave for pedals: 0 to 7
    u8 octave;
-   // volume scaling fraction from 
+   // volume expressed as midi velocity
+   u8 velocity;
 } midi_preset_t;
 
 
@@ -81,6 +82,7 @@ extern const char * MIDI_PRESETS_GetGenMIDIVoiceName(u8 progNum);
 extern u8 MIDI_PRESETS_GetNumGenMIDIVoices();
 
 extern const midi_preset_t * MIDI_PRESETS_SetGenMIDIPreset(const midi_preset_num_t * presetNum,const midi_preset_t* setPresetPtr);
+extern midi_preset_t * MIDI_PRESETS_CopyPreset(const midi_preset_num_t* presetNum, midi_preset_t * ptr);
 
 extern const midi_preset_num_t * MIDI_PRESETS_ActivateGenMIDIPreset(const midi_preset_num_t * presetNum);
 extern u8 MIDI_PRESETS_ActivateMIDIVoice(u8 programNumber, u8 bankNumber, u8 midiPorts, u8 midiChannel);
