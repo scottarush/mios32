@@ -223,8 +223,6 @@ const char* ARP_HMI_GetClockModeText(arp_clock_mode_t mode) {
 // Sets/updates the indicators for the Arp mode
 /////////////////////////////////////////////////////////////////////////////
 void ARP_HMI_UpdateArpIndicators() {
-   IND_ClearAll();
-
    // First the gen mode indicators
    switch (ARP_GetArpGenOrder()) {
    case ARP_GEN_ORDER_ASCENDING:
@@ -259,22 +257,21 @@ void ARP_HMI_UpdateArpIndicators() {
 void ARP_HMI_UpdateChordIndicators() {
    // Update stomp state according to the ARP mode
    indicator_color_t color = IND_COLOR_GREEN;
-   indicator_states_t state = IND_OFF;
-   switch (ARP_GetArpMode()) {
-   case ARP_MODE_CHORD_ARP:
-      state = IND_ON;
-      color = IND_COLOR_GREEN;   
-      break;
-   case ARP_MODE_CHORD_PAD:
-      state = IND_ON;   
-      color = IND_COLOR_RED;   
-      break;
-   case ARP_MODE_KEYS:
-      state = IND_OFF;
-      break;
+   if (ARP_GetEnabled()) {
+      switch (ARP_GetArpMode()) {
+      case ARP_MODE_CHORD_ARP:
+         color = IND_COLOR_GREEN;
+         break;
+      case ARP_MODE_CHORD_PAD:
+         color = IND_COLOR_YELLOW;
+         break;
+      case ARP_MODE_KEYS:
+         color = IND_COLOR_RED;
+         break;
+      }
    }
    IND_SetIndicatorColor(IND_STOMP_3, color);
-   IND_SetIndicatorState(IND_STOMP_3, state, 100, IND_RAMP_NONE);
+   IND_SetIndicatorState(IND_STOMP_3, IND_ON, 100, IND_RAMP_NONE);
 }
 
 /////////////////////////////////////////////////////////////////////////////

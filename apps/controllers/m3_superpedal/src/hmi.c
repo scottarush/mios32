@@ -548,8 +548,8 @@ void HMI_UpdateIndicators() {
          // Indicators 2 through 7 show direct octave.
          IND_SetIndicatorState(octave - MIN_DIRECT_OCTAVE_NUMBER + 2, IND_ON,100,IND_RAMP_NONE);
       }
-      // Now set the stomp indicator to Red
-      IND_SetIndicatorColor(IND_STOMP_1,IND_COLOR_RED);
+      // Now set the stomp indicator to Yellow
+      IND_SetIndicatorColor(IND_STOMP_1,IND_COLOR_YELLOW);
       IND_SetIndicatorState(IND_STOMP_1,IND_ON,100,IND_RAMP_NONE);
       break;
    case TOE_SWITCH_ARP:
@@ -565,7 +565,7 @@ void HMI_UpdateIndicators() {
       }
       break;
    case TOE_SWITCH_CHORD:
-      // TODO
+      ARP_HMI_UpdateChordIndicators();
       break;
    case TOE_SWITCH_VOICE_PRESETS:
       // Set the indicator for the bank index + 1 of the last activated presetNum if we 

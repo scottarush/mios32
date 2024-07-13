@@ -502,7 +502,8 @@ void IND_SetFullIndicatorState(indicator_id_t indicatorNum, indicator_states_t s
    // And the two outputs to set the initial state
    u8 outputState = ptr->flashOutputState & ptr->brightnessOutputState;
 
-   // Set the output pin in J10 unless its the last two in J5
+   //------------------------------------------------------------
+   // Now set the output pin in either J10 or J5
    indicator_color_t setColor = ptr->color;
    if (setColor == IND_COLOR_YELLOW) {
       setColor = IND_COLOR_RED;  // Set the RED one first
