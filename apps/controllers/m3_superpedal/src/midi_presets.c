@@ -13,11 +13,9 @@
 #include "pedals.h"
 #include "persist.h"
 
-#undef DEBUG
+#define DEBUG
 
-#ifndef DEBUG_MSG
-# define DEBUG_MSG MIOS32_MIDI_SendDebugMessage
-#endif
+#define DEBUG_MSG MIOS32_MIDI_SendDebugMessage
 
 /////////////////////////////////////////////////////////////////////////////
 // Local Variables
@@ -55,7 +53,8 @@ void MIDI_PRESETS_PersistData();
 
 const char* defaultGenMIDIBankNames[] = { "Strings","Bass","Keys","Bells/Wind" };
 
-const char* genMIDIVoiceNames[] = { "Acoustic Grand Piano","Bright Acoustic Piano","Electric Grand Piano","Honky-tonk Piano","Electric Piano 1",
+const char* genMIDIVoiceNames[] = { 
+"Acoustic Grand Piano","Bright Acoustic Piano","Electric Grand Piano","Honky-tonk Piano","Electric Piano 1",
 "Electric Piano 2","Harpsichord","Clavi","Celesta","Glockenspiel",
 "Music Box","Vibraphone","Marimba","Xylophone","Tubular Bells",
 "Dulcimer","Drawbar Organ","Percussive Organ","Rock Organ","Church Organ",
@@ -149,7 +148,7 @@ void MIDI_PRESETS_Init() {
             ptr->midiPorts = DEFAULT_PRESET_MIDI_PORTS;
             ptr->midiChannel = DEFAULT_PRESET_MIDI_CHANNEL;
             ptr->octave = defaultMIDIPresetOctaveNumbers[bank][i];
-            ptr->velocity = 127;
+            ptr->volume = 0;
          }
       }
       // Default to preset 1
@@ -186,17 +185,18 @@ extern u8 MIDI_PRESETS_GetGenMidiPresetBankSize() {
 // Returns the name of the bank
 // bankNum:  number of the bank from 1 to MAX_NUM_GEN_MIDI_PRESET_BANKS
 /////////////////////////////////////////////////////////////////////////////
-extern const char * MIDI_PRESETS_GetGenMidiBankName(u8 bankNumber){
-      if ((bankNumber == 0) || (bankNumber > MAX_NUM_GEN_MIDI_PRESET_BANKS)) {
+extern const char* MIDI_PRESETS_GetGenMidiBankName(u8 bankNumber) {
+   if ((bankNumber == 0) || (bankNumber > MAX_NUM_GEN_MIDI_PRESET_BANKS)) {
       DEBUG_MSG("MIDI_PRESETS_GetGenMidiBankName: Invalid bankNumber: %d", bankNumber);
       return NULL;
    }
-   return defaultGenMIDIBankNames[bankNumber-1];
+   return defaultGenMIDIBankNames[bankNumber - 1];
 }
 
 
 /////////////////////////////////////////////////////////////////////////////
-// Activates a general MIDI Preset.
+// Activates a general MIDI Preset including setting the PEDALS octave 
+// and volume (velocity).
 // presetNum:  pointer to presetNumber struct
 // returns:  pointer to activated presetNumber on success, NULL on error.
 /////////////////////////////////////////////////////////////////////////////
@@ -209,13 +209,22 @@ const midi_preset_num_t* MIDI_PRESETS_ActivateGenMIDIPreset(const midi_preset_nu
       DEBUG_MSG("MIDI_PRESETS_ActivateGenMIDIPreset: Invalid presetBankIndex: %d", presetNum->presetBankIndex);
       return NULL;
    }
+
    midi_preset_t* ptr = &presets.generalMidiPresets[presetNum->bankNumber - 1][presetNum->presetBankIndex - 1];
+#ifdef DEBUG
+   DEBUG_MSG("MIDI_PRESETS_ActivateGenMIDIPreset:  Activating preset# %d.%d, progNumber=%d",
+      presetNum->bankNumber,presetNum->presetBankIndex,ptr->programNumber);
+#endif
 
    MIDI_PRESETS_ActivateMIDIVoice(ptr->programNumber, ptr->midiBankNumber, ptr->midiPorts, ptr->midiChannel);
 
    // Set the octave
    PEDALS_SetOctave(ptr->octave);
 
+   // If the volume is non-zero then change the current PEDALS volume to the preset value
+   if (ptr->volume > 0) {
+      PEDALS_SetVolume(ptr->volume);
+   }
    // Save last activate preset number
    presets.lastActivatedGenMIDIPresetNumber.bankNumber = presetNum->bankNumber;
    presets.lastActivatedGenMIDIPresetNumber.presetBankIndex = presetNum->presetBankIndex;
@@ -225,7 +234,7 @@ const midi_preset_num_t* MIDI_PRESETS_ActivateGenMIDIPreset(const midi_preset_nu
    return presetNum; // for success
 }
 /////////////////////////////////////////////////////////////////////////////
-// Direct voice activation without preset
+// Temporary direct voice activation without change of preset.
 // programNumber:  The General MIDI program number
 // midiBankNumber: General MIDI bank number
 // midiPorts: MIDI hardware outputs
@@ -244,6 +253,7 @@ u8 MIDI_PRESETS_ActivateMIDIVoice(u8 programNumber, u8 midiBankNumber, u8 midiPo
          // Send midiBankNumber if non-zero
          if (midiBankNumber != 0) {
             // TODO
+            DEBUG_MSG("MIDI_PRESETS_ActivateMIDIVoice:  midi bank# != 0 (%d) but bank# Tx not yet implemented.", midiBankNumber);
          }
       }
    }
@@ -269,13 +279,17 @@ const midi_preset_t* MIDI_PRESETS_SetGenMIDIPreset(const midi_preset_num_t* pres
       return NULL;
    }
    midi_preset_t* ptr = &presets.generalMidiPresets[presetNum->bankNumber - 1][presetNum->presetBankIndex - 1];
+   #ifdef DEBUG
+   DEBUG_MSG("MIDI_PRESETS_SetGenMIDIPreset: Setting preset# %d.%d, progNumber=%d",
+      presetNum->bankNumber,presetNum->presetBankIndex,ptr->programNumber);
+   #endif
    // TODO:  Validate programNumber, midiBankNumber, etc.
    ptr->programNumber = setPresetPtr->programNumber;
    ptr->midiBankNumber = setPresetPtr->midiBankNumber;
    ptr->octave = setPresetPtr->octave;
    ptr->midiPorts = setPresetPtr->midiPorts;
    ptr->midiChannel = setPresetPtr->midiChannel;
-   ptr->velocity = setPresetPtr->velocity;
+   ptr->volume = setPresetPtr->volume;
 
    // Update presets to E2
    MIDI_PRESETS_PersistData();
@@ -287,8 +301,8 @@ const midi_preset_t* MIDI_PRESETS_SetGenMIDIPreset(const midi_preset_num_t* pres
 // in updating preset params on an existing preset before calling SetGenMIDIPreset
 // Returns supplied pointer with updated params, NULL if presetNum is invalid
 /////////////////////////////////////////////////////////////////////////////
-midi_preset_t * MIDI_PRESETS_CopyPreset(const midi_preset_num_t* presetNum, midi_preset_t * ptr) {
-      if ((presetNum->bankNumber == 0) || (presetNum->bankNumber > MAX_NUM_GEN_MIDI_PRESET_BANKS)) {
+midi_preset_t* MIDI_PRESETS_CopyPreset(const midi_preset_num_t* presetNum, midi_preset_t* ptr) {
+   if ((presetNum->bankNumber == 0) || (presetNum->bankNumber > MAX_NUM_GEN_MIDI_PRESET_BANKS)) {
       DEBUG_MSG("MIDI_PRESETS_CopyPresetParams: Invalid bankNumber: %d", presetNum->bankNumber);
       return NULL;
    }
@@ -302,7 +316,7 @@ midi_preset_t * MIDI_PRESETS_CopyPreset(const midi_preset_num_t* presetNum, midi
    ptr->octave = presetPtr->octave;
    ptr->midiPorts = presetPtr->midiPorts;
    ptr->midiChannel = presetPtr->midiChannel;
-   ptr->velocity = presetPtr->velocity;
+   ptr->volume = presetPtr->volume;
    return ptr;
 }
 
@@ -313,16 +327,16 @@ midi_preset_t * MIDI_PRESETS_CopyPreset(const midi_preset_num_t* presetNum, midi
 /////////////////////////////////////////////////////////////////////////////
 const midi_preset_t* MIDI_PRESETS_GetGenMidiPreset(const midi_preset_num_t* presetNum) {
    if ((presetNum->bankNumber == 0) || (presetNum->bankNumber > MAX_NUM_GEN_MIDI_PRESET_BANKS)) {
-      DEBUG_MSG("MIDI_PRESETS_ActivateGenMIDIPreset: Invalid bankNumber: %d", presetNum->bankNumber );
+      DEBUG_MSG("MIDI_PRESETS_ActivateGenMIDIPreset: Invalid bankNumber: %d", presetNum->bankNumber);
       return NULL;
    }
    if ((presetNum->presetBankIndex == 0) || (presetNum->presetBankIndex > MAX_NUM_PRESETS_PER_BANK)) {
-      DEBUG_MSG("MIDI_PRESETS_ActivateGenMIDIPreset: Invalid presetBankIndex: %d", presetNum->presetBankIndex );
+      DEBUG_MSG("MIDI_PRESETS_ActivateGenMIDIPreset: Invalid presetBankIndex: %d", presetNum->presetBankIndex);
       return NULL;
    }
    midi_preset_t* ptr = &presets.generalMidiPresets[presetNum->bankNumber - 1][presetNum->presetBankIndex - 1];
 #ifdef DEBUG
-   DEBUG_MSG("MIDI_PRESETS_GetMidiPreset: bank%d index%d progNumber=%d", presetNum->bankNumber, presetNum->presetBankIndex , ptr->programNumber);
+//   DEBUG_MSG("MIDI_PRESETS_GetMidiPreset: bank%d index%d progNumber=%d", presetNum->bankNumber, presetNum->presetBankIndex, ptr->programNumber);
 #endif
    return ptr;
 }

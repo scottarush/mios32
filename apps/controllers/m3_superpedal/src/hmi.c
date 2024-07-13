@@ -340,7 +340,7 @@ void HMI_NotifyToeToggle(u8 toeNum, u8 pressed, s32 timestamp) {
       // Get the volumeLevel corresponding to the pressed switch
       u8 volumeLevel = toeVolumeLevels[toeNum - 1];
       // Set the volume in PEDALS
-      PEDALS_SetVelocity(volumeLevel);
+      PEDALS_SetVolume(volumeLevel);
       // Update the indicators
       HMI_UpdateIndicators();
       // And update the current page display
@@ -525,9 +525,8 @@ void HMI_HandleVoicePresetsToeToggle(u8 toeNum) {
             DEBUG_MSG("HMI_NotifyToeToggle:  Invalid presetNum in call to MIDI_PRESETS_CopyPreset");
          }
          else {
-            // Update the preset with octave and volume
+            // Update the preset with current octave
             curPreset.octave = PEDALS_GetOctave();
-            curPreset.velocity = PEDALS_GetVolume();
             MIDI_PRESETS_SetGenMIDIPreset(presetNumPtr, &curPreset);
             // Temporarily flash the updated one
             IND_SetTempIndicatorState(toeNum, IND_FLASH_FAST, IND_TEMP_FLASH_STATE_DEFAULT_DURATION, IND_ON, 100);
@@ -538,15 +537,15 @@ void HMI_HandleVoicePresetsToeToggle(u8 toeNum) {
          const midi_preset_num_t* ptr = MIDI_PRESETS_ActivateGenMIDIPreset(&presetNum);
 
          if (ptr != NULL) {
-            // Update the volume and octave to this preset
-            PEDALS_SetOctave(MIDI_PRESETS_GetGenMidiPreset(ptr)->octave);
-            PEDALS_SetVelocity(MIDI_PRESETS_GetGenMidiPreset(ptr)->velocity);
             // Update the indicators
             HMI_UpdateIndicators();
             // And update the current page display
             pCurrentPage->pUpdateDisplayCallback();
-            // And set the current program number so a rotation of the encoder starts at this one
-            hmiSettings.lastSelectedMIDIProgNumber = MIDI_PRESETS_GetGenMidiPreset(ptr)->programNumber;
+            // Set the lastSelectedMIDIProgNumber o a rotation of the encoder starts at this one
+            // unless we are in the MIDIPresetPage in which case this would overwrite the program to set
+            if (pCurrentPage->pageID != PAGE_MIDI_PROGRAM_SELECT){
+               hmiSettings.lastSelectedMIDIProgNumber = MIDI_PRESETS_GetGenMidiPreset(ptr)->programNumber;
+            }
          }
          else {
             // Invalid preset.  Flash and then off
@@ -935,7 +934,7 @@ void HMI_HomePage_RotaryEncoderChanged(s8 increment) {
       break;
    case TOE_SWITCH_VOLUME:
       // Change the volume directly
-      PEDALS_SetVelocity(PEDALS_GetVolume() + increment);
+      PEDALS_SetVolume(PEDALS_GetVolume() + increment);
       break;
    default:
       return;
@@ -1074,7 +1073,7 @@ void HMI_MIDIProgramSelectPage_RotaryEncoderChanged(s8 increment) {
    if (progNumber < 1) {
       progNumber = 1;
    }
-   if (progNumber > MIDI_PRESETS_GetNumGenMIDIVoices()) {
+   if (progNumber >= MIDI_PRESETS_GetNumGenMIDIVoices()) {
       progNumber = MIDI_PRESETS_GetNumGenMIDIVoices();
    }
    if (hmiSettings.lastSelectedMIDIProgNumber != progNumber) {
@@ -1132,7 +1131,8 @@ void HMI_MIDIProgramSelectPage_BackButtonCallback() {
    // last one.
    const midi_preset_num_t* preset = MIDI_PRESETS_GetLastActivatedGenMIDIPreset();
    MIDI_PRESETS_ActivateGenMIDIPreset(preset);
-   // And restore the pointer in the program number to the preset
+   // And restore the pointer in the program number to the current preset so that the
+   // next time into the menu we start at that one.
    hmiSettings.lastSelectedMIDIProgNumber = MIDI_PRESETS_GetGenMidiPreset(preset)->programNumber;
 }
 

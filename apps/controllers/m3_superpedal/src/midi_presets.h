@@ -52,8 +52,8 @@ typedef struct {
    u8 midiChannel;
    // octave for pedals: 0 to 7
    u8 octave;
-   // volume expressed as midi velocity
-   u8 velocity;
+   // volume expressed as midi velocity.  0 is default and follows current system volume
+   u8 volume;
 } midi_preset_t;
 
 

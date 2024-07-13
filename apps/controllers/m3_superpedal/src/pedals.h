@@ -71,7 +71,7 @@ extern void PEDALS_NotifyMakeChange(u8 pressed, u32 timestamp);
 extern void PEDALS_SetOctave(s8 octave);
 extern s8 PEDALS_GetOctave();
 extern u8 PEDALS_GetVolume();
-extern void PEDALS_SetVelocity(u8 volumeLevel);
+extern void PEDALS_SetVolume(u8 volumeLevel);
 
 extern u8 PEDALS_ScaleVelocity(u8 velocity,u8 volumeLevel);
 
