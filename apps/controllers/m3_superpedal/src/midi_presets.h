@@ -29,10 +29,10 @@
 // Global Types
 /////////////////////////////////////////////////////////////////////////////
 typedef enum {
-   GENERAL_MIDI_PRESET = 0,
-   MIDI_PRESET = 1,
-   PATTERN_PRESET = 2
-} midi_preset_bank_t;
+   PRESET_GENERAL_MIDI = 0,
+   PRESET_DISKLAVIER_XG = 1,
+   PRESET_JV880 = 2
+} midi_preset_type_t;
 
 typedef struct midi_preset_num_s {
    // from 1..Number of Banks
@@ -42,7 +42,7 @@ typedef struct midi_preset_num_s {
 } midi_preset_num_t;
 
 typedef struct {   
-   // Per Gen MIDI 1 spec programNumbers 1-128
+   // Per Gen MIDI 1 spec programNumbers 0..127
    u8 programNumber;
    // bankNumber is device specific.  For GenMIDI, set to 0.
    u8 midiBankNumber;
@@ -78,17 +78,17 @@ typedef struct persisted_midi_presets_s {
 
 extern void MIDI_PRESETS_Init();
 
-extern const char * MIDI_PRESETS_GetGenMIDIVoiceName(u8 progNum);
-extern u8 MIDI_PRESETS_GetNumGenMIDIVoices();
+extern const char * MIDI_PRESETS_GetMIDIVoiceName(u8 progNum);
+extern u8 MIDI_PRESETS_GetNumMIDIVoices();
 
-extern const midi_preset_t * MIDI_PRESETS_SetGenMIDIPreset(const midi_preset_num_t * presetNum,const midi_preset_t* setPresetPtr);
+extern const midi_preset_t * MIDI_PRESETS_SetMIDIPreset(const midi_preset_num_t * presetNum,const midi_preset_t* setPresetPtr);
 extern midi_preset_t * MIDI_PRESETS_CopyPreset(const midi_preset_num_t* presetNum, midi_preset_t * ptr);
 
-extern const midi_preset_num_t * MIDI_PRESETS_ActivateGenMIDIPreset(const midi_preset_num_t * presetNum);
+extern const midi_preset_num_t * MIDI_PRESETS_ActivateMIDIPreset(const midi_preset_num_t * presetNum);
 extern u8 MIDI_PRESETS_ActivateMIDIVoice(u8 programNumber, u8 bankNumber, u8 midiPorts, u8 midiChannel);
 
-extern const midi_preset_t* MIDI_PRESETS_GetGenMidiPreset(const midi_preset_num_t * presetNum);
-extern const midi_preset_num_t* MIDI_PRESETS_GetLastActivatedGenMIDIPreset();
+extern const midi_preset_t* MIDI_PRESETS_GetMidiPreset(const midi_preset_num_t * presetNum);
+extern const midi_preset_num_t* MIDI_PRESETS_GetLastActivatedMIDIPreset();
 
 extern u8 MIDI_PRESETS_GetGenMidiPresetNumBanks();
 extern u8 MIDI_PRESETS_GetGenMidiPresetBankSize();

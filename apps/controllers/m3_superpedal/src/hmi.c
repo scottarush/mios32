@@ -198,8 +198,8 @@ void HMI_Init(void) {
    HMI_UpdateIndicators();
 
    // Activate the last selected preset
-   const midi_preset_num_t* presetNumber = MIDI_PRESETS_GetLastActivatedGenMIDIPreset();
-   MIDI_PRESETS_ActivateGenMIDIPreset(presetNumber);
+   const midi_preset_num_t* presetNumber = MIDI_PRESETS_GetLastActivatedMIDIPreset();
+   MIDI_PRESETS_ActivateMIDIPreset(presetNumber);
 
    // Clear the display and update
    MIOS32_LCD_Clear();
@@ -517,7 +517,7 @@ void HMI_HandleVoicePresetsToeToggle(u8 toeNum) {
       const midi_preset_num_t presetNum = {
          .bankNumber = hmiSettings.currentToeSwitchGenMIDIPresetBank,
          .presetBankIndex = toeNum - 1 };
-      const midi_preset_num_t* presetNumPtr = MIDI_PRESETS_GetLastActivatedGenMIDIPreset();
+      const midi_preset_num_t* presetNumPtr = MIDI_PRESETS_GetLastActivatedMIDIPreset();
       if ((presetNum.bankNumber == presetNumPtr->bankNumber) && (presetNum.presetBankIndex == presetNumPtr->presetBankIndex)) {
          // This is the same one so just update the preset with the current octave and volume setting
          midi_preset_t curPreset;
@@ -527,14 +527,14 @@ void HMI_HandleVoicePresetsToeToggle(u8 toeNum) {
          else {
             // Update the preset with current octave
             curPreset.octave = PEDALS_GetOctave();
-            MIDI_PRESETS_SetGenMIDIPreset(presetNumPtr, &curPreset);
+            MIDI_PRESETS_SetMIDIPreset(presetNumPtr, &curPreset);
             // Temporarily flash the updated one
             IND_SetTempIndicatorState(toeNum, IND_FLASH_FAST, IND_TEMP_FLASH_STATE_DEFAULT_DURATION, IND_ON, 100);
          }
       }
       else {
          // Preset is a different one so activate it
-         const midi_preset_num_t* ptr = MIDI_PRESETS_ActivateGenMIDIPreset(&presetNum);
+         const midi_preset_num_t* ptr = MIDI_PRESETS_ActivateMIDIPreset(&presetNum);
 
          if (ptr != NULL) {
             // Update the indicators
@@ -544,7 +544,7 @@ void HMI_HandleVoicePresetsToeToggle(u8 toeNum) {
             // Set the lastSelectedMIDIProgNumber o a rotation of the encoder starts at this one
             // unless we are in the MIDIPresetPage in which case this would overwrite the program to set
             if (pCurrentPage->pageID != PAGE_MIDI_PROGRAM_SELECT){
-               hmiSettings.lastSelectedMIDIProgNumber = MIDI_PRESETS_GetGenMidiPreset(ptr)->programNumber;
+               hmiSettings.lastSelectedMIDIProgNumber = MIDI_PRESETS_GetMidiPreset(ptr)->programNumber;
             }
          }
          else {
@@ -607,7 +607,7 @@ void HMI_UpdateIndicators() {
    case TOE_SWITCH_VOICE_PRESETS:
       // Set the indicator for the bank index + 1 of the last activated presetNum if we 
       // are currently on that bank.
-      const midi_preset_num_t* presetNum = MIDI_PRESETS_GetLastActivatedGenMIDIPreset();
+      const midi_preset_num_t* presetNum = MIDI_PRESETS_GetLastActivatedMIDIPreset();
       if (presetNum->bankNumber == hmiSettings.currentToeSwitchGenMIDIPresetBank) {
          IND_SetIndicatorState(presetNum->presetBankIndex + 1, IND_ON, 100, IND_RAMP_NONE);
       }
@@ -627,7 +627,7 @@ void HMI_UpdateIndicators() {
          break;
       case 4:
          color = IND_COLOR_GREEN;
-         state = IND_FLASH_SLOW;
+         state = IND_FLASH_BLIP;
          break;
       }
       IND_SetIndicatorColor(IND_STOMP_2, color);
@@ -828,9 +828,9 @@ void HMI_ClearLine(u8 lineNum) {
 void HMI_HomePage_UpdateDisplay() {
 
    // Get the current Bank and Preset names
-   const midi_preset_num_t* presetNum = MIDI_PRESETS_GetLastActivatedGenMIDIPreset();
-   const midi_preset_t* preset = MIDI_PRESETS_GetGenMidiPreset(presetNum);
-   const char* presetName = MIDI_PRESETS_GetGenMIDIVoiceName(preset->programNumber);
+   const midi_preset_num_t* presetNum = MIDI_PRESETS_GetLastActivatedMIDIPreset();
+   const midi_preset_t* preset = MIDI_PRESETS_GetMidiPreset(presetNum);
+   const char* presetName = MIDI_PRESETS_GetMIDIVoiceName(preset->programNumber);
    const char* bankNamePtr = MIDI_PRESETS_GetGenMidiBankName(hmiSettings.currentToeSwitchGenMIDIPresetBank);
 
    char lineBuffer[DISPLAY_CHAR_WIDTH + 1];
@@ -1048,39 +1048,39 @@ void HMI_MIDIProgramSelectPage_UpdateDisplay() {
 
    // Selected entry on line 2
    u8 lastProgNumber = hmiSettings.lastSelectedMIDIProgNumber;
-   HMI_RenderLine(2, MIDI_PRESETS_GetGenMIDIVoiceName(lastProgNumber), RENDER_LINE_SELECT);
+   HMI_RenderLine(2, MIDI_PRESETS_GetMIDIVoiceName(lastProgNumber), RENDER_LINE_SELECT);
    if (lastProgNumber == 1) {
       // At the beginning. Clear line 1
       HMI_ClearLine(1);
    }
    else {
-      HMI_RenderLine(1, MIDI_PRESETS_GetGenMIDIVoiceName(lastProgNumber - 1), RENDER_LINE_CENTER);
+      HMI_RenderLine(1, MIDI_PRESETS_GetMIDIVoiceName(lastProgNumber-1), RENDER_LINE_CENTER);
    }
-   if (lastProgNumber == MIDI_PRESETS_GetNumGenMIDIVoices() - 1) {
+   if (lastProgNumber == MIDI_PRESETS_GetNumMIDIVoices() - 1) {
       // At the end, clear line 3
       HMI_ClearLine(3);
    }
    else {
-      HMI_RenderLine(3, MIDI_PRESETS_GetGenMIDIVoiceName(lastProgNumber + 1), RENDER_LINE_CENTER);
+      HMI_RenderLine(3, MIDI_PRESETS_GetMIDIVoiceName(lastProgNumber + 1), RENDER_LINE_CENTER);
    }
 }
 /////////////////////////////////////////////////////////////////////////////
 // Callback for rotary encoder change on general MIDI select page
 /////////////////////////////////////////////////////////////////////////////
 void HMI_MIDIProgramSelectPage_RotaryEncoderChanged(s8 increment) {
-   u8 progNumber = hmiSettings.lastSelectedMIDIProgNumber;
+   s32 progNumber = hmiSettings.lastSelectedMIDIProgNumber;
    progNumber += increment;
-   if (progNumber < 1) {
-      progNumber = 1;
+   if (progNumber < 0) {
+      progNumber = 0;
    }
-   if (progNumber >= MIDI_PRESETS_GetNumGenMIDIVoices()) {
-      progNumber = MIDI_PRESETS_GetNumGenMIDIVoices();
+   if (progNumber >= MIDI_PRESETS_GetNumMIDIVoices()) {
+      progNumber = MIDI_PRESETS_GetNumMIDIVoices()-1;
    }
    if (hmiSettings.lastSelectedMIDIProgNumber != progNumber) {
       hmiSettings.lastSelectedMIDIProgNumber = progNumber;
       // Activate the MIDI voice temporarily using midi config from current preset
-      const midi_preset_num_t* presetNum = MIDI_PRESETS_GetLastActivatedGenMIDIPreset();
-      const midi_preset_t* preset = MIDI_PRESETS_GetGenMidiPreset(presetNum);
+      const midi_preset_num_t* presetNum = MIDI_PRESETS_GetLastActivatedMIDIPreset();
+      const midi_preset_t* preset = MIDI_PRESETS_GetMidiPreset(presetNum);
       // TODO handle bankNumber too
       MIDI_PRESETS_ActivateMIDIVoice(progNumber, 0, preset->midiPorts, preset->midiChannel);
       // And force an update to the current page display
@@ -1092,14 +1092,14 @@ void HMI_MIDIProgramSelectPage_RotaryEncoderChanged(s8 increment) {
 /////////////////////////////////////////////////////////////////////////////
 void HMI_MIDIProgramSelectPage_RotaryEncoderSelected() {
    // Replace the last activated preset with the new program number
-   const midi_preset_num_t* presetNum = MIDI_PRESETS_GetLastActivatedGenMIDIPreset();
+   const midi_preset_num_t* presetNum = MIDI_PRESETS_GetLastActivatedMIDIPreset();
    const midi_preset_t setPreset = {
       .programNumber = hmiSettings.lastSelectedMIDIProgNumber,
       .midiBankNumber = 0,
       .midiPorts = hmiSettings.lastSelectedMidiOutput,
       .midiChannel = hmiSettings.lastSelectedMidiChannel,
       .octave = PEDALS_GetOctave() };
-   const midi_preset_t* presetPtr = MIDI_PRESETS_SetGenMIDIPreset(presetNum, &setPreset);
+   const midi_preset_t* presetPtr = MIDI_PRESETS_SetMIDIPreset(presetNum, &setPreset);
 
    if (presetPtr == NULL) {
       DEBUG_MSG("HMI_MIDIProgramSelectPage_RotaryEncoderSelected:  Error editing preset");
@@ -1129,11 +1129,11 @@ void HMI_MIDIProgramSelectPage_RotaryEncoderSelected() {
 void HMI_MIDIProgramSelectPage_BackButtonCallback() {
    // On a back button press, user did not select a new preset so re-activate the
    // last one.
-   const midi_preset_num_t* preset = MIDI_PRESETS_GetLastActivatedGenMIDIPreset();
-   MIDI_PRESETS_ActivateGenMIDIPreset(preset);
+   const midi_preset_num_t* preset = MIDI_PRESETS_GetLastActivatedMIDIPreset();
+   MIDI_PRESETS_ActivateMIDIPreset(preset);
    // And restore the pointer in the program number to the current preset so that the
    // next time into the menu we start at that one.
-   hmiSettings.lastSelectedMIDIProgNumber = MIDI_PRESETS_GetGenMidiPreset(preset)->programNumber;
+   hmiSettings.lastSelectedMIDIProgNumber = MIDI_PRESETS_GetMidiPreset(preset)->programNumber;
 }
 
 /////////////////////////////////////////////////////////////////////////////
