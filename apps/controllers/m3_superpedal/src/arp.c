@@ -292,7 +292,7 @@ s32 ARP_FillNoteStack() {
       return -1;
    }
    // Compute octave by subtracting C-2 (note 24)
-   s8 octave = ((chordPlayedNote - 24) / 12) - 1;
+   s8 octave = ((chordPlayedNote - 24) / 12) - 2;
 
    // Push the keys one by one onto the note stack in the proper gen order
    u8 numChordNotes = SEQ_CHORD_GetNumNotesByEnum(chord);

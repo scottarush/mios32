@@ -127,6 +127,7 @@ void HMI_UpdateOctaveIncDecIndicators();
 u8 HMI_GetToeVolumeIndex();
 
 void HMI_HandleVoicePresetsToeToggle(u8 toeNum);
+u8 HMI_DebounceSwitchChange(switchState_t * pState,u8 pressed,s32 timestamp);
 
 /////////////////////////////////////////////////////////////////////////////
 // called at Init to initialize the HMI
@@ -277,6 +278,31 @@ void HMI_InitPages() {
    dialogPageMessage1[0] = '\0';
    dialogPageMessage2[0] = '\0';
 }
+/////////////////////////////////////////////////////////////////////////////
+// Helper does debounce and long press detection on a switch
+// returns 0 if should be ignored.
+// returns +1 if change valid
+u8 HMI_DebounceSwitchChange(switchState_t * pState,u8 pressed,s32 timestamp){
+   if (pressed) {
+      // Transition from release to press. Check if timestamp from last press
+      // is greater than debounce interval.
+      s32 delta = timestamp-pState->switchPressTimeStamp;
+      if (delta > DEBOUNCE_TIME_MS){
+         // It is so this is a valid initial press.
+         pState->switchPressTimeStamp = timestamp;
+         pState->switchState = 0;
+         return 1;
+      }
+      else{
+         // This is a bounce press so ignore it.
+         return 0;
+      }
+   }
+   else {
+      // Release.  For now, just ignore it
+      return 0;
+   }
+}
 
 /////////////////////////////////////////////////////////////////////////////
 // Called on a change in a toe switch
@@ -289,27 +315,9 @@ void HMI_NotifyToeToggle(u8 toeNum, u8 pressed, s32 timestamp) {
       DEBUG_MSG("HMI_NotifyToeToggle: Invalid toe switch=%d", toeNum);
       return;
    }
-
-   // Save the state for long press detection although we may not need this
-   if (pressed) {
-#ifdef HW_DEBUG
-      DEBUG_MSG("HMI_NotifyToeToggle: Toe switch %d pressed", toeNum);
-#endif
-      if (toeSwitchState[toeNum - 1].switchState == 0) {
-         // Save initial press timestamp         
-         toeSwitchState[toeNum - 1].switchPressTimeStamp = timestamp;
-      }
-      toeSwitchState[toeNum - 1].switchState = 1;
-   }
-   else {
-#ifdef HW_DEBUG
-      DEBUG_MSG("HMI_NotifyToeToggle: Toe switch %d released", toeNum);
-#endif
-      toeSwitchState[toeNum - 1].switchState = 0;
-   }
-
-   // Wait for the release so we don't have to deal with bouncing
-   if (pressed) {
+   // Debounce the switch. Ignore unless a valid press greater than debounce interval
+   u8 valid = HMI_DebounceSwitchChange(&toeSwitchState[toeNum - 1],pressed,timestamp);
+   if (!valid){
       return;
    }
 
@@ -396,28 +404,12 @@ void HMI_NotifyStompToggle(u8 stompNum, u8 pressed, s32 timestamp) {
       DEBUG_MSG("HMI_NotifyStompToggle:  Invalid stomp switch=%d", stompNum);
       return;
    }
-   // Save the state for long press detection although we likely will not need this
-   if (pressed) {
-#ifdef HW_DEBUG
-      DEBUG_MSG("HMI_NotifyStompToggle:  stomp switch %d pressed", stompNum);
-#endif
-      if (stompSwitchState[stompNum - 1].switchState == 0) {
-         // Save initial press timestamp         
-         stompSwitchState[stompNum - 1].switchPressTimeStamp = timestamp;
-      }
-      stompSwitchState[stompNum - 1].switchState = 1;
-   }
-   else {
-#ifdef HW_DEBUG
-      DEBUG_MSG("HMI_NotifyStompToggle: stomp switch %d released", stompNum);
-#endif
-      stompSwitchState[stompNum - 1].switchState = 0;
-   }
-
-   // Wait for the release so we don't have to deal with bouncing
-   if (pressed) {
+   // Debounce the switch. Ignore unless a valid press greater than debounce interval
+   u8 valid = HMI_DebounceSwitchChange(&stompSwitchState[stompNum - 1],pressed,timestamp);
+   if (!valid){
       return;
    }
+
    // Process the change according to the current switch setting
    switch (hmiSettings.stompSwitchSetting[stompNum - 1]) {
    case STOMP_SWITCH_OCTAVE_VOLUME:
@@ -701,32 +693,13 @@ void HMI_NotifyBackToggle(u8 pressed, s32 timestamp) {
    // a long press because this function is only called on switch press and release.
 
    u8 longPress = 0;
-   if (pressed && !backSwitchState.handled) {
-#ifdef HW_DEBUG
-      DEBUG_MSG("Back button pressed");
-#endif
-      if (backSwitchState.switchState == 0) {
-         // Save initial press timestamp         
-         backSwitchState.switchPressTimeStamp = timestamp;
-      }
-      backSwitchState.switchState = 1;
-      // Check if this is a long press
-      u32 delay = timestamp - backSwitchState.switchPressTimeStamp;
-      if (delay >= LONG_PRESS_TIME_MS) {
-         longPress = 1;
-      }
+
+   // Debounce the switch. Ignore unless a valid press greater than debounce interval
+   u8 valid = HMI_DebounceSwitchChange(&backSwitchState,pressed,timestamp);
+   if (!valid){
+      return;
    }
-   else {
-#ifdef HW_DEBUG
-      DEBUG_MSG("Back button released");
-#endif
-      backSwitchState.switchState = 0;
-      if (backSwitchState.handled) {
-         // Clear handled flag and return to ignore this release
-         backSwitchState.handled = 0;
-         return;
-      }
-   }
+
    if (longPress && !backSwitchState.handled) {
       // Go back to home page 
       pCurrentPage = &homePage;
@@ -737,7 +710,7 @@ void HMI_NotifyBackToggle(u8 pressed, s32 timestamp) {
       return;
    }
 
-   // Otherwise, on a release, check if there is a registered handler.  If so call it 
+   // Otherwise, not a long press nor handled.  Check if there is a registered handler.  If so call it 
    if (pCurrentPage->pBackButtonCallback != NULL) {
       pCurrentPage->pBackButtonCallback();
    }
