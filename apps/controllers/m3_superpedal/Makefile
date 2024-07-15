@@ -22,6 +22,7 @@ THUMB_SOURCE    = src/app.c \
 		  src/hmi.c \
 		  src/arp_hmi.c\
 		  src/midi_presets.c\
+		  src/midi_patch_data.c\
         src/persist.c\
 		  src/terminal.c\
 		  src/arp.c \
@@ -32,7 +33,7 @@ THUMB_SOURCE    = src/app.c \
 		  src/seq/seq_chord.c \
 		  src/seq/seq_scale.c \
 		  src/seq/seq_core.c \
-		  src/seq/notestack.c
+		  src/seq/notestack.c 
 
 #		  src/shell.c \
 
