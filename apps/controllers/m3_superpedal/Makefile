@@ -99,10 +99,10 @@ include $(MIOS32_PATH)/modules/eeprom/eeprom.mk
 # Use platform sequence BPM and MidiOut functions
 include $(MIOS32_PATH)/modules/sequencer/sequencer.mk
 
-# MIDI file Player
+# MIDI file parser
 include $(MIOS32_PATH)/modules/midifile/midifile.mk
 
-# FATFS Driver
+# FATFS DriverW
 include $(MIOS32_PATH)/modules/fatfs/fatfs.mk
 
 # FILE Access Layer

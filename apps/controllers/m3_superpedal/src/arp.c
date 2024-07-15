@@ -241,7 +241,7 @@ static s32 ARP_Tick(u32 bpm_tick)
          // get note/velocity/length from notestack
          u8 note = notestack_items[arp_counter].note;
          u8 velocity = notestack_items[arp_counter].tag;
-         u8 length = 72; // always the same, could be varied, e.g. via CC
+         u8 length = notestack_items[arp_counter].length;
 
          // put note into queue if all values are != 0
          if (note && velocity && length) {
@@ -251,7 +251,7 @@ static s32 ARP_Tick(u32 bpm_tick)
             midi_package.chn = Chn1;
             midi_package.note = note;
             midi_package.velocity = velocity;
-
+            
             // Play on the enabled ports.
             int i;
             u16 mask = 1;
@@ -361,7 +361,9 @@ s32 ARP_FillNoteStack() {
          if (note >= 0) {
             // add offset for the chordPlayedNote
             note += (chordPlayedNote % 12);
-            NOTESTACK_Push(&notestack, note, chordPlayedNoteVelocity);
+            // TODO implement the 
+            u16 length = 16;
+            NOTESTACK_Push(&notestack, note, chordPlayedNoteVelocity,length);
          }
       }
    }
@@ -407,7 +409,8 @@ s32 ARP_NotifyNoteOn(u8 note, u8 velocity)
             // This key is not a valid key in this cord.  Just fill the note stack with 
             // this single note instead
             NOTESTACK_Clear(&notestack);
-            NOTESTACK_Push(&notestack, note, velocity);
+            u16 length = 72;
+            NOTESTACK_Push(&notestack, note, velocity,length);
          }
          else {
             // This is a valid root of a chord witin the scale so replace the root and refill the stack
@@ -418,7 +421,8 @@ s32 ARP_NotifyNoteOn(u8 note, u8 velocity)
    case ARP_MODE_KEYS:
       if (velocity) {
          // push note into note stack
-         NOTESTACK_Push(&notestack, note, velocity);
+         u16 length = 72;  // placeholder
+         NOTESTACK_Push(&notestack, note, velocity, length);
       }
       else {
          // remove note from note stack
