@@ -144,17 +144,6 @@ void APP_Init(void) {
    MIDI_PORT_Init(0);
    MIDI_ROUTER_Init(0);
 
-
-   // init MIDI file handler
-   MID_FILE_Init(0);
-   // init MIDI parser module
-   MID_PARSER_Init(0);
-
-   // install callback functions
-   MID_PARSER_InstallFileCallbacks(&MID_FILE_read, &MID_FILE_eof, &MID_FILE_seek);
-   // TODO:  Use the MID_PARSER to play sequences from MID files on preset
-  // MID_PARSER_InstallEventCallbacks(&SEQ_PlayEvent, &SEQ_PlayMeta);
-
    // initialize MIDI handler for Sequencer used by Arpeggiator
    SEQ_MIDI_OUT_Init(0);
 
@@ -255,9 +244,6 @@ void APP_MIDI_NotifyPackage(mios32_midi_port_t port, mios32_midi_package_t midi_
    // (the SysEx stream would interfere with monitor messages)
    u8 filter_sysex_message = (port == USB0) || (port == UART0);
    MIDIMON_Receive(port, midi_package, filter_sysex_message);
-
-   // -> MIDI file recorder
-   MID_FILE_Receive(port, midi_package);
 
    //////////////////////////////////////////////////////
    // Notifications to Arpeggiator from a remote 

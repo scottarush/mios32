@@ -68,10 +68,9 @@ s32 NOTESTACK_Init(notestack_t* n, notestack_mode_t mode, notestack_item_t* note
 //! \param[in] new_note the note number which should be added (1..127)
 //! \param[in] tag an optional tag which is bundled with the note. It can
 //!            contain a voice number, the velocity, or...
-//! \param[in] length length of note.  Added by Scott Rush
 //! \return < 0 on errors
 /////////////////////////////////////////////////////////////////////////////
-s32 NOTESTACK_Push(notestack_t* n, u8 new_note, u8 tag,u16 length)
+s32 NOTESTACK_Push(notestack_t* n, u8 new_note, u8 tag)
 {
    int i;
 
@@ -86,7 +85,6 @@ s32 NOTESTACK_Push(notestack_t* n, u8 new_note, u8 tag,u16 length)
          if (n->note_items[i].note == new_note) {
             n->note_items[i].depressed = 0;
             n->note_items[i].tag = tag;
-            n->note_items[i].length = length;
             return 0; // no error
          }
       }
@@ -110,7 +108,6 @@ s32 NOTESTACK_Push(notestack_t* n, u8 new_note, u8 tag,u16 length)
          n->note_items[n->size - 1].note = new_note;
          n->note_items[n->size - 1].depressed = 0;
          n->note_items[n->size - 1].tag = tag;
-         n->note_items[n->size - 1].length = length;
          return 0; // no error
       }
       insertion_point = n->len;
@@ -135,7 +132,6 @@ s32 NOTESTACK_Push(notestack_t* n, u8 new_note, u8 tag,u16 length)
             n->note_items[n->size - 1].note = new_note;
             n->note_items[n->size - 1].depressed = 0;
             n->note_items[n->size - 1].tag = tag;
-            n->note_items[n->size - 1].length = length;
             return 0; // no error
          }
          insertion_point = n->len;
@@ -152,7 +148,6 @@ s32 NOTESTACK_Push(notestack_t* n, u8 new_note, u8 tag,u16 length)
    n->note_items[insertion_point].note = new_note;
    n->note_items[insertion_point].depressed = 0;
    n->note_items[insertion_point].tag = tag;
-   n->note_items[insertion_point].length = length;
 
    return 0; // no error
 }
@@ -285,8 +280,7 @@ s32 NOTESTACK_SendDebugMessage(notestack_t* n)
          note_name[n->note_items[i].note % 12], (int)(n->note_items[i].note / 12) - 2,
          n->note_items[i].note,
          n->note_items[i].depressed ? "depressed" : "pressed  ",
-         n->note_items[i].tag,
-         n->note_items[i].length);
+         n->note_items[i].tag);
    }
 
    return 0; // no error

@@ -42,7 +42,6 @@ typedef union {
     u8 note:7;
     u8 depressed:1;
     u8 tag;
-    u16 length;
   };
 } notestack_item_t;
 
@@ -61,7 +60,7 @@ typedef struct {
 
 extern s32 NOTESTACK_Init(notestack_t *n, notestack_mode_t mode, notestack_item_t *note_items, u8 size);
 
-extern s32 NOTESTACK_Push(notestack_t* n, u8 new_note, u8 tag,u16 length);
+extern s32 NOTESTACK_Push(notestack_t* n, u8 new_note, u8 tag);
 extern s32 NOTESTACK_Pop(notestack_t *n, u8 old_note);
 extern s32 NOTESTACK_CountActiveNotes(notestack_t *n);
 extern s32 NOTESTACK_RemoveNonActiveNotes(notestack_t *n);

@@ -240,7 +240,6 @@ s32 SEQ_Handler(void)
       // so long any Stop/Cont/Start/SongPos event hasn't been flagged to the sequencer
       if (SEQ_BPM_ChkReqStop()) {
          SEQ_PlayOffEvents();
-         MID_FILE_SetRecordMode(0);
 
          MIDI_ROUTER_SendMIDIClockEvent(0xfc, 0);
       }
@@ -263,29 +262,28 @@ s32 SEQ_Handler(void)
          SEQ_SongPos(new_song_pos);
       }
 
-      if (!MID_FILE_RecordingEnabled()) {
-         u32 bpm_tick;
-         if (SEQ_BPM_ChkReqClk(&bpm_tick) > 0) {
+      u32 bpm_tick;
+      if (SEQ_BPM_ChkReqClk(&bpm_tick) > 0) {
 
-            // check if song is finished
-            if (SEQ_CheckSongFinished(bpm_tick) >= 1) {
-               bpm_tick = 0;
+         // check if song is finished
+         if (SEQ_CheckSongFinished(bpm_tick) >= 1) {
+            bpm_tick = 0;
 
-               if (SEQ_PauseEnabled()) // don't play bpm_tick 0 events...
-                  break;
-            }
-
-            // set initial BPM according to MIDI spec
-            if (bpm_tick == 0 && !seq_clk_locked)
-               SEQ_BPM_Set(120.0);
-
-            if (bpm_tick == 0) // send start (again) to synchronize with new MIDI songs
-               MIDI_ROUTER_SendMIDIClockEvent(0xfa, 0);
-
-            again = 1; // check all requests again after execution of this part
-            SEQ_Tick(bpm_tick);
+            if (SEQ_PauseEnabled()) // don't play bpm_tick 0 events...
+               break;
          }
+
+         // set initial BPM according to MIDI spec
+         if (bpm_tick == 0 && !seq_clk_locked)
+            SEQ_BPM_Set(120.0);
+
+         if (bpm_tick == 0) // send start (again) to synchronize with new MIDI songs
+            MIDI_ROUTER_SendMIDIClockEvent(0xfa, 0);
+
+         again = 1; // check all requests again after execution of this part
+         SEQ_Tick(bpm_tick);
       }
+
    } while (again && num_loops < 10);
 
    return 0; // no error
@@ -360,8 +358,6 @@ s32 SEQ_Reset(u8 play_off_events)
 /////////////////////////////////////////////////////////////////////////////
 static s32 SEQ_SongPos(u16 new_song_pos)
 {
-   if (MID_FILE_RecordingEnabled())
-      return 0; // nothing to do
 
    u32 new_tick = new_song_pos * (SEQ_BPM_PPQN_Get() / 4);
 
@@ -796,7 +792,7 @@ static s32 Hook_MIDI_SendPackage(mios32_midi_port_t port, mios32_midi_package_t 
       u16 mask = 1;
       for (i = 0; i < 16; ++i, mask <<= 1) {
          if (seq_play_enabled_ports & mask) {
-            DEBUG_MSG("Hook_MIDI_SendPackage sending on port %d",mask);
+            DEBUG_MSG("Hook_MIDI_SendPackage sending on port %d", mask);
             // USB0/1/2/3, UART0/1/2/3, IIC0/1/2/3, OSC0/1/2/3
             mios32_midi_port_t port = USB0 + ((i & 0xc) << 2) + (i & 3);
             MIOS32_MIDI_SendPackage(port, package);
@@ -816,7 +812,6 @@ s32 SEQ_PlayStopButton(void)
    if (SEQ_BPM_IsRunning()) {
       SEQ_BPM_Stop();          // stop sequencer
       SEQ_SetPauseMode(1);
-      MID_FILE_SetRecordMode(0);
    }
    else {
       if (SEQ_PauseEnabled()) {
@@ -848,35 +843,6 @@ s32 SEQ_PlayStopButton(void)
 }
 
 
-/////////////////////////////////////////////////////////////////////////////
-// To control the rec/stop button function
-/////////////////////////////////////////////////////////////////////////////
-s32 SEQ_RecStopButton(void)
-{
-   if (SEQ_BPM_IsRunning()) {
-      SEQ_BPM_Stop();          // stop sequencer
-      SEQ_SetPauseMode(1);
-      MID_FILE_SetRecordMode(0);
-   }
-   else {
-      SEQ_SetPauseMode(0);
-
-      // if in auto mode and BPM generator is clocked in slave mode:
-      // change to master mode
-      SEQ_BPM_CheckAutoMaster();
-
-      // enter record mode
-      if (MID_FILE_SetRecordMode(1) >= 0) {
-         // reset sequencer
-         SEQ_Reset(1);
-
-         // start sequencer
-         SEQ_BPM_Start();
-      }
-   }
-
-   return 0; // no error
-}
 
 s32 SEQ_FFwdButton(void)
 {
