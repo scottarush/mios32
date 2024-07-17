@@ -90,7 +90,7 @@ extern void ARP_SetEnabled(u8 enabled);
 extern u8 ARP_GetEnabled();
 extern const char * ARP_GetArpStateText();
 
-persisted_arp_data_t ARP_GetARPSettings();
+extern persisted_arp_data_t * ARP_GetARPSettings();
 
 extern float ARP_GetBPM();
 extern void ARP_SetBPM(u16 bpm);

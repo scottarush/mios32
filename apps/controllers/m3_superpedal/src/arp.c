@@ -20,6 +20,7 @@
 
 #include "arp.h"
 #include "arp_modes.h"
+#include "arp_pattern.h"
 #include "persist.h"
 #include "seq_scale.h"
 
@@ -171,8 +172,8 @@ s32 ARP_Handler(void)
       u32 bpm_tick;
       if (SEQ_BPM_ChkReqClk(&bpm_tick) > 0) {
          again = 1; // check all requests again after execution of this part
-
-         ARP_Tick(bpm_tick);
+         ARP_PAT_Tick(bpm_tick);
+ //        ARP_Tick(bpm_tick);
       }
    } while (again && num_loops < 10);
 
@@ -242,7 +243,7 @@ static s32 ARP_Tick(u32 bpm_tick)
          u8 note = oldNotestack_items[arp_counter].note;
          u8 velocity = oldNotestack_items[arp_counter].tag;
          u8 length = 72;
-         
+
          // put note into queue if all values are != 0
          if (note && velocity && length) {
             mios32_midi_package_t midi_package;
@@ -672,8 +673,8 @@ void ARP_SetMIDIChannel(u8 channel) {
 /////////////////////////////////////////////////////////////////////////////
 // Returns arp settings 
 /////////////////////////////////////////////////////////////////////////////
-persisted_arp_data_t ARP_GetARPSettings() {
-   return arpSettings;
+persisted_arp_data_t * ARP_GetARPSettings() {
+   return &arpSettings;
 }
 /////////////////////////////////////////////////////////////////////////////
 // Returns current root key from 0-11

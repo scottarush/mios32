@@ -21,19 +21,19 @@
 /////////////////////////////////////////////////////////////////////////////
 #define MAX_NUM_STEPS 16
 #define MAX_NUM_NOTES_PER_STEP 4
-#define MAX_NUM_PATTERNS 32
+#define NUM_PATTERNS 1
 
 /////////////////////////////////////////////////////////////////////////////
 // Global Types
 /////////////////////////////////////////////////////////////////////////////
 
 typedef enum step_type_e {
-   STEP_TYPE_RNDM = 0,
-   STEP_TYPE_CHORD = 1,
-   STEP_TYPE_TIE = 2,
-   STEP_TYPE_NORM = 3,
-   STEP_TYPE_REST = 4,
-   STEP_TYPE_OFF = 5
+   RNDM = 0,
+   CHORD = 1,
+   TIE = 2,
+   NORM = 3,
+   REST = 4,
+   OFF = 5
 } step_type_t;
 
 typedef struct step_event_s {
@@ -45,6 +45,7 @@ typedef struct step_event_s {
 
 typedef struct arp_pattern_s {
    const char * name;
+   const char * shortName;
    u8 numSteps;
    step_event_t events[MAX_NUM_STEPS];
 } arp_pattern_t;
@@ -52,7 +53,10 @@ typedef struct arp_pattern_s {
 typedef struct step_note_s {
    u8 note;
    u8 velocity;
+   // duration in bpmticks from starting tickoffset in the step
    u8 length;
+   // offset += in bpmticks.  Default is 0 at start of step
+   s32 tickOffset;
 } step_note_t;
 
 
@@ -66,7 +70,7 @@ extern s32 ARP_PAT_KeyPressed(u8 note, u8 velocity);
 extern void ARP_PAT_KeyReleased(u8 note, u8 velocity);
 
 extern const arp_pattern_t * ARP_PAT_GetCurrentPattern();
-
+extern s32 ARP_PAT_Tick(u32 bpm_tick);
 
 /////////////////////////////////////////////////////////////////////////////
 // Export global variables
