@@ -67,7 +67,7 @@ typedef struct step_note_s {
 extern s32 ARP_PAT_Init();
 
 extern s32 ARP_PAT_KeyPressed(u8 note, u8 velocity);
-extern void ARP_PAT_KeyReleased(u8 note, u8 velocity);
+extern s32 ARP_PAT_KeyReleased(u8 note, u8 velocity);
 
 extern const arp_pattern_t * ARP_PAT_GetCurrentPattern();
 extern s32 ARP_PAT_Tick(u32 bpm_tick);

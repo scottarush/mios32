@@ -33,6 +33,7 @@
 #include "midio_file.h"
 #include "file.h"
 #include "arp.h"
+#include "arp_pattern.h"
 #include "arp_hmi.h"
 #include "app.h"
 #include "hmi.h"
@@ -149,6 +150,7 @@ void APP_Init(void) {
 
    // initialize Arpeggiator and HMI
    ARP_Init();
+   ARP_PAT_Init();
    ARP_HMI_Init();
 
    // init terminal

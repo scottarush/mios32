@@ -173,7 +173,7 @@ s32 ARP_Handler(void)
       if (SEQ_BPM_ChkReqClk(&bpm_tick) > 0) {
          again = 1; // check all requests again after execution of this part
          ARP_PAT_Tick(bpm_tick);
- //        ARP_Tick(bpm_tick);
+         //        ARP_Tick(bpm_tick);
       }
    } while (again && num_loops < 10);
 
@@ -252,7 +252,7 @@ static s32 ARP_Tick(u32 bpm_tick)
             midi_package.chn = Chn1;
             midi_package.note = note;
             midi_package.velocity = velocity;
-            
+
             // Play on the enabled ports.
             int i;
             u16 mask = 1;
@@ -298,7 +298,7 @@ s32 ARP_FillNoteStack() {
    // Push the keys one by one onto the note stack in the proper gen order
    u8 numChordNotes = SEQ_CHORD_GetNumNotesByEnum(chord);
 #ifdef DEBUG
-   DEBUG_MSG("ARP_FillNoteStack: Pushing chord: %s, chordPlayedNote=%d octave=%d numChordNotes=%d", 
+   DEBUG_MSG("ARP_FillNoteStack: Pushing chord: %s, chordPlayedNote=%d octave=%d numChordNotes=%d",
       SEQ_CHORD_NameGetByEnum(chord), chordPlayedNote, octave, numChordNotes);
 #endif   
    u8 numNotes = numChordNotes;
@@ -328,9 +328,9 @@ s32 ARP_FillNoteStack() {
             keyNum = count;
          }
          else {
-            keyNum = numNotes - count-1;
+            keyNum = numNotes - count - 1;
             // Check if this is the last note
-            if (keyNum == numChordNotes-1){
+            if (keyNum == numChordNotes - 1) {
                // Add the first note one octave higher
                keyNum = 0;
                outputOctave += 1;
@@ -345,10 +345,10 @@ s32 ARP_FillNoteStack() {
          else {
             // descending.  skip the end
             keyNum = numNotes - count - 1;
-            if (keyNum == numChordNotes-1){
+            if (keyNum == numChordNotes - 1) {
                skip = 1;
-            } 
-            else if (keyNum == 0){
+            }
+            else if (keyNum == 0) {
                skip = 1;  // skip the last one
             }
          }
@@ -357,7 +357,7 @@ s32 ARP_FillNoteStack() {
       if (!skip) {
          s32 note = SEQ_CHORD_NoteGetByEnum(keyNum, chord, outputOctave);
 #ifdef DEBUG
-   //DEBUG_MSG("ARP_FillNoteStack: Pushing note %d keyNum=%d",note,keyNum);
+         //DEBUG_MSG("ARP_FillNoteStack: Pushing note %d keyNum=%d",note,keyNum);
 #endif
          if (note >= 0) {
             // add offset for the chordPlayedNote
@@ -382,6 +382,8 @@ s32 ARP_NotifyNoteOn(u8 note, u8 velocity)
    if (!arpEnabled) {
       return 0;   // Note not consumed
    }
+   return ARP_PAT_KeyPressed(note, velocity);
+
    switch (arpSettings.arpMode) {
    case ARP_MODE_CHORD_ARP:
    case ARP_MODE_CHORD_PAD:
@@ -408,7 +410,6 @@ s32 ARP_NotifyNoteOn(u8 note, u8 velocity)
             // This key is not a valid key in this cord.  Just fill the note stack with 
             // this single note instead
             NOTESTACK_Clear(&oldNotestack);
-            u16 length = 72;
             NOTESTACK_Push(&oldNotestack, note, velocity);
          }
          else {
@@ -468,6 +469,9 @@ s32 ARP_NotifyNoteOff(u8 note, u8 velocity) {
    if (!arpEnabled) {
       return 0;  // note not consumed
    }
+
+   return ARP_PAT_KeyReleased(note, velocity);
+
    // Otherwise arp or pad mode active
    if (arpSettings.arpMode == ARP_MODE_CHORD_PAD) {
       // Call function directly so release velocity gets sent
@@ -493,10 +497,10 @@ arp_gen_order_t ARP_GetArpGenOrder() {
 // sendOn:  if > 0 then note On.  == 0 for NoteOffs
 /////////////////////////////////////////////////////////////////////////////
 void ARP_SendChordNoteOnOffs(u8 sendOn, u8 velocity) {
- //  DEBUG_MSG("ARP_SendChordNoteOnOffs: sendOn=%d notestack.len=%d",sendOn,notestack.len);
+   //  DEBUG_MSG("ARP_SendChordNoteOnOffs: sendOn=%d notestack.len=%d",sendOn,notestack.len);
    for (u8 count = 0;count < oldNotestack.len;count++) {
       // get note/velocity/length from notestack
-      u8 note = oldNotestack_items[count].note;      
+      u8 note = oldNotestack_items[count].note;
       // put note into queue if all values are != 0
       if (note >= 0) {
          // Play note the enabled ports.
@@ -642,11 +646,11 @@ arp_clock_mode_t ARP_GetClockMode() {
 // Sets the clock mode
 /////////////////////////////////////////////////////////////////////////////
 void ARP_SetClockMode(arp_clock_mode_t mode) {
-   if (arpSettings.clockMode == mode){
+   if (arpSettings.clockMode == mode) {
       return;
    }
    arpSettings.clockMode = mode;
-   
+
    ARP_Reset();
    // persist the change
    ARP_PersistData();
@@ -661,11 +665,11 @@ u8 ARP_GetMIDIChannel() {
 // Sets the midi channel
 /////////////////////////////////////////////////////////////////////////////
 void ARP_SetMIDIChannel(u8 channel) {
-   if (arpSettings.midiChannel == channel){
+   if (arpSettings.midiChannel == channel) {
       return;
    }
    arpSettings.midiChannel = channel;
-   
+
    // persist the change
    ARP_PersistData();
 }
@@ -673,7 +677,7 @@ void ARP_SetMIDIChannel(u8 channel) {
 /////////////////////////////////////////////////////////////////////////////
 // Returns arp settings 
 /////////////////////////////////////////////////////////////////////////////
-persisted_arp_data_t * ARP_GetARPSettings() {
+persisted_arp_data_t* ARP_GetARPSettings() {
    return &arpSettings;
 }
 /////////////////////////////////////////////////////////////////////////////
