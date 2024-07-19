@@ -38,10 +38,9 @@
 /////////////////////////////////////////////////////////////////////////////
 
 static s32 ARP_PlayOffEvents(void);
-static s32 ARP_Tick(u32 bpm_tick);
 
 static s32 ARP_PersistData();
-static s32 ARP_FillNoteStack();
+static s32 ARP_FillChordPadNoteStack(u8 rootNote, u8 velocity);
 static void ARP_SendChordNoteOnOffs(u8 sendOn, u8 velocity);
 
 /////////////////////////////////////////////////////////////////////////////
@@ -51,18 +50,12 @@ static void ARP_SendChordNoteOnOffs(u8 sendOn, u8 velocity);
 // the arpeggiator position
 static u8 arp_counter;
 
-// currently played root note or 0 if invalid/not active
-static u8 chordPlayedNote;
-
-// velocity for root note
-static u8 chordPlayedNoteVelocity;
-
 // enables/disables arp
 static u8 arpEnabled = 0;
 
 // notestack
-static notestack_t oldNotestack;
-static notestack_item_t oldNotestack_items[NOTESTACK_SIZE];
+static notestack_t chordPadNotestack;
+static notestack_item_t chordPadNotestackItems[6];
 
 persisted_arp_data_t arpSettings;
 
@@ -72,7 +65,7 @@ persisted_arp_data_t arpSettings;
 s32 ARP_Init()
 {
    // initialize the Notestack Stack will be cleared whenever no note is played anymore
-   NOTESTACK_Init(&oldNotestack, NOTESTACK_MODE_PUSH_BOTTOM, &oldNotestack_items[0], NOTESTACK_SIZE);
+   NOTESTACK_Init(&chordPadNotestack, NOTESTACK_MODE_PUSH_BOTTOM, &chordPadNotestackItems[0], NOTESTACK_SIZE);
 
    // Restore settings from E^2 if they exist.  If not then initialize to defaults
    s32 valid = 0;
@@ -82,7 +75,6 @@ s32 ARP_Init()
    valid = PERSIST_ReadBlock(PERSIST_ARP_BLOCK, (unsigned char*)&arpSettings, sizeof(persisted_arp_data_t));
    if (valid < 0) {
       DEBUG_MSG("ARP_Init:  PERSIST_ReadBlock return invalid. Re-initing persisted settings to defaults");
-      arpSettings.genOrder = ARP_GEN_ORDER_ASCENDING;
       arpSettings.arpMode = ARP_MODE_CHORD_ARP;
       arpSettings.rootKey = KEY_A;
       arpSettings.modeScale = SCALE_AEOLIAN;
@@ -94,8 +86,6 @@ s32 ARP_Init()
 
       ARP_PersistData();
 
-      chordPlayedNote = 0;  // invalid, inactive
-      chordPlayedNoteVelocity = 0;
    }
 
    // clear the arp counter
@@ -173,7 +163,6 @@ s32 ARP_Handler(void)
       if (SEQ_BPM_ChkReqClk(&bpm_tick) > 0) {
          again = 1; // check all requests again after execution of this part
          ARP_PAT_Tick(bpm_tick);
-         //        ARP_Tick(bpm_tick);
       }
    } while (again && num_loops < 10);
 
@@ -218,155 +207,49 @@ s32 ARP_Reset(void)
 
 
 /////////////////////////////////////////////////////////////////////////////
-// performs a single bpm tick
+// Called to fill the note stack for PAD mode
 /////////////////////////////////////////////////////////////////////////////
-static s32 ARP_Tick(u32 bpm_tick)
-{
-   // whenever we reach a new 16th note (96 ticks @384 ppqn):
-   if ((bpm_tick % (SEQ_BPM_PPQN_Get() / 4)) == 0) {
-      // ensure that arp is reseted on first bpm_tick
-      if (bpm_tick == 0) {
-         arp_counter = 0;
-
-      }
-      else {
-         // increment arpeggiator counter
-         ++arp_counter;
-
-         // reset once we reached length of notestack
-         if (arp_counter >= oldNotestack.len)
-            arp_counter = 0;
-      }
-
-      if (oldNotestack.len > 0) {
-         // get note/velocity/length from notestack
-         u8 note = oldNotestack_items[arp_counter].note;
-         u8 velocity = oldNotestack_items[arp_counter].tag;
-         u8 length = 72;
-
-         // put note into queue if all values are != 0
-         if (note && velocity && length) {
-            mios32_midi_package_t midi_package;
-            midi_package.type = NoteOn; // package type must match with event!
-            midi_package.event = NoteOn;
-            midi_package.chn = Chn1;
-            midi_package.note = note;
-            midi_package.velocity = velocity;
-
-            // Play on the enabled ports.
-            int i;
-            u16 mask = 1;
-            for (i = 0; i < 16; ++i, mask <<= 1) {
-               if (arpSettings.midi_ports & mask) {
-                  // USB0/1/2/3, UART0/1/2/3, IIC0/1/2/3, OSC0/1/2/3
-                  mios32_midi_port_t port = 0x10 + ((i & 0xc) << 2) + (i & 3);
-
-                  SEQ_MIDI_OUT_Send(port, midi_package, SEQ_MIDI_OUT_OnOffEvent, bpm_tick, length);
-               }
-            }
-         }
+s32 ARP_FillChordPadNoteStack(u8 rootNote, u8 velocity) {
+   if (chordPadNotestack.len > 0) {
+      if (rootNote != chordPadNotestack.note_items[0].note) {
+         // Change of note, so turn off any keys that were on
+         ARP_PlayOffEvents();
       }
    }
-
-   return 0; // no error
-}
-/////////////////////////////////////////////////////////////////////////////
-// Called to fill the note stack.
-/////////////////////////////////////////////////////////////////////////////
-s32 ARP_FillNoteStack() {
-
-   if (arpSettings.arpMode == ARP_MODE_KEYS) {
-      DEBUG_MSG("ARP_FillNoteStack:  Invalid call.  Current mode=%d", arpSettings.arpMode);
-      return -1;
-   }
-
-   // Clear the note stack
-   NOTESTACK_Clear(&oldNotestack);
+   // Clear the notestack before filling
+   NOTESTACK_Clear(&chordPadNotestack);
 
    // Get the keys of the chord
    const chord_type_t chord = ARP_MODES_GetModeChord(arpSettings.modeScale,
-      arpSettings.chordExtension, arpSettings.rootKey, chordPlayedNote);
-
+      arpSettings.chordExtension, arpSettings.rootKey, rootNote);
    if ((chord == CHORD_INVALID) || (chord == CHORD_ERROR)) {
-      DEBUG_MSG("ARP_FillNoteStack: Invalid modeScale=%d, chordExtension=%d, or chordPlayedNote=%d combination",
-         arpSettings.modeScale, arpSettings.chordExtension, chordPlayedNote);
-      return -1;
+      // This key is not a valid key in this cord.  Just fill the note stack with 
+      // this single note instead
+      NOTESTACK_Clear(&chordPadNotestack);
+      NOTESTACK_Push(&chordPadNotestack, rootNote, velocity);
+      return 1;
    }
+
    // Compute octave by subtracting C-2 (note 24)
-   s8 octave = ((chordPlayedNote - 24) / 12) - 2;
+   s8 octave = ((rootNote - 24) / 12) - 2;
 
    // Push the keys one by one onto the note stack in the proper gen order
    u8 numChordNotes = SEQ_CHORD_GetNumNotesByEnum(chord);
 #ifdef DEBUG
-   DEBUG_MSG("ARP_FillNoteStack: Pushing chord: %s, chordPlayedNote=%d octave=%d numChordNotes=%d",
-      SEQ_CHORD_NameGetByEnum(chord), chordPlayedNote, octave, numChordNotes);
+   DEBUG_MSG("ARP_FillChordPadNoteStack: Pushing chord: %s, chordPlayedNote=%d octave=%d numChordNotes=%d",
+      SEQ_CHORD_NameGetByEnum(chord), rootNote, octave, numChordNotes);
 #endif   
-   u8 numNotes = numChordNotes;
-   if (arpSettings.genOrder == ARP_GEN_ORDER_ASC_DESC) {
-      // Fill notestack with 2x up and down arpeggios
-      numNotes = 2 * numChordNotes;
-   }
-   // Add according to the current gen order.
-   for (u8 count = 0; count < numNotes;count++) {
-      int keyNum = 0;
-      u8 skip = 0;
-      s8 outputOctave = octave;
-      switch (arpSettings.genOrder) {
-      case ARP_GEN_ORDER_ASCENDING:
-         keyNum = count;
-         break;
-      case ARP_GEN_ORDER_DESCENDING:
-         keyNum = numNotes - count - 1;
-         break;
-      case ARP_GEN_ORDER_RANDOM:
-         // TODO.  for now just do ascending
-         keyNum = count;
-         break;
-      case ARP_GEN_ORDER_ASC_DESC:
-         if (count < numNotes / 2) {
-            // We are ascending
-            keyNum = count;
-         }
-         else {
-            keyNum = numNotes - count - 1;
-            // Check if this is the last note
-            if (keyNum == numChordNotes - 1) {
-               // Add the first note one octave higher
-               keyNum = 0;
-               outputOctave += 1;
-            }
-         }
-         break;
-      case ARP_GEN_ORDER_ASC_DESC_SKIP_ENDS:
-         if (count < numNotes / 2) {
-            // We are ascending
-            keyNum = count;
-         }
-         else {
-            // descending.  skip the end
-            keyNum = numNotes - count - 1;
-            if (keyNum == numChordNotes - 1) {
-               skip = 1;
-            }
-            else if (keyNum == 0) {
-               skip = 1;  // skip the last one
-            }
-         }
-         break;
+   for (u8 keyNum = 0;keyNum < numChordNotes;keyNum++) {
+      s32 note = SEQ_CHORD_NoteGetByEnum(keyNum, chord, octave);
+      if (note >= 0) {
+         // add offset for the chordPlayedNote
+         note += (rootNote % 12);
+         NOTESTACK_Push(&chordPadNotestack, note, velocity);
       }
-      if (!skip) {
-         s32 note = SEQ_CHORD_NoteGetByEnum(keyNum, chord, outputOctave);
+   }
 #ifdef DEBUG
-         //DEBUG_MSG("ARP_FillNoteStack: Pushing note %d keyNum=%d",note,keyNum);
+   NOTESTACK_SendDebugMessage(&chordPadNotestack);
 #endif
-         if (note >= 0) {
-            // add offset for the chordPlayedNote
-            note += (chordPlayedNote % 12);
-            NOTESTACK_Push(&oldNotestack, note, chordPlayedNoteVelocity);
-         }
-      }
-   }
-
    return 0;
 }
 
@@ -382,81 +265,18 @@ s32 ARP_NotifyNoteOn(u8 note, u8 velocity)
    if (!arpEnabled) {
       return 0;   // Note not consumed
    }
-   return ARP_PAT_KeyPressed(note, velocity);
 
    switch (arpSettings.arpMode) {
    case ARP_MODE_CHORD_ARP:
-   case ARP_MODE_CHORD_PAD:
-
-      if (velocity == 0) {
-         // It's a release, send off events and then clear the stack
-         ARP_PlayOffEvents();
-         NOTESTACK_Clear(&oldNotestack);
-      }
-      else {
-         if (note != chordPlayedNote) {
-            // Change of note, so turn off any keys that were on and clear notestack
-            ARP_PlayOffEvents();
-            NOTESTACK_Clear(&oldNotestack);
-            // And save the note with velcoity
-            chordPlayedNote = note;
-            chordPlayedNoteVelocity = velocity;
-         }
-         // verify that the root is a valid chord in the current scale.
-         // If not then just add it alone to the notestack.
-         chord_type_t chord = ARP_MODES_GetModeChord(arpSettings.modeScale,
-            arpSettings.chordExtension, arpSettings.rootKey, note);
-         if (chord == CHORD_INVALID) {
-            // This key is not a valid key in this cord.  Just fill the note stack with 
-            // this single note instead
-            NOTESTACK_Clear(&oldNotestack);
-            NOTESTACK_Push(&oldNotestack, note, velocity);
-         }
-         else {
-            // This is a valid root of a chord witin the scale so replace the root and refill the stack
-            ARP_FillNoteStack();
-         }
-      }
-      break;
    case ARP_MODE_KEYS:
-      if (velocity) {
-         // push note into note stack
-         u16 length = 72;  // placeholder
-         NOTESTACK_Push(&oldNotestack, note, velocity);
-      }
-      else {
-         // remove note from note stack
-         // function returns 2 if no note played anymore (all keys depressed)
-         if (NOTESTACK_Pop(&oldNotestack, note) == 2) {
-            NOTESTACK_Clear(&oldNotestack);
+      // Delegate to the ARP Pattern handler
+      return ARP_PAT_KeyPressed(note, velocity);
 
-         }
-      }
+   case ARP_MODE_CHORD_PAD:
+      // Delegate to local fill function
+      ARP_FillChordPadNoteStack(note, velocity);
       break;
    }
-   if (arpSettings.arpMode == ARP_MODE_CHORD_PAD) {
-      // Note stack filled above so send the note ons for the chord
-      ARP_SendChordNoteOnOffs(1, chordPlayedNoteVelocity);
-   }
-
-
-   // Start/Stop sequencer depending upon notestack
-   if (oldNotestack.len > 0) {
-      // start sequencer if it isn't already running
-      if (!SEQ_BPM_IsRunning())
-         SEQ_BPM_Start();
-   }
-   else {
-      // no key is pressed anymore: stop sequencer
-      SEQ_BPM_Stop();
-   }
-
-
-#ifdef DEBUG
-   // optional debug messages
-   NOTESTACK_SendDebugMessage(&oldNotestack);
-#endif
-
    return 1; //  Event was consumed by arpeggiator
 }
 
@@ -478,18 +298,10 @@ s32 ARP_NotifyNoteOff(u8 note, u8 velocity) {
       ARP_SendChordNoteOnOffs(0, velocity);
    }
    else {
-      // Just send to On with zero velociy
-      ARP_NotifyNoteOn(note, 0);
+      // delegate to arp pattern handler
+      ARP_PAT_KeyReleased(note, velocity);
    }
    return 1;  // note consumed
-}
-
-
-/**
- * Returns the current Arpeggiator generation mode.
-*/
-arp_gen_order_t ARP_GetArpGenOrder() {
-   return arpSettings.genOrder;
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -498,9 +310,9 @@ arp_gen_order_t ARP_GetArpGenOrder() {
 /////////////////////////////////////////////////////////////////////////////
 void ARP_SendChordNoteOnOffs(u8 sendOn, u8 velocity) {
    //  DEBUG_MSG("ARP_SendChordNoteOnOffs: sendOn=%d notestack.len=%d",sendOn,notestack.len);
-   for (u8 count = 0;count < oldNotestack.len;count++) {
+   for (u8 count = 0;count < chordPadNotestack.len;count++) {
       // get note/velocity/length from notestack
-      u8 note = oldNotestack_items[count].note;
+      u8 note = chordPadNotestackItems[count].note;
       // put note into queue if all values are != 0
       if (note >= 0) {
          // Play note the enabled ports.
@@ -521,28 +333,6 @@ void ARP_SendChordNoteOnOffs(u8 sendOn, u8 velocity) {
       }
    }
 }
-
-/////////////////////////////////////////////////////////////////////////////
-// Sets the ArpGenMode.  On a change, the notestack order will be changed
-// at the next bar.
-/////////////////////////////////////////////////////////////////////////////
-u8 ARP_SetArpGenOrder(arp_gen_order_t genOrder) {
-   if (arpSettings.genOrder == genOrder)
-      return 0;
-   // Otherwise this is a change
-   arpSettings.genOrder = genOrder;
-
-   // Persist settings to E2
-   ARP_PersistData();
-
-   // And refill the note stack with the new order if arpeggiator currently running
-   if (arpEnabled) {
-      ARP_FillNoteStack();
-   }
-   return 0;
-}
-
-
 
 /////////////////////////////////////////////////////////////////////////////
 // Sets the ARP operating mode.

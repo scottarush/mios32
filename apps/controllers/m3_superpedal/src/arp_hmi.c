@@ -223,22 +223,6 @@ const char* ARP_HMI_GetClockModeText(arp_clock_mode_t mode) {
 // Sets/updates the indicators for the Arp mode
 /////////////////////////////////////////////////////////////////////////////
 void ARP_HMI_UpdateArpIndicators() {
-   // First the gen mode indicators
-   switch (ARP_GetArpGenOrder()) {
-   case ARP_GEN_ORDER_ASCENDING:
-      IND_SetIndicatorState(ARP_LIVE_TOE_GEN_ORDER, IND_ON, 100, IND_RAMP_UP);
-      break;
-   case ARP_GEN_ORDER_DESCENDING:
-      IND_SetIndicatorState(ARP_LIVE_TOE_GEN_ORDER, IND_ON, 100, IND_RAMP_DOWN);
-      break;
-   case ARP_GEN_ORDER_ASC_DESC:
-   case ARP_GEN_ORDER_ASC_DESC_SKIP_ENDS:
-      IND_SetIndicatorState(ARP_LIVE_TOE_GEN_ORDER, IND_ON, 100, IND_RAMP_UP_DOWN);
-      break;
-   case ARP_GEN_ORDER_RANDOM:
-      // TODO
-      break;
-   }
    // Set the stomp indicator to Red if running, Green if paused
    indicator_color_t color = IND_COLOR_GREEN;
    if (ARP_GetEnabled()) {
@@ -275,50 +259,11 @@ void ARP_HMI_UpdateChordIndicators() {
 }
 
 /////////////////////////////////////////////////////////////////////////////
-// Helper provides text for gen order
-/////////////////////////////////////////////////////////////////////////////
-const char* ARP_HMI_GetArpGenOrderText() {
-   switch (ARP_GetArpGenOrder()) {
-   case ARP_GEN_ORDER_ASCENDING:
-      return "_-";
-   case ARP_GEN_ORDER_DESCENDING:
-      return "-_";
-   case ARP_GEN_ORDER_ASC_DESC:
-      return "_^_";
-   case ARP_GEN_ORDER_ASC_DESC_SKIP_ENDS:
-      return "^";
-   case ARP_GEN_ORDER_RANDOM:
-      return "RND";
-   }
-   return "ERR";
-}
-
-/////////////////////////////////////////////////////////////////////////////
 // Helper to handle Arp live toe toggle. 
 /////////////////////////////////////////////////////////////////////////////
 void ARP_HMI_HandleArpLiveToeToggle(u8 toeNum, u8 pressed) {
    u16 bpm;
    switch (toeNum) {
-   case ARP_LIVE_TOE_GEN_ORDER:
-      // Wrap the 3 modes on this toe switch
-      switch (ARP_GetArpGenOrder()) {
-      case ARP_GEN_ORDER_ASCENDING:
-         ARP_SetArpGenOrder(ARP_GEN_ORDER_DESCENDING);
-         break;
-      case ARP_GEN_ORDER_DESCENDING:
-         ARP_SetArpGenOrder(ARP_GEN_ORDER_ASC_DESC);
-         break;
-      case ARP_GEN_ORDER_ASC_DESC:
-         ARP_SetArpGenOrder(ARP_GEN_ORDER_ASC_DESC_SKIP_ENDS);
-         break;
-      case ARP_GEN_ORDER_ASC_DESC_SKIP_ENDS:
-         ARP_SetArpGenOrder(ARP_GEN_ORDER_RANDOM);
-         break;
-      case ARP_GEN_ORDER_RANDOM:
-         ARP_SetArpGenOrder(ARP_GEN_ORDER_ASCENDING);
-      }
-      ARP_HMI_UpdateArpIndicators();
-      break;
    case ARP_LIVE_TOE_SELECT_KEY:
       /// Go to the dialog page
       snprintf(dialogPageTitle, DISPLAY_CHAR_WIDTH + 1, "%s", "SET ARP ROOT KEY");

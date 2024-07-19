@@ -44,8 +44,6 @@ typedef struct step_event_s {
 } step_event_t;
 
 typedef struct arp_pattern_s {
-   const char * name;
-   const char * shortName;
    u8 numSteps;
    step_event_t events[MAX_NUM_STEPS];
 } arp_pattern_t;
@@ -70,6 +68,8 @@ extern s32 ARP_PAT_KeyPressed(u8 note, u8 velocity);
 extern s32 ARP_PAT_KeyReleased(u8 note, u8 velocity);
 
 extern const arp_pattern_t * ARP_PAT_GetCurrentPattern();
+extern const char * ARP_PAT_GetCurrentPatternShortName();
+
 extern s32 ARP_PAT_Tick(u32 bpm_tick);
 
 /////////////////////////////////////////////////////////////////////////////

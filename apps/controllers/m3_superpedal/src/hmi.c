@@ -22,6 +22,7 @@
 #include "hmi.h"
 #include "midi_presets.h"
 #include "arp.h"
+#include "arp_pattern.h"
 #include "arp_hmi.h"
 #include "pedals.h"
 #include "indicators.h"
@@ -127,7 +128,7 @@ void HMI_UpdateOctaveIncDecIndicators();
 u8 HMI_GetToeVolumeIndex();
 
 void HMI_HandleVoicePresetsToeToggle(u8 toeNum);
-u8 HMI_DebounceSwitchChange(switchState_t * pState,u8 pressed,s32 timestamp);
+u8 HMI_DebounceSwitchChange(switchState_t* pState, u8 pressed, s32 timestamp);
 
 /////////////////////////////////////////////////////////////////////////////
 // called at Init to initialize the HMI
@@ -282,18 +283,18 @@ void HMI_InitPages() {
 // Helper does debounce and long press detection on a switch
 // returns 0 if should be ignored.
 // returns +1 if change valid
-u8 HMI_DebounceSwitchChange(switchState_t * pState,u8 pressed,s32 timestamp){
+u8 HMI_DebounceSwitchChange(switchState_t* pState, u8 pressed, s32 timestamp) {
    if (pressed) {
       // Transition from release to press. Check if timestamp from last press
       // is greater than debounce interval.
-      s32 delta = timestamp-pState->switchPressTimeStamp;
-      if (delta > DEBOUNCE_TIME_MS){
+      s32 delta = timestamp - pState->switchPressTimeStamp;
+      if (delta > DEBOUNCE_TIME_MS) {
          // It is so this is a valid initial press.
          pState->switchPressTimeStamp = timestamp;
          pState->switchState = 0;
          return 1;
       }
-      else{
+      else {
          // This is a bounce press so ignore it.
          return 0;
       }
@@ -316,8 +317,8 @@ void HMI_NotifyToeToggle(u8 toeNum, u8 pressed, s32 timestamp) {
       return;
    }
    // Debounce the switch. Ignore unless a valid press greater than debounce interval
-   u8 valid = HMI_DebounceSwitchChange(&toeSwitchState[toeNum - 1],pressed,timestamp);
-   if (!valid){
+   u8 valid = HMI_DebounceSwitchChange(&toeSwitchState[toeNum - 1], pressed, timestamp);
+   if (!valid) {
       return;
    }
 
@@ -405,8 +406,8 @@ void HMI_NotifyStompToggle(u8 stompNum, u8 pressed, s32 timestamp) {
       return;
    }
    // Debounce the switch. Ignore unless a valid press greater than debounce interval
-   u8 valid = HMI_DebounceSwitchChange(&stompSwitchState[stompNum - 1],pressed,timestamp);
-   if (!valid){
+   u8 valid = HMI_DebounceSwitchChange(&stompSwitchState[stompNum - 1], pressed, timestamp);
+   if (!valid) {
       return;
    }
 
@@ -535,7 +536,7 @@ void HMI_HandleVoicePresetsToeToggle(u8 toeNum) {
             pCurrentPage->pUpdateDisplayCallback();
             // Set the lastSelectedMIDIProgNumber o a rotation of the encoder starts at this one
             // unless we are in the MIDIPresetPage in which case this would overwrite the program to set
-            if (pCurrentPage->pageID != PAGE_MIDI_PROGRAM_SELECT){
+            if (pCurrentPage->pageID != PAGE_MIDI_PROGRAM_SELECT) {
                hmiSettings.lastSelectedMIDIProgNumber = MIDI_PRESETS_GetMidiPreset(ptr)->programNumber;
             }
          }
@@ -695,8 +696,8 @@ void HMI_NotifyBackToggle(u8 pressed, s32 timestamp) {
    u8 longPress = 0;
 
    // Debounce the switch. Ignore unless a valid press greater than debounce interval
-   u8 valid = HMI_DebounceSwitchChange(&backSwitchState,pressed,timestamp);
-   if (!valid){
+   u8 valid = HMI_DebounceSwitchChange(&backSwitchState, pressed, timestamp);
+   if (!valid) {
       return;
    }
 
@@ -866,7 +867,7 @@ void HMI_HomePage_UpdateDisplay() {
       scratchBuffer[truncLength] = '\0';
 
       snprintf(lineBuffer, DISPLAY_CHAR_WIDTH + 1, "%s %s %s %d",
-         ARP_MODES_GetNoteName(ARP_GetRootKey()), scratchBuffer, ARP_HMI_GetArpGenOrderText(), bpm);
+         ARP_MODES_GetNoteName(ARP_GetRootKey()), scratchBuffer, ARP_PAT_GetCurrentPatternShortName(), bpm);
       HMI_RenderLine(2, lineBuffer, RENDER_LINE_LEFT);
       break;
    case TOE_SWITCH_CHORD:
@@ -912,20 +913,45 @@ void HMI_HomePage_RotaryEncoderChanged(s8 increment) {
    default:
       return;
    }
-   // update the current page display
-   pCurrentPage->pUpdateDisplayCallback();
+
 }
 /////////////////////////////////////////////////////////////////////////////
 // Callback for rotary encoder select on home page
 /////////////////////////////////////////////////////////////////////////////
 void HMI_HomePage_RotaryEncoderSelect() {
-   snprintf(dialogPageTitle, DISPLAY_CHAR_WIDTH + 1, "%s", "About M3-SuperPedal");
-   snprintf(dialogPageMessage1, DISPLAY_CHAR_WIDTH + 1, "%s", M3_SUPERPEDAL_VERSION);
-   snprintf(dialogPageMessage2, DISPLAY_CHAR_WIDTH + 1, "%s", M3_SUPERPEDAL_VERSION_DATE);
+   switch (hmiSettings.toeSwitchMode) {
+   case TOE_SWITCH_VOICE_PRESETS:
+      // Go MIDI program number page
+      midiProgramSelectPage.pBackPage = pCurrentPage;
+      pCurrentPage = &midiProgramSelectPage;
+      break;
+   case TOE_SWITCH_ARP:
+      // TODO - Got to the next pattern
+      return;
+   case TOE_SWITCH_PATTERN_PRESETS:
+      // Goto Pattern select page
+      // TODO
+      return;
+   case TOE_SWITCH_OCTAVE:
+   case TOE_SWITCH_VOLUME:
+      if (pCurrentPage != &dialogPage) {
+         snprintf(dialogPageTitle, DISPLAY_CHAR_WIDTH + 1, "%s", "About M3-SuperPedal");
+         snprintf(dialogPageMessage1, DISPLAY_CHAR_WIDTH + 1, "%s", M3_SUPERPEDAL_VERSION);
+         snprintf(dialogPageMessage2, DISPLAY_CHAR_WIDTH + 1, "%s", M3_SUPERPEDAL_VERSION_DATE);
 
-   dialogPage.pBackPage = pCurrentPage;
-   pCurrentPage = &dialogPage;
+         dialogPage.pBackPage = pCurrentPage;
+         pCurrentPage = &dialogPage;
+      }
+      else{
+         return;
+      }
+      break;
+   default:
+      return;
+   }
+   // update the current page display
    pCurrentPage->pUpdateDisplayCallback();
+
 }
 ////////////////////////////////////////////////////////////////////////////
 // Callback to update the display on the Dialog page.
@@ -1027,7 +1053,7 @@ void HMI_MIDIProgramSelectPage_UpdateDisplay() {
       HMI_ClearLine(1);
    }
    else {
-      HMI_RenderLine(1, MIDI_PRESETS_GetMIDIVoiceName(lastProgNumber-1), RENDER_LINE_CENTER);
+      HMI_RenderLine(1, MIDI_PRESETS_GetMIDIVoiceName(lastProgNumber - 1), RENDER_LINE_CENTER);
    }
    if (lastProgNumber == MIDI_PRESETS_GetNumMIDIVoices() - 1) {
       // At the end, clear line 3
@@ -1047,7 +1073,7 @@ void HMI_MIDIProgramSelectPage_RotaryEncoderChanged(s8 increment) {
       progNumber = 0;
    }
    if (progNumber >= MIDI_PRESETS_GetNumMIDIVoices()) {
-      progNumber = MIDI_PRESETS_GetNumMIDIVoices()-1;
+      progNumber = MIDI_PRESETS_GetNumMIDIVoices() - 1;
    }
    if (hmiSettings.lastSelectedMIDIProgNumber != progNumber) {
       hmiSettings.lastSelectedMIDIProgNumber = progNumber;

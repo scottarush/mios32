@@ -22,15 +22,6 @@
 
 /////////////////////////////////////////////////////////////////////////////
 // Global Types
-/////////////////////////////////////////////////////////////////////////////
-typedef enum arp_gen_order_e {
-   ARP_GEN_ORDER_ASCENDING = 0,
-   ARP_GEN_ORDER_DESCENDING = 1,
-   ARP_GEN_ORDER_ASC_DESC = 2,
-   ARP_GEN_ORDER_ASC_DESC_SKIP_ENDS = 3,
-   ARP_GEN_ORDER_RANDOM = 4
-} arp_gen_order_t;
-
 typedef enum arp_mode_e {
    // Arppegiates from multiple press keys.  Not very usable with pedal board
    ARP_MODE_KEYS = 1,
@@ -51,8 +42,6 @@ typedef enum arp_clock_mode_e {
 typedef struct persisted_arp_data_s {
    // First 4 bytes must be serialization version ID.  Big-ended order
    u32 serializationID;
-
-   arp_gen_order_t genOrder;
    arp_mode_t arpMode;
    u16 midi_ports;
    u8 midiChannel;
@@ -79,9 +68,6 @@ extern s32 ARP_NotifyNewNote(notestack_t *n);
 
 extern s32 ARP_NotifyNoteOn(u8 note, u8 velocity);
 extern s32 ARP_NotifyNoteOff(u8 note,u8 velocity);
-
-extern arp_gen_order_t ARP_GetArpGenOrder();
-extern u8 ARP_SetArpGenOrder(arp_gen_order_t mode);
 
 extern void ARP_SetArpMode(arp_mode_t mode);
 extern const arp_mode_t ARP_GetArpMode();

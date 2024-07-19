@@ -43,7 +43,17 @@ static notestack_t notestack;
 static notestack_item_t notestack_items[MAX_NUM_KEYS];
 
 static arp_pattern_t patterns[NUM_PATTERNS] = {
-   {"Ascending","Asc",4,{{NORM,1,0,0},{NORM,2,0,0},{NORM,3,0,0},{NORM,4,0,0}}}
+   {4,{{NORM,1,0,0},{NORM,2,0,0},{NORM,3,0,0},{NORM,4,0,0}}},
+   {4,{{NORM,4,0,0},{NORM,3,0,0},{NORM,2,0,0},{NORM,1,0,0}}}
+};
+
+static const char * patternNames[] = {
+   "Ascending",
+   "Descending"
+};
+static const char * patternShortNames[] = {
+   "Asc ",
+   "Desc"
 };
 
 // Queue of notes.
@@ -214,6 +224,12 @@ s32 ARP_PAT_KeyReleased(u8 note, u8 velocity) {
 /////////////////////////////////////////////////////////////////////////////
 const arp_pattern_t* ARP_PAT_GetCurrentPattern() {
    return &patterns[patternIndex];
+}
+/////////////////////////////////////////////////////////////////////////////
+// Helper returns short nmae for a pattern
+/////////////////////////////////////////////////////////////////////////////
+const char * ARP_PAT_GetCurrentPatternShortName() {
+   return patternShortNames[patternIndex];
 }
 
 /////////////////////////////////////////////////////////////////////////////
