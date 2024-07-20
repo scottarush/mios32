@@ -19,7 +19,7 @@
 #include <string.h>
 
 #include "arp_pattern.h"
-
+#include "arp_pattern_data.h"
 #include "seq_chord.h"
 #include "seq_midi_out.h"
 #include "seq_bpm.h"
@@ -31,7 +31,7 @@
 // Local definitions
 /////////////////////////////////////////////////////////////////////////////
 
-static void ARP_PAT_ClearPatternBuffer();
+
 
 /////////////////////////////////////////////////////////////////////////////
 // Local variables
@@ -42,77 +42,81 @@ static void ARP_PAT_ClearPatternBuffer();
 static notestack_t notestack;
 static notestack_item_t notestack_items[MAX_NUM_KEYS];
 
-static arp_pattern_t patterns[NUM_PATTERNS] = {
-   {4,{{NORM,1,0,0},{NORM,2,0,0},{NORM,3,0,0},{NORM,4,0,0}}},
-   {4,{{NORM,4,0,0},{NORM,3,0,0},{NORM,2,0,0},{NORM,1,0,0}}}
-};
-
-static const char * patternNames[] = {
-   "Ascending",
-   "Descending"
-};
-static const char * patternShortNames[] = {
-   "Asc ",
-   "Desc"
-};
-
 // Queue of notes.
 // Notes set to 0 length are null
 static step_note_t patternBuffer[MAX_NUM_STEPS][MAX_NUM_NOTES_PER_STEP];
 
-// index of current pattern
-static u8 patternIndex;
-
 // pattern step counter
 static u8 stepCounter;
+static u8 localPatternIndex;
 
 /////////////////////////////////////////////////////////////////////////////
 // Local prototypes
 /////////////////////////////////////////////////////////////////////////////
 void ARP_PAT_UpdatePatternBuffer();
-
+static void ARP_PAT_ClearPatternBuffer();
 
 /////////////////////////////////////////////////////////////////////////////
 // Initialisation
+// This must be called AFTER Arp pattern init.
 /////////////////////////////////////////////////////////////////////////////
 s32 ARP_PAT_Init()
 {
-   patternIndex = 0;
    stepCounter = 0;
    // initialize the Notestack Stack to hold the keys
    NOTESTACK_Init(&notestack, NOTESTACK_MODE_PUSH_BOTTOM, &notestack_items[0], MAX_NUM_KEYS);
 
+   localPatternIndex = ARP_GetARPSettings()->arpPatternIndex;
    return 0; // no error
 }
 
 /////////////////////////////////////////////////////////////////////////////
-// Called to load a new pattern.  
+// Called to set the current pattern which will be persisted to storage.
 /////////////////////////////////////////////////////////////////////////////
-s32 ARP_PAT_LoadPattern(u8 _patternIndex) {
+s32 ARP_PAT_SetCurrentPattern(u8 _patternIndex) {
+   s32 error = ARP_PAT_ActivatePattern(_patternIndex);
+   if (error <= 0){
+      return -1;
+   }
+   ARP_PAT_ActivatePattern(_patternIndex);
+   // Persist the pattern change
+   ARP_GetARPSettings()->arpPatternIndex = _patternIndex;
+   ARP_PersistData();
+   return 0;
+}
+////////////////////////////////////////////////////////////////////////////
+// Called to activate a pattern.  It will not be persisted to storage.
+// Returns -1 on invalid index, 0 on no pattern change, and +1 on change to
+// new pattern
+/////////////////////////////////////////////////////////////////////////////
+s32 ARP_PAT_ActivatePattern(u8 _patternIndex) {
    if (_patternIndex >= NUM_PATTERNS) {
       return -1;
    }
-   if (_patternIndex == patternIndex) {
+   if (_patternIndex == localPatternIndex) {
       return 0;
    }
-   // Otherwise new pattern.  Clear the notestack
+   // Otherwise new pattern.  Transfer locally but do not persist.
+   #ifdef DEBUG
+   DEBUG_MSG("ARP_PAT_ActivatePattern:  activating pattern: %s",ARP_PAT_GetPatternName(_patternIndex));
+   #endif
+   // Update local index
+   localPatternIndex = _patternIndex;
+
    NOTESTACK_Clear(&notestack);
    // Flush the queue to play off events
    SEQ_MIDI_OUT_FlushQueue();
-
-   // transfer the new pattern and wait for a key.
-   patternIndex = _patternIndex;
    // clear the pattern buffer up to the number of steps in the new patter
    ARP_PAT_ClearPatternBuffer();
-
-   return 0;
+   return 1;
 }
+
 
 /////////////////////////////////////////////////////////////////////////////
 // Helper clears the pattern buffer.
 /////////////////////////////////////////////////////////////////////////////
 void ARP_PAT_ClearPatternBuffer() {
-   for (int i = 0;i < ARP_PAT_GetCurrentPattern()->numSteps;i++) {
+   for (int i = 0;i < patterns[localPatternIndex].numSteps;i++) {
       for (int j = 0;j < MAX_NUM_NOTES_PER_STEP;j++) {
          step_note_t* pNote = &patternBuffer[i][j];
          pNote->length = 0;
@@ -220,16 +224,20 @@ s32 ARP_PAT_KeyReleased(u8 note, u8 velocity) {
 }
 
 /////////////////////////////////////////////////////////////////////////////
-// Helper returns a pointer to the currently selected pattern
-/////////////////////////////////////////////////////////////////////////////
-const arp_pattern_t* ARP_PAT_GetCurrentPattern() {
-   return &patterns[patternIndex];
-}
-/////////////////////////////////////////////////////////////////////////////
 // Helper returns short nmae for a pattern
 /////////////////////////////////////////////////////////////////////////////
 const char * ARP_PAT_GetCurrentPatternShortName() {
-   return patternShortNames[patternIndex];
+   return patternShortNames[localPatternIndex];
+}
+/////////////////////////////////////////////////////////////////////////////
+// Helper returns name for a pattern
+/////////////////////////////////////////////////////////////////////////////
+const char * ARP_PAT_GetPatternName(u8 patternIndex) {
+   if (patternIndex > NUM_PATTERNS-1){
+      return "ERR!";
+   }
+   
+   return patternNames[patternIndex];
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -250,7 +258,7 @@ s32 ARP_PAT_Tick(u32 bpm_tick)
          ++stepCounter;
 
          // reset once we reached number of steps in pattern
-         if (stepCounter >= ARP_PAT_GetCurrentPattern()->numSteps) {
+         if (stepCounter >= patterns[localPatternIndex].numSteps) {
             stepCounter = 0;
          }
       }
@@ -267,7 +275,9 @@ s32 ARP_PAT_Tick(u32 bpm_tick)
                mios32_midi_package_t midi_package;
                midi_package.type = NoteOn; // package type must match with event!
                midi_package.event = NoteOn;
-               midi_package.chn = ARP_GetARPSettings()->midiChannel;
+               // For some reason SEQ_MIDI_OUT is 0 based midiChannel but ARPSettings is 1...16 
+               // so subtract 1.
+               midi_package.chn = ARP_GetARPSettings()->midiChannel-1;
                midi_package.note = note;
                midi_package.velocity = velocity;
 
@@ -295,12 +305,17 @@ s32 ARP_PAT_Tick(u32 bpm_tick)
 // Called whenever there is a change in the notestack content.
 /////////////////////////////////////////////////////////////////////////////
 void ARP_PAT_UpdatePatternBuffer() {
-
    // Clear the pattern buffer first
    ARP_PAT_ClearPatternBuffer();
+   if (notestack.len == 0){
+      // There are no notes in the stack so nothing to fill
+      return;
+   }
+
+
 
    // Now refill it
-   const arp_pattern_t* pPattern = ARP_PAT_GetCurrentPattern();
+   const arp_pattern_t* pPattern = &patterns[localPatternIndex];
    u32 stepPPQN = SEQ_BPM_PPQN_Get() / 4;
 
    for (u8 step = 0;step < pPattern->numSteps;step++) {
@@ -325,7 +340,8 @@ void ARP_PAT_UpdatePatternBuffer() {
             s8 octave = ((chordNote - 24) / 12) - 2;
             // adjust octave by the delta in the event
             octave += pEvent->octave;
-
+            // Add offset from the root note
+            chordNote += (chordNote % 12);
             // Now put the notes of the chord into the pattern buffer at the chordNoteVelocity
             u8 numChordNotes = SEQ_CHORD_GetNumNotesByEnum(chord);
 #ifdef DEBUG
@@ -342,19 +358,18 @@ void ARP_PAT_UpdatePatternBuffer() {
          }
          else {
             DEBUG_MSG("ARP_PAT_UpdatePatternBuffer: Error: k#: %d for pattern:%s step:%d exceeds notestack size",
-               pEvent->keySelect, pPattern->name, step);
+               pEvent->keySelect, patternNames[localPatternIndex], step);
          }
          break;
       case NORM:
-      case TIE:
-         // add the note at the keySelect with a single step length adjusting for the octave and scale step
+          // add the note at the keySelect with a single step length adjusting for the octave and scale step
          if (notestack.len >= pEvent->keySelect) {
-            step_note_t* pNote = &patternBuffer[step][pEvent->keySelect];
+            step_note_t* pNote = &patternBuffer[step][pEvent->keySelect-1];
             pNote->note = notestack.note_items[pEvent->keySelect - 1].note + 12 * pEvent->octave + pEvent->scaleStep;
             pNote->velocity = notestack.note_items[pEvent->keySelect - 1].tag;
 #ifdef DEBUG
-            DEBUG_MSG("ARP_PAT_UpdatePatternBuffer:NORM Adding note %02x @ step:%d k#:%d",
-               pNote->note, step, pEvent->keySelect);
+ //           DEBUG_MSG("ARP_PAT_UpdatePatternBuffer:NORM Adding note %02x @ step:%d k#:%d",
+ //              pNote->note, step, pEvent->keySelect);
 #endif                  
             if (pEvent->stepType == NORM) {
                pNote->length = stepPPQN;

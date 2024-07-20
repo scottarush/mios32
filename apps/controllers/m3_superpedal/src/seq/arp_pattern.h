@@ -21,7 +21,7 @@
 /////////////////////////////////////////////////////////////////////////////
 #define MAX_NUM_STEPS 16
 #define MAX_NUM_NOTES_PER_STEP 4
-#define NUM_PATTERNS 1
+#define NUM_PATTERNS 4
 
 /////////////////////////////////////////////////////////////////////////////
 // Global Types
@@ -38,6 +38,7 @@ typedef enum step_type_e {
 
 typedef struct step_event_s {
    step_type_t stepType;
+   // from 1..MAX_NUM_NOTES_PER_STEP
    u8 keySelect;
    s8 octave;
    s8 scaleStep;
@@ -67,8 +68,11 @@ extern s32 ARP_PAT_Init();
 extern s32 ARP_PAT_KeyPressed(u8 note, u8 velocity);
 extern s32 ARP_PAT_KeyReleased(u8 note, u8 velocity);
 
-extern const arp_pattern_t * ARP_PAT_GetCurrentPattern();
+extern s32 ARP_PAT_SetCurrentPattern(u8 _patternIndex);
+extern s32 ARP_PAT_ActivatePattern(u8 _patternIndex);
+
 extern const char * ARP_PAT_GetCurrentPatternShortName();
+extern const char * ARP_PAT_GetPatternName(u8 patternIndex);
 
 extern s32 ARP_PAT_Tick(u32 bpm_tick);
 

@@ -28,7 +28,7 @@
 // Local definitions
 /////////////////////////////////////////////////////////////////////////////
 
-#define NOTESTACK_SIZE 16
+#define NOTESTACK_SIZE 6
 
 #define DEBUG_MSG MIOS32_MIDI_SendDebugMessage
 #define DEBUG
@@ -39,9 +39,8 @@
 
 static s32 ARP_PlayOffEvents(void);
 
-static s32 ARP_PersistData();
 static s32 ARP_FillChordPadNoteStack(u8 rootNote, u8 velocity);
-static void ARP_SendChordNoteOnOffs(u8 sendOn, u8 velocity);
+static void ARP_SendChordNoteOnOffs(u8 sendOn);
 
 /////////////////////////////////////////////////////////////////////////////
 // Local variables
@@ -76,6 +75,7 @@ s32 ARP_Init()
    if (valid < 0) {
       DEBUG_MSG("ARP_Init:  PERSIST_ReadBlock return invalid. Re-initing persisted settings to defaults");
       arpSettings.arpMode = ARP_MODE_CHORD_ARP;
+      arpSettings.arpPatternIndex = 0;
       arpSettings.rootKey = KEY_A;
       arpSettings.modeScale = SCALE_AEOLIAN;
       arpSettings.chordExtension = CHORD_EXT_SEVENTH;
@@ -83,7 +83,6 @@ s32 ARP_Init()
       arpSettings.bpm = 120.0;
       arpSettings.midi_ports = 0x0031;     // OUT1, OUT2, and USB
       arpSettings.midiChannel = 1;
-
       ARP_PersistData();
 
    }
@@ -178,7 +177,7 @@ s32 ARP_Handler(void)
 static s32 ARP_PlayOffEvents(void)
 {
    if (arpSettings.arpMode == ARP_MODE_CHORD_PAD) {
-      ARP_SendChordNoteOnOffs(0, 0);
+      ARP_SendChordNoteOnOffs(0);
       return 0;
    }
    // Otherwise, it is a sequence mode, so flush the queue to play the "off events
@@ -233,17 +232,17 @@ s32 ARP_FillChordPadNoteStack(u8 rootNote, u8 velocity) {
    // Compute octave by subtracting C-2 (note 24)
    s8 octave = ((rootNote - 24) / 12) - 2;
 
-   // Push the keys one by one onto the note stack in the proper gen order
+   // Push the keys one by one onto the note stack from the root
    u8 numChordNotes = SEQ_CHORD_GetNumNotesByEnum(chord);
 #ifdef DEBUG
-   DEBUG_MSG("ARP_FillChordPadNoteStack: Pushing chord: %s, chordPlayedNote=%d octave=%d numChordNotes=%d",
-      SEQ_CHORD_NameGetByEnum(chord), rootNote, octave, numChordNotes);
+  // DEBUG_MSG("ARP_FillChordPadNoteStack: Pushing chord: %s, chordPlayedNote=%d octave=%d numChordNotes=%d",
+    //  SEQ_CHORD_NameGetByEnum(chord), rootNote, octave, numChordNotes);
 #endif   
    for (u8 keyNum = 0;keyNum < numChordNotes;keyNum++) {
       s32 note = SEQ_CHORD_NoteGetByEnum(keyNum, chord, octave);
       if (note >= 0) {
          // add offset for the chordPlayedNote
-         note += (rootNote % 12);
+         note += (rootNote % 12);         
          NOTESTACK_Push(&chordPadNotestack, note, velocity);
       }
    }
@@ -275,6 +274,7 @@ s32 ARP_NotifyNoteOn(u8 note, u8 velocity)
    case ARP_MODE_CHORD_PAD:
       // Delegate to local fill function
       ARP_FillChordPadNoteStack(note, velocity);
+      ARP_SendChordNoteOnOffs(1);
       break;
    }
    return 1; //  Event was consumed by arpeggiator
@@ -290,12 +290,10 @@ s32 ARP_NotifyNoteOff(u8 note, u8 velocity) {
       return 0;  // note not consumed
    }
 
-   return ARP_PAT_KeyReleased(note, velocity);
-
    // Otherwise arp or pad mode active
    if (arpSettings.arpMode == ARP_MODE_CHORD_PAD) {
       // Call function directly so release velocity gets sent
-      ARP_SendChordNoteOnOffs(0, velocity);
+      ARP_SendChordNoteOnOffs(0);
    }
    else {
       // delegate to arp pattern handler
@@ -308,11 +306,12 @@ s32 ARP_NotifyNoteOff(u8 note, u8 velocity) {
 // Sends NoteOns/Offs for for a chord in the notestack.
 // sendOn:  if > 0 then note On.  == 0 for NoteOffs
 /////////////////////////////////////////////////////////////////////////////
-void ARP_SendChordNoteOnOffs(u8 sendOn, u8 velocity) {
+void ARP_SendChordNoteOnOffs(u8 sendOn) {
    //  DEBUG_MSG("ARP_SendChordNoteOnOffs: sendOn=%d notestack.len=%d",sendOn,notestack.len);
    for (u8 count = 0;count < chordPadNotestack.len;count++) {
       // get note/velocity/length from notestack
       u8 note = chordPadNotestackItems[count].note;
+      u8 velocity = chordPadNotestackItems[count].tag;
       // put note into queue if all values are != 0
       if (note >= 0) {
          // Play note the enabled ports.

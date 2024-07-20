@@ -49,6 +49,7 @@
 struct page_s homePage;
 struct page_s midiProgramSelectPage;
 struct page_s arpSettingsPage;
+struct page_s arpPatternPage;
 struct page_s dialogPage;
 struct page_s* pCurrentPage;
 
@@ -265,6 +266,17 @@ void HMI_InitPages() {
    arpSettingsPage.pPedalSelectedCallback = NULL;
    arpSettingsPage.pBackButtonCallback = NULL;
    arpSettingsPage.pBackPage = &homePage;
+
+
+   arpSettingsPage.pageID = PAGE_ARP_SETTINGS;
+   char* arpPatternTitle = { "ARP PATTERNS" };
+   arpPatternPage.pPageTitle = arpPatternTitle;
+   arpPatternPage.pUpdateDisplayCallback = ARP_HMI_ARPPatternPage_UpdateDisplay;
+   arpPatternPage.pRotaryEncoderChangedCallback = ARP_HMI_ARPPatternPage_RotaryEncoderChanged;
+   arpPatternPage.pRotaryEncoderSelectCallback = ARP_HMI_ARPPatternPage_RotaryEncoderSelected;
+   arpPatternPage.pPedalSelectedCallback = NULL;
+   arpPatternPage.pBackButtonCallback = ARP_HMI_ARPPatternPage_BackButtonCallback;
+   arpPatternPage.pBackPage = &homePage;
 
    dialogPage.pageID = PAGE_DIALOG;
    dialogPage.pPageTitle = dialogPageTitle;
@@ -895,9 +907,10 @@ void HMI_HomePage_RotaryEncoderChanged(s8 increment) {
       pCurrentPage = &midiProgramSelectPage;
       break;
    case TOE_SWITCH_ARP:
-      arpSettingsPage.pBackPage = pCurrentPage;
-      pCurrentPage = &arpSettingsPage;
-      return;
+      // Go directly to the arp pattern select page
+      arpPatternPage.pBackPage = pCurrentPage;
+      pCurrentPage = &arpPatternPage;
+      break;
    case TOE_SWITCH_PATTERN_PRESETS:
       // Goto Pattern select page
       // TODO
@@ -913,7 +926,8 @@ void HMI_HomePage_RotaryEncoderChanged(s8 increment) {
    default:
       return;
    }
-
+   // update the current page display
+   pCurrentPage->pUpdateDisplayCallback();
 }
 /////////////////////////////////////////////////////////////////////////////
 // Callback for rotary encoder select on home page
@@ -926,8 +940,10 @@ void HMI_HomePage_RotaryEncoderSelect() {
       pCurrentPage = &midiProgramSelectPage;
       break;
    case TOE_SWITCH_ARP:
-      // TODO - Got to the next pattern
-      return;
+      // Go to arp settings page
+      arpSettingsPage.pBackPage = pCurrentPage;
+      pCurrentPage = & arpSettingsPage;
+      break;
    case TOE_SWITCH_PATTERN_PRESETS:
       // Goto Pattern select page
       // TODO
@@ -943,6 +959,7 @@ void HMI_HomePage_RotaryEncoderSelect() {
          pCurrentPage = &dialogPage;
       }
       else{
+         // Already on about page
          return;
       }
       break;

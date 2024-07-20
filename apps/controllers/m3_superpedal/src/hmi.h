@@ -82,6 +82,7 @@ extern struct page_s homePage;
 extern struct page_s dialogPage;
 extern struct page_s* pCurrentPage;
 extern struct page_s arpSettingsPage;
+extern struct page_s arpPatternPage;
 
 // Buffer for dialog Page Title
 extern char dialogPageTitle[DISPLAY_CHAR_WIDTH + 1];

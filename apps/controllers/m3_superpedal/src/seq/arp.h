@@ -43,6 +43,7 @@ typedef struct persisted_arp_data_s {
    // First 4 bytes must be serialization version ID.  Big-ended order
    u32 serializationID;
    arp_mode_t arpMode;
+   u8 arpPatternIndex;
    u16 midi_ports;
    u8 midiChannel;
    arp_clock_mode_t clockMode;
@@ -91,7 +92,9 @@ extern arp_clock_mode_t ARP_GetClockMode();
 extern void ARP_SetClockMode(arp_clock_mode_t mode);
 
 extern void ARP_SetMIDIChannel(u8 channel);
-u8 ARP_GetMIDIChannel();
+extern u8 ARP_GetMIDIChannel();
+
+extern s32 ARP_PersistData();
 /////////////////////////////////////////////////////////////////////////////
 // Export global variables
 /////////////////////////////////////////////////////////////////////////////

@@ -14,8 +14,6 @@ LCD       =     $(MIOS32_LCD)
 # Source Files, include paths and libraries
 ################################################################################
 
-# Scott Rush:  January 2024.  Added Studio90Plus specific keyboard driver 
-# pending future pull into mainline keyboard module.
 THUMB_SOURCE    = src/app.c \
  		  src/pedals.c \
 		  src/indicators.c \
@@ -25,17 +23,16 @@ THUMB_SOURCE    = src/app.c \
 		  src/midi_patch_data.c\
         src/persist.c\
 		  src/terminal.c\
-		  src/arp.c \
-		  src/arp_modes.c\
+		  src/seq/arp.c \
+		  src/seq/arp_modes.c\
 		  src/seq/arp_pattern.c\
+		  src/seq/arp_pattern_data.c\
 		  src/seq/mid_file.c \
 		  src/seq/midio_file.c \
 		  src/seq/seq.c \
 		  src/seq/seq_chord.c \
 		  src/seq/seq_scale.c \
 		  src/seq/seq_core.c 
-#		  src/seq/notestack.c 
-
 #		  src/shell.c \
 
 

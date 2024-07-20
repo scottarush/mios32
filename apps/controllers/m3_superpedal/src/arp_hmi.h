@@ -48,9 +48,13 @@ extern void ARP_HMI_HandleArpLiveToeToggle(u8, u8);
 extern s32 ARP_HMI_PersistData();
 extern void ARP_HMI_ARPSettingsPage_RotaryEncoderChanged(s8 increment);
 extern void ARP_HMI_ARPSettingsPage_RotaryEncoderSelected();
+extern void ARP_HMI_ARPPatternPage_RotaryEncoderChanged(s8 increment);
+extern void ARP_HMI_ARPPatternPage_RotaryEncoderSelected();
+extern void ARP_HMI_ARPPatternPage_BackButtonCallback();
 
+extern void ARP_HMI_ARPPatternPage_UpdateDisplay();
 
-/////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////
 // Export global variables
 /////////////////////////////////////////////////////////////////////////////
 

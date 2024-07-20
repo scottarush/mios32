@@ -27,7 +27,7 @@ typedef enum key_e {
    KEY_G = 7,
    KEY_AFLAT = 8,
    KEY_A = 9,
-   KEY_BFLAG = 10,
+   KEY_BFLAT = 10,
    KEY_B = 11
 } key_t;
 

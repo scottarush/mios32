@@ -21,6 +21,7 @@
 
 #include "hmi.h"
 #include "arp_hmi.h"
+#include "arp_pattern.h"
 #include "arp.h"
 #include "pedals.h"
 #include "indicators.h"
@@ -75,7 +76,7 @@ void ARP_HMI_ARPSettingsValues_RotaryEncoderChanged(s8 increment);
 //----------------------------------------------------------------------------
 persisted_arp_hmi_data_t arpHMISettings;
 
-
+static s16 lastARPPatternIndex = 0;
 
 /////////////////////////////////////////////////////////////////////////////
 // Initialisation
@@ -110,9 +111,30 @@ s32 ARP_HMI_PersistData() {
    }
    return valid;
 }
-
 ////////////////////////////////////////////////////////////////////////////
-// Callback to update the display on the MIDIProgramSelectPage
+// Callback to update the arp pattern select display
+////////////////////////////////////////////////////////////////////////////
+void ARP_HMI_ARPPatternPage_UpdateDisplay() {
+   HMI_RenderLine(0, arpPatternPage.pPageTitle, RENDER_LINE_CENTER);
+   // Spacer on line 1
+   HMI_RenderLine(1, "--------------------", RENDER_LINE_LEFT);
+
+   // Print up to 2 entries with current selection on line 2
+
+   // Selected entry on line 2
+   HMI_RenderLine(2, ARP_PAT_GetPatternName(lastARPPatternIndex), RENDER_LINE_SELECT);
+   if (lastARPPatternIndex >= NUM_PATTERNS - 1) {
+      // At the end, clear line 3
+      HMI_ClearLine(3);
+   }
+   else {
+      // Print next item on line 3
+      HMI_RenderLine(3, ARP_PAT_GetPatternName(lastARPPatternIndex + 1), RENDER_LINE_CENTER);
+   }
+
+}
+////////////////////////////////////////////////////////////////////////////
+// Callback to update the arp settings display
 ////////////////////////////////////////////////////////////////////////////
 void ARP_HMI_ARPSettings_UpdateDisplay() {
    HMI_RenderLine(0, arpSettingsPage.pPageTitle, RENDER_LINE_CENTER);
@@ -132,17 +154,64 @@ void ARP_HMI_ARPSettings_UpdateDisplay() {
       HMI_RenderLine(3, arpSettingsPageEntryTitles[arpHMISettings.lastArpSettingsPageIndex + 1], RENDER_LINE_CENTER);
    }
 }
+
 /////////////////////////////////////////////////////////////////////////////
-// Callback for rotary encoder change on arp settings page
+// Callback for select arp pattern page rotary encoder select
+/////////////////////////////////////////////////////////////////////////////
+void ARP_HMI_ARPPatternPage_RotaryEncoderSelected() {
+   ARP_PAT_SetCurrentPattern(lastARPPatternIndex);
+   // Go back to the previous page
+   pCurrentPage = pCurrentPage->pBackPage;
+   // And force an update to the current page display
+   pCurrentPage->pUpdateDisplayCallback();
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// Callback for rotary encoder change on arp pattern page
+/////////////////////////////////////////////////////////////////////////////
+void ARP_HMI_ARPPatternPage_RotaryEncoderChanged(s8 increment) {
+   s16 index = lastARPPatternIndex;
+   index += increment;
+   if (index < 0) {
+      index = 0;
+   }
+   else if (index >= NUM_PATTERNS) {
+      index = NUM_PATTERNS - 1;
+   }
+   if (index == lastARPPatternIndex){
+      return;
+   }
+   lastARPPatternIndex= index;
+   // Activate the pattern, but don't set it as current until/unless user selects encoder.  
+   ARP_PAT_ActivatePattern(lastARPPatternIndex);      
+
+   // force an update to the current page display
+   pCurrentPage->pUpdateDisplayCallback();
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// Callback for back button pressed on arp pattern select page.
+/////////////////////////////////////////////////////////////////////////////
+void ARP_HMI_ARPPatternPage_BackButtonCallback() {
+   // On a back button press, user did not select a new pattern so restore the
+   // current one
+   ARP_PAT_SetCurrentPattern(ARP_GetARPSettings()->arpPatternIndex);
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// Callback for select arp settings page rotary encoder change
 /////////////////////////////////////////////////////////////////////////////
 void ARP_HMI_ARPSettingsPage_RotaryEncoderChanged(s8 increment) {
-   arpHMISettings.lastArpSettingsPageIndex += increment;
-   if (arpHMISettings.lastArpSettingsPageIndex < 0) {
-      arpHMISettings.lastArpSettingsPageIndex = 0;
+   s32 index = arpHMISettings.lastArpSettingsPageIndex + increment;
+   if (index < 0) {
+      index = 0;
    }
-   else if (arpHMISettings.lastArpSettingsPageIndex >= ARP_SETTINGS_PAGE_NUM_ENTRIES) {
-      arpHMISettings.lastArpSettingsPageIndex = ARP_SETTINGS_PAGE_NUM_ENTRIES - 1;
+   else if (index >= ARP_SETTINGS_PAGE_NUM_ENTRIES) {
+      index = ARP_SETTINGS_PAGE_NUM_ENTRIES - 1;
    }
+   if (index == arpHMISettings.lastArpSettingsPageIndex)
+      return;
+   arpHMISettings.lastArpSettingsPageIndex = index;
    // force an update to the current page display
    pCurrentPage->pUpdateDisplayCallback();
 }
