@@ -75,6 +75,7 @@ extern const char * ARP_PAT_GetCurrentPatternShortName();
 extern const char * ARP_PAT_GetPatternName(u8 patternIndex);
 
 extern s32 ARP_PAT_Tick(u32 bpm_tick);
+extern void ARP_PAT_Reset();
 
 /////////////////////////////////////////////////////////////////////////////
 // Export global variables

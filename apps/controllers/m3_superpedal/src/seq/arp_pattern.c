@@ -103,11 +103,8 @@ s32 ARP_PAT_ActivatePattern(u8 _patternIndex) {
    // Update local index
    localPatternIndex = _patternIndex;
 
-   NOTESTACK_Clear(&notestack);
-   // Flush the queue to play off events
-   SEQ_MIDI_OUT_FlushQueue();
-   // clear the pattern buffer up to the number of steps in the new patter
-   ARP_PAT_ClearPatternBuffer();
+   // Reset everything
+   ARP_PAT_Reset();
    return 1;
 }
 
@@ -135,21 +132,16 @@ s32 ARP_PAT_KeyPressed(u8 note, u8 velocity) {
    //-- If we are in chord mode and this is a different note, then clear the notestack
    // and repush to play a different chord
    if (ARP_GetARPSettings()->arpMode == ARP_MODE_CHORD_ARP) {
-      // check if this is a different note than the first note, if so then clear the note stack and repush
+      // check if this is a different note than the first note, if so then clear the note stack
+      // before dropping through to push new notes
+      // NOTE:  This code is intended to make sure that slurring from one pedal to another
+      // makes for clean transitions.  Note sure if that is actually achieved.
       if (notestack.len > 0) {
          if (notestack.note_items[0].note != note) {
-            // Clear the stack
-            NOTESTACK_Clear(&notestack);
-#ifdef DEBUG
-            DEBUG_MSG("ARP_PAT_KeyPressed:  clearing notestack for note: %d", note);
-            NOTESTACK_SendDebugMessage(&notestack);
-#endif
-         }
-         else {
-#ifdef DEBUG
-            DEBUG_MSG("ARP_PAT_KeyPressed:  notestack NOT cleared for note: %d", note);
-            NOTESTACK_SendDebugMessage(&notestack);
-#endif           
+            // Pop the old root from the stack
+            NOTESTACK_Pop(&notestack,notestack.note_items[0].note);
+            // And reset the stepcounter so that the sequence starts from the beginning
+            stepCounter = 0;
          }
       }
    }
@@ -175,12 +167,7 @@ s32 ARP_PAT_KeyPressed(u8 note, u8 velocity) {
          chordNote += (note % 12);
 
          NOTESTACK_Push(&notestack, chordNote, velocity);
-      }
-#ifdef DEBUG
-      DEBUG_MSG("ARP_PAT_KeyPressed: Added %d notes to notestack for chord:%s, root=%02X",
-         numChordNotes, SEQ_CHORD_NameGetByEnum(chord), note);
-      NOTESTACK_SendDebugMessage(&notestack);
-#endif          
+      }      
    }
    else {
       // Note in chord mode so just push the note
@@ -205,19 +192,20 @@ s32 ARP_PAT_KeyReleased(u8 note, u8 velocity) {
 
    u8 cleared = 0;
    if (ARP_GetARPSettings()->arpMode == ARP_MODE_CHORD_ARP) {
-      // Clear out the notestack
-      NOTESTACK_Clear(&notestack);
-#ifdef DEBUG
-      DEBUG_MSG("ARP_PAT_KeyReleased cleared notestack for note:%d", note);
-      NOTESTACK_SendDebugMessage(&notestack);
-#endif
+      // Check if the release key is the root in the notestack
+      if (notestack_items[0].note == note){
+         // Same note so clear notestack and fall through to update pattern buffer (which
+         // will just clear it out and reset step counter.
+         NOTESTACK_Clear(&notestack);
+         cleared = 1;
+      }
    }
    if (!cleared) {
       // Not the root or we are in key mode so just remove the note
       NOTESTACK_Pop(&notestack, note);
    }
 
-   // Now update the pattern buffer from the notestack.
+   // update the pattern buffer from the notestack.
    ARP_PAT_UpdatePatternBuffer();
 
    return 1;   // note consumed
@@ -241,6 +229,16 @@ const char * ARP_PAT_GetPatternName(u8 patternIndex) {
 }
 
 /////////////////////////////////////////////////////////////////////////////
+// Resets the pattern generator by clearing the notestack, pattern Buffer
+// and sequencer queue.
+/////////////////////////////////////////////////////////////////////////////
+void ARP_PAT_Reset(){
+   NOTESTACK_Clear(&notestack);
+   stepCounter = 0;
+   ARP_PAT_ClearPatternBuffer();
+   SEQ_MIDI_OUT_FlushQueue();
+}
+/////////////////////////////////////////////////////////////////////////////
 // Forward from ARP_Tick when in pattern mode for each tick.  This function will output
 // notes from the pattern buffer to the sequenceer
 /////////////////////////////////////////////////////////////////////////////
@@ -248,7 +246,7 @@ s32 ARP_PAT_Tick(u32 bpm_tick)
 {
    // whenever we reach a new 16th note (96 ticks @384 ppqn):
    if ((bpm_tick % (SEQ_BPM_PPQN_Get() / 4)) == 0) {
-      // ensure that arp is reseted on first bpm_tick
+      // ensure that arp is reset on first bpm_tick
       if (bpm_tick == 0) {
          stepCounter = 0;
 
@@ -308,13 +306,16 @@ void ARP_PAT_UpdatePatternBuffer() {
    // Clear the pattern buffer first
    ARP_PAT_ClearPatternBuffer();
    if (notestack.len == 0){
-      // There are no notes in the stack so nothing to fill
+      // There are no notes left in the stack so clear the step counter.  This ensures
+      // that on the next note, the sequence will start from the beginning of the
+      // patternBuffer and not in the middle.
+      stepCounter = 0;
+      // Also send out note offs to keep from stuck notes
+      SEQ_MIDI_OUT_FlushQueue();
       return;
    }
 
-
-
-   // Now refill it
+   // At least one note in the notestack so refill it
    const arp_pattern_t* pPattern = &patterns[localPatternIndex];
    u32 stepPPQN = SEQ_BPM_PPQN_Get() / 4;
 
@@ -345,8 +346,8 @@ void ARP_PAT_UpdatePatternBuffer() {
             // Now put the notes of the chord into the pattern buffer at the chordNoteVelocity
             u8 numChordNotes = SEQ_CHORD_GetNumNotesByEnum(chord);
 #ifdef DEBUG
-            DEBUG_MSG("ARP_PAT_UpdatePatternBuffer.CHORD: Adding notes @ step:%d k#:%d chord:%s, root=%d oct=%d #notes=%d",
-               step, pEvent->keySelect, SEQ_CHORD_NameGetByEnum(chord), chordNote, octave, numChordNotes);
+   //         DEBUG_MSG("ARP_PAT_UpdatePatternBuffer.CHORD: Adding notes @ step:%d k#:%d chord:%s, root=%d oct=%d #notes=%d",
+   //            step, pEvent->keySelect, SEQ_CHORD_NameGetByEnum(chord), chordNote, octave, numChordNotes);
 #endif                  
             for (u8 keyNum = 0;keyNum < numChordNotes;keyNum++) {
                s32 note = SEQ_CHORD_NoteGetByEnum(keyNum, chord, octave);

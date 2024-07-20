@@ -201,6 +201,9 @@ s32 ARP_Reset(void)
    // reset BPM tick
    SEQ_BPM_TickSet(0);
 
+   // Also reset pattern
+   ARP_PAT_Reset();
+   
    return 0; // no error
 }
 
@@ -373,6 +376,8 @@ void ARP_SetEnabled(u8 enabled) {
       SEQ_BPM_Stop();
    }
    else {
+      // Reset 
+      ARP_Reset();
       // start SEQ
       SEQ_BPM_Start();
    }
