@@ -172,14 +172,9 @@ s32 ARP_Handler(void)
 /////////////////////////////////////////////////////////////////////////////
 // This function plays all "off" events
 // Should be called on sequencer reset/restart/pause to avoid hanging notes
-// Also used for chord pad mode to send explict NoteOffs.
 /////////////////////////////////////////////////////////////////////////////
 static s32 ARP_PlayOffEvents(void)
 {
-   if (arpSettings.arpMode == ARP_MODE_CHORD_PAD) {
-      ARP_SendChordNoteOnOffs(0);
-      return 0;
-   }
    // Otherwise, it is a sequence mode, so flush the queue to play the "off events
    SEQ_MIDI_OUT_FlushQueue();
 
@@ -203,7 +198,7 @@ s32 ARP_Reset(void)
 
    // Also reset pattern
    ARP_PAT_Reset();
-   
+
    return 0; // no error
 }
 
@@ -295,12 +290,13 @@ s32 ARP_NotifyNoteOff(u8 note, u8 velocity) {
 
    // Otherwise arp or pad mode active
    if (arpSettings.arpMode == ARP_MODE_CHORD_PAD) {
-      // Call function directly so release velocity gets sent
+      // Call function to release the chord
       ARP_SendChordNoteOnOffs(0);
+
    }
    else {
       // delegate to arp pattern handler
-      ARP_PAT_KeyReleased(note, velocity);
+      return ARP_PAT_KeyReleased(note, velocity);
    }
    return 1;  // note consumed
 }

@@ -94,6 +94,9 @@ xSemaphoreHandle xMIDIINSemaphore;
 xSemaphoreHandle xMIDIOUTSemaphore;
 static volatile msd_state_t msd_state;
 
+// Mutex for pattern buffer and midi out synchronization in arp_pattern.c
+xSemaphoreHandle xPatternBufferSemaphore;
+
 /////////////////////////////////////////////////////////////////////////////
 // Local prototypes
 /////////////////////////////////////////////////////////////////////////////
@@ -120,7 +123,7 @@ void APP_Init(void) {
    xSDCardSemaphore = xSemaphoreCreateRecursiveMutex();
    xMIDIINSemaphore = xSemaphoreCreateRecursiveMutex();
    xMIDIOUTSemaphore = xSemaphoreCreateRecursiveMutex();
-
+   xPatternBufferSemaphore = xSemaphoreCreateRecursiveMutex();
    // install SysEx callback
    MIOS32_MIDI_SysExCallback_Init(APP_SYSEX_Parser);
 

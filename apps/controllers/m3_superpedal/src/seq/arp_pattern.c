@@ -23,6 +23,10 @@
 #include "seq_chord.h"
 #include "seq_midi_out.h"
 #include "seq_bpm.h"
+
+#include "FreeRTOS.h"
+#include "tasks.h"
+
 #define DEBUG
 #define DEBUG_MSG MIOS32_MIDI_SendDebugMessage
 
@@ -67,6 +71,7 @@ s32 ARP_PAT_Init()
    NOTESTACK_Init(&notestack, NOTESTACK_MODE_PUSH_BOTTOM, &notestack_items[0], MAX_NUM_KEYS);
 
    localPatternIndex = ARP_GetARPSettings()->arpPatternIndex;
+
    return 0; // no error
 }
 
@@ -75,7 +80,7 @@ s32 ARP_PAT_Init()
 /////////////////////////////////////////////////////////////////////////////
 s32 ARP_PAT_SetCurrentPattern(u8 _patternIndex) {
    s32 error = ARP_PAT_ActivatePattern(_patternIndex);
-   if (error <= 0){
+   if (error <= 0) {
       return -1;
    }
    ARP_PAT_ActivatePattern(_patternIndex);
@@ -97,9 +102,9 @@ s32 ARP_PAT_ActivatePattern(u8 _patternIndex) {
       return 0;
    }
    // Otherwise new pattern.  Transfer locally but do not persist.
-   #ifdef DEBUG
-   DEBUG_MSG("ARP_PAT_ActivatePattern:  activating pattern: %s",ARP_PAT_GetPatternName(_patternIndex));
-   #endif
+#ifdef DEBUG
+   DEBUG_MSG("ARP_PAT_ActivatePattern:  activating pattern: %s", ARP_PAT_GetPatternName(_patternIndex));
+#endif
    // Update local index
    localPatternIndex = _patternIndex;
 
@@ -129,29 +134,17 @@ void ARP_PAT_ClearPatternBuffer() {
 // Returns 0 for not consumed or too many keys, 1 for consumed
 /////////////////////////////////////////////////////////////////////////////
 s32 ARP_PAT_KeyPressed(u8 note, u8 velocity) {
-   //-- If we are in chord mode and this is a different note, then clear the notestack
-   // and repush to play a different chord
+   //-- If we are in chord mode then clear the notestack and push a new chord into
+   // the stack
    if (ARP_GetARPSettings()->arpMode == ARP_MODE_CHORD_ARP) {
-      // check if this is a different note than the first note, if so then clear the note stack
-      // before dropping through to push new notes
-      // NOTE:  This code is intended to make sure that slurring from one pedal to another
-      // makes for clean transitions.  Note sure if that is actually achieved.
-      if (notestack.len > 0) {
-         if (notestack.note_items[0].note != note) {
-            // Pop the old root from the stack
-            NOTESTACK_Pop(&notestack,notestack.note_items[0].note);
-            // And reset the stepcounter so that the sequence starts from the beginning
-            stepCounter = 0;
-         }
-      }
-   }
+      // Flush SEQ queue to send and impending notes out
+      SEQ_MIDI_OUT_FlushQueue();
+      // Clear notestack
+      NOTESTACK_Clear(&notestack);
+      // reset the stepcounter so that the sequence starts from the beginning
+      stepCounter = 0;
 
-   //--------------------------------------------------------------------------------------
-   // if arp is in CHORD_ARP mode and push all the keys into the stack
-   if (ARP_GetARPSettings()->arpMode == ARP_MODE_CHORD_ARP) {
-
-      // If the notestack is empty then this is the root of a chord so add the keys of the chord 
-      // as k1...k#notes to the stack.  This is the same as pressing all the keys
+      // add the keys of the chord as k1...k#notes to the stack.  This is the same as pressing all the keys
       persisted_arp_data_t* pArpSettings = ARP_GetARPSettings();
       const chord_type_t chord = ARP_MODES_GetModeChord(pArpSettings->modeScale,
          pArpSettings->chordExtension, pArpSettings->rootKey, note);
@@ -167,10 +160,10 @@ s32 ARP_PAT_KeyPressed(u8 note, u8 velocity) {
          chordNote += (note % 12);
 
          NOTESTACK_Push(&notestack, chordNote, velocity);
-      }      
+      }
    }
    else {
-      // Note in chord mode so just push the note
+      // Not in chord mode so just push the note
       NOTESTACK_Push(&notestack, note, velocity);
 
       // if the push was a different note that exceeded the max number of keys, then pop it and return error
@@ -179,7 +172,7 @@ s32 ARP_PAT_KeyPressed(u8 note, u8 velocity) {
          return 0;
       }
    }
-   // update the pattern buffer from the notestack.
+   // update the pattern buffer from the new notestack.
    ARP_PAT_UpdatePatternBuffer();
    return 1; // note consumed
 
@@ -193,16 +186,32 @@ s32 ARP_PAT_KeyReleased(u8 note, u8 velocity) {
    u8 cleared = 0;
    if (ARP_GetARPSettings()->arpMode == ARP_MODE_CHORD_ARP) {
       // Check if the release key is the root in the notestack
-      if (notestack_items[0].note == note){
+      if (notestack_items[0].note == note) {
          // Same note so clear notestack and fall through to update pattern buffer (which
          // will just clear it out and reset step counter.
          NOTESTACK_Clear(&notestack);
          cleared = 1;
+
       }
    }
    if (!cleared) {
-      // Not the root or we are in key mode so just remove the note
+      // Not the root or we are in key mode so remove the note
       NOTESTACK_Pop(&notestack, note);
+   }
+   // flush the SEQ 
+   SEQ_MIDI_OUT_FlushQueue();
+
+   // Send the note off just in case to avoid a stuck on note.  During edge-case transitions between 
+   // notes and into/out of ARP mode, an On can be sent, so we need to send an off
+   int i;
+   u16 mask = 1;
+   u8 midiChannel = ARP_GetARPSettings()->midiChannel;
+   for (i = 0; i < 16; ++i, mask <<= 1) {
+      if (ARP_GetARPSettings()->midi_ports & mask) {
+         // USB0/1/2/3, UART0/1/2/3, IIC0/1/2/3, OSC0/1/2/3
+         mios32_midi_port_t port = 0x10 + ((i & 0xc) << 2) + (i & 3);
+         MIOS32_MIDI_SendNoteOff(port, midiChannel, note, velocity);
+      }
    }
 
    // update the pattern buffer from the notestack.
@@ -214,17 +223,17 @@ s32 ARP_PAT_KeyReleased(u8 note, u8 velocity) {
 /////////////////////////////////////////////////////////////////////////////
 // Helper returns short nmae for a pattern
 /////////////////////////////////////////////////////////////////////////////
-const char * ARP_PAT_GetCurrentPatternShortName() {
+const char* ARP_PAT_GetCurrentPatternShortName() {
    return patternShortNames[localPatternIndex];
 }
 /////////////////////////////////////////////////////////////////////////////
 // Helper returns name for a pattern
 /////////////////////////////////////////////////////////////////////////////
-const char * ARP_PAT_GetPatternName(u8 patternIndex) {
-   if (patternIndex > NUM_PATTERNS-1){
+const char* ARP_PAT_GetPatternName(u8 patternIndex) {
+   if (patternIndex > NUM_PATTERNS - 1) {
       return "ERR!";
    }
-   
+
    return patternNames[patternIndex];
 }
 
@@ -232,7 +241,7 @@ const char * ARP_PAT_GetPatternName(u8 patternIndex) {
 // Resets the pattern generator by clearing the notestack, pattern Buffer
 // and sequencer queue.
 /////////////////////////////////////////////////////////////////////////////
-void ARP_PAT_Reset(){
+void ARP_PAT_Reset() {
    NOTESTACK_Clear(&notestack);
    stepCounter = 0;
    ARP_PAT_ClearPatternBuffer();
@@ -260,39 +269,45 @@ s32 ARP_PAT_Tick(u32 bpm_tick)
             stepCounter = 0;
          }
       }
-      // Now get the active notes for this step/tick and send to the sequencer for output
-      for (u8 i = 0;i < MAX_NUM_NOTES_PER_STEP;i++) {
-         u8 length = patternBuffer[stepCounter][i].length;
-         if (length > 0) {
-            // there is a note here
-            u8 note = patternBuffer[stepCounter][i].note;
-            u8 velocity = patternBuffer[stepCounter][i].velocity;
+      // Take the pattern buffer mutex so it doesn't change while we are reading it due to 
+      // a simultaneous update.
+      MUTEX_PATTERN_BUFFER_TAKE
 
-            // put note into queue if all values are != 0
-            if (note && velocity && length) {
-               mios32_midi_package_t midi_package;
-               midi_package.type = NoteOn; // package type must match with event!
-               midi_package.event = NoteOn;
-               // For some reason SEQ_MIDI_OUT is 0 based midiChannel but ARPSettings is 1...16 
-               // so subtract 1.
-               midi_package.chn = ARP_GetARPSettings()->midiChannel-1;
-               midi_package.note = note;
-               midi_package.velocity = velocity;
+         // Now get the active notes for this step/tick and send to the sequencer for output
+         for (u8 i = 0;i < MAX_NUM_NOTES_PER_STEP;i++) {
+            u8 length = patternBuffer[stepCounter][i].length;
+            if (length > 0) {
+               // there is a note here
+               u8 note = patternBuffer[stepCounter][i].note;
+               u8 velocity = patternBuffer[stepCounter][i].velocity;
 
-               // Play on the enabled ports.
-               int i;
-               u16 mask = 1;
-               for (i = 0; i < 16; ++i, mask <<= 1) {
-                  if (ARP_GetARPSettings()->midi_ports & mask) {
-                     // USB0/1/2/3, UART0/1/2/3, IIC0/1/2/3, OSC0/1/2/3
-                     mios32_midi_port_t port = 0x10 + ((i & 0xc) << 2) + (i & 3);
+               // put note into queue if all values are != 0
+               if (note && velocity && length) {
+                  mios32_midi_package_t midi_package;
+                  midi_package.type = NoteOn; // package type must match with event!
+                  midi_package.event = NoteOn;
+                  // For some reason SEQ_MIDI_OUT is 0 based midiChannel but ARPSettings is 1...16 
+                  // so subtract 1.
+                  midi_package.chn = ARP_GetARPSettings()->midiChannel - 1;
+                  midi_package.note = note;
+                  midi_package.velocity = velocity;
 
-                     SEQ_MIDI_OUT_Send(port, midi_package, SEQ_MIDI_OUT_OnOffEvent, bpm_tick, length);
+                  // Play on the enabled ports.
+                  int i;
+                  u16 mask = 1;
+                  for (i = 0; i < 16; ++i, mask <<= 1) {
+                     if (ARP_GetARPSettings()->midi_ports & mask) {
+                        // USB0/1/2/3, UART0/1/2/3, IIC0/1/2/3, OSC0/1/2/3
+                        mios32_midi_port_t port = 0x10 + ((i & 0xc) << 2) + (i & 3);
+
+                        SEQ_MIDI_OUT_Send(port, midi_package, SEQ_MIDI_OUT_OnOffEvent, bpm_tick, length);
+                     }
                   }
                }
             }
          }
-      }
+      // Release the pattern buffer mutext
+      MUTEX_PATTERN_BUFFER_GIVE
    }
 
    return 0; // no error
@@ -305,18 +320,19 @@ s32 ARP_PAT_Tick(u32 bpm_tick)
 void ARP_PAT_UpdatePatternBuffer() {
    // Clear the pattern buffer first
    ARP_PAT_ClearPatternBuffer();
-   if (notestack.len == 0){
+   if (notestack.len == 0) {
       // There are no notes left in the stack so clear the step counter.  This ensures
       // that on the next note, the sequence will start from the beginning of the
       // patternBuffer and not in the middle.
       stepCounter = 0;
-      // Also send out note offs to keep from stuck notes
+      // send out note offs to keep from stuck notes
       SEQ_MIDI_OUT_FlushQueue();
-      return;
    }
+   // Take the pattern buffer mutex while filling so we don't send incorrect data
+   MUTEX_PATTERN_BUFFER_TAKE
 
-   // At least one note in the notestack so refill it
-   const arp_pattern_t* pPattern = &patterns[localPatternIndex];
+      // At least one note in the notestack so refill it
+      const arp_pattern_t* pPattern = &patterns[localPatternIndex];
    u32 stepPPQN = SEQ_BPM_PPQN_Get() / 4;
 
    for (u8 step = 0;step < pPattern->numSteps;step++) {
@@ -346,8 +362,8 @@ void ARP_PAT_UpdatePatternBuffer() {
             // Now put the notes of the chord into the pattern buffer at the chordNoteVelocity
             u8 numChordNotes = SEQ_CHORD_GetNumNotesByEnum(chord);
 #ifdef DEBUG
-   //         DEBUG_MSG("ARP_PAT_UpdatePatternBuffer.CHORD: Adding notes @ step:%d k#:%d chord:%s, root=%d oct=%d #notes=%d",
-   //            step, pEvent->keySelect, SEQ_CHORD_NameGetByEnum(chord), chordNote, octave, numChordNotes);
+            //         DEBUG_MSG("ARP_PAT_UpdatePatternBuffer.CHORD: Adding notes @ step:%d k#:%d chord:%s, root=%d oct=%d #notes=%d",
+            //            step, pEvent->keySelect, SEQ_CHORD_NameGetByEnum(chord), chordNote, octave, numChordNotes);
 #endif                  
             for (u8 keyNum = 0;keyNum < numChordNotes;keyNum++) {
                s32 note = SEQ_CHORD_NoteGetByEnum(keyNum, chord, octave);
@@ -363,14 +379,14 @@ void ARP_PAT_UpdatePatternBuffer() {
          }
          break;
       case NORM:
-          // add the note at the keySelect with a single step length adjusting for the octave and scale step
+         // add the note at the keySelect with a single step length adjusting for the octave and scale step
          if (notestack.len >= pEvent->keySelect) {
-            step_note_t* pNote = &patternBuffer[step][pEvent->keySelect-1];
+            step_note_t* pNote = &patternBuffer[step][pEvent->keySelect - 1];
             pNote->note = notestack.note_items[pEvent->keySelect - 1].note + 12 * pEvent->octave + pEvent->scaleStep;
             pNote->velocity = notestack.note_items[pEvent->keySelect - 1].tag;
 #ifdef DEBUG
- //           DEBUG_MSG("ARP_PAT_UpdatePatternBuffer:NORM Adding note %02x @ step:%d k#:%d",
- //              pNote->note, step, pEvent->keySelect);
+            //           DEBUG_MSG("ARP_PAT_UpdatePatternBuffer:NORM Adding note %02x @ step:%d k#:%d",
+            //              pNote->note, step, pEvent->keySelect);
 #endif                  
             if (pEvent->stepType == NORM) {
                pNote->length = stepPPQN;
@@ -401,4 +417,7 @@ void ARP_PAT_UpdatePatternBuffer() {
          break;
       }
    }
+
+   // Release the pattern buffer mutex
+   MUTEX_PATTERN_BUFFER_GIVE
 }
