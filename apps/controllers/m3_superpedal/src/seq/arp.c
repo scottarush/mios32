@@ -179,7 +179,18 @@ static s32 ARP_PlayOffEvents(void)
    // Otherwise, it is a sequence mode, so flush the queue to play the "off events
    SEQ_MIDI_OUT_FlushQueue();
 
-   // here you could send additional events, e.g. "All Notes Off" CC
+   // Send an all notes off to all enable ports just in case we had a bug resulting
+   // in stuck on keys.
+   int i;
+   u16 mask = 1;
+   u8 midiChannel = ARP_GetARPSettings()->midiChannel;
+   for (i = 0; i < 16; ++i, mask <<= 1) {
+      if (ARP_GetARPSettings()->midi_ports & mask) {
+         // USB0/1/2/3, UART0/1/2/3, IIC0/1/2/3, OSC0/1/2/3
+         mios32_midi_port_t port = 0x10 + ((i & 0xc) << 2) + (i & 3);
+         MIOS32_MIDI_SendCC(port, midiChannel, 123,0);
+      }
+   }
 
    return 0; // no error
 }
@@ -341,7 +352,7 @@ void ARP_SetArpMode(arp_mode_t mode) {
    if (mode == arpSettings.arpMode) {
       return;
    }
-   // Otherwise a mode change
+   // Otherwise a mode change.  
    arpSettings.arpMode = mode;
    switch (arpSettings.arpMode) {
    case ARP_MODE_KEYS:
@@ -368,7 +379,7 @@ void ARP_SetEnabled(u8 enabled) {
    }
    arpEnabled = enabled;
    if (!arpEnabled) {
-      // Disable arp
+      // Disable arp and send all off events to avoid any stuck notes
       ARP_PlayOffEvents();
       SEQ_BPM_Stop();
    }

@@ -72,6 +72,7 @@ extern s32 ARP_PAT_SetCurrentPattern(u8 _patternIndex);
 extern s32 ARP_PAT_ActivatePattern(u8 _patternIndex);
 
 extern const char * ARP_PAT_GetCurrentPatternShortName();
+u8 ARP_PAT_GetCurrentPatternIndex();
 extern const char * ARP_PAT_GetPatternName(u8 patternIndex);
 
 extern s32 ARP_PAT_Tick(u32 bpm_tick);

@@ -169,7 +169,7 @@ void HMI_Init(void) {
       // stomp switch settings
       hmiSettings.stompSwitchSetting[4] = STOMP_SWITCH_OCTAVE_VOLUME;
       hmiSettings.stompSwitchSetting[3] = STOMP_SWITCH_ARPEGGIATOR;
-      hmiSettings.stompSwitchSetting[2] = STOMP_SWITCH_CHORD_PAD;
+      hmiSettings.stompSwitchSetting[2] = STOMP_SWITCH_UNUSED;
       hmiSettings.stompSwitchSetting[1] = STOMP_SWITCH_VOICE_PRESETS;
       hmiSettings.stompSwitchSetting[0] = STOMP_SWITCH_PATTERN_PRESETS;
 
@@ -356,6 +356,9 @@ void HMI_NotifyToeToggle(u8 toeNum, u8 pressed, s32 timestamp) {
       }
       // Note that we don't have to call HMI_UpdateIndicators because this will be 
       // call in HMI_NotifyOctaveChange
+
+      // Flash the indicator for confirmation
+      IND_SetTempIndicatorState(toeNum,IND_FLASH_FAST,IND_TEMP_FLASH_STATE_DEFAULT_DURATION,IND_OFF,100);    
       break;
    case TOE_SWITCH_VOLUME:
       // Get the volumeLevel corresponding to the pressed switch
@@ -366,6 +369,8 @@ void HMI_NotifyToeToggle(u8 toeNum, u8 pressed, s32 timestamp) {
       HMI_UpdateIndicators();
       // And update the current page display
       pCurrentPage->pUpdateDisplayCallback();
+      // Flash the indicator for confirmation
+      IND_SetTempIndicatorState(toeNum,IND_FLASH_FAST,IND_TEMP_FLASH_STATE_DEFAULT_DURATION,IND_OFF,100);    
       break;
    case TOE_SWITCH_VOICE_PRESETS:
       HMI_HandleVoicePresetsToeToggle(toeNum);
@@ -386,23 +391,10 @@ void HMI_NotifyToeToggle(u8 toeNum, u8 pressed, s32 timestamp) {
          break;
       default:
          // switches 2-7 handled by separate module/function
-         ARP_HMI_HandleArpLiveToeToggle(toeNum, pressed);
+         ARP_HMI_HandleArpToeToggle(toeNum, pressed);
       }
       break;
-   case TOE_SWITCH_CHORD:
-      switch (toeNum) {
-      case 1:
-         // Toe 1 decrements
-         PEDALS_SetOctave(PEDALS_GetOctave() - 1);
-         break;
-      case 8:
-         // Toe3 increments
-         PEDALS_SetOctave(PEDALS_GetOctave() + 1);
-         break;
-      default:
-         // switches 2-7TODO
-      }
-   break;  default:
+       default:
    }
 }
 
@@ -447,8 +439,10 @@ void HMI_NotifyStompToggle(u8 stompNum, u8 pressed, s32 timestamp) {
          }
       }
       else {
-         // just switch into preset mode
+         // switch into preset mode
          hmiSettings.toeSwitchMode = TOE_SWITCH_VOICE_PRESETS;
+         // And reactivate the current MIDI preset in case the synthesizer hadn't yet received it
+         MIDI_PRESETS_ActivateMIDIPreset(MIDI_PRESETS_GetLastActivatedMIDIPreset());
       }
       break;
    case STOMP_SWITCH_PATTERN_PRESETS:
@@ -456,37 +450,19 @@ void HMI_NotifyStompToggle(u8 stompNum, u8 pressed, s32 timestamp) {
       break;
    case STOMP_SWITCH_ARPEGGIATOR:
       if (hmiSettings.toeSwitchMode == TOE_SWITCH_ARP) {
-         // Already selected toe mode so toggle it
-         if (ARP_GetArpMode() != ARP_MODE_CHORD_ARP) {
-            ARP_SetArpMode(ARP_MODE_CHORD_ARP);
-            // And turn on Arpeggiator
-            ARP_SetEnabled(1);
+         // Arp switch already selected so toggle it on / off
+         if (ARP_GetEnabled()) {
+            ARP_SetEnabled(0);
          }
          else {
-            // Toggle the run state
-            ARP_SetEnabled(!ARP_GetEnabled());
+            ARP_SetEnabled(1);
          }
       }
+      // change to ARP mode toe switches
       hmiSettings.toeSwitchMode = TOE_SWITCH_ARP;
       // Set to home page
       pCurrentPage = &homePage;
-      break;
-   case STOMP_SWITCH_CHORD_PAD:
-      // Got to Chord Pad mode.  If already there then toggle the enable state
-      if (hmiSettings.toeSwitchMode == TOE_SWITCH_CHORD) {
 
-         if (ARP_GetArpMode() != ARP_MODE_CHORD_PAD) {
-            ARP_SetArpMode(ARP_MODE_CHORD_PAD);
-            ARP_SetEnabled(1);
-         }
-         else {
-            // Toggle the ARP on/off
-            ARP_SetEnabled(!ARP_GetEnabled());
-         }
-      }
-      hmiSettings.toeSwitchMode = TOE_SWITCH_CHORD;
-      // Set to home page
-      pCurrentPage = &homePage;
       break;
    default:
       // Invalid.  Just return;
@@ -605,9 +581,6 @@ void HMI_UpdateIndicators() {
          // Call separate function in ARP_HMI to handle toe indicators 2-7 and stomp indicator
          ARP_HMI_UpdateArpIndicators();
       }
-      break;
-   case TOE_SWITCH_CHORD:
-      ARP_HMI_UpdateChordIndicators();
       break;
    case TOE_SWITCH_VOICE_PRESETS:
       // Set the indicator for the bank index + 1 of the last activated presetNum if we 
@@ -834,14 +807,12 @@ void HMI_HomePage_UpdateDisplay() {
       HMI_RenderLine(0, lineBuffer, RENDER_LINE_CENTER);
       break;
    case TOE_SWITCH_ARP:
-   case TOE_SWITCH_CHORD:
       // Toeswitchmode and preset name since preset can't be displayed on line 2
       snprintf(lineBuffer, DISPLAY_CHAR_WIDTH + 1, "%s:%s",
          pToeSwitchModeTitles[hmiSettings.toeSwitchMode], presetName);
       HMI_RenderLine(0, lineBuffer, RENDER_LINE_CENTER);
       break;
    }
-
 
    // Spacer on line 1
    HMI_RenderLine(1, "--------------------", RENDER_LINE_LEFT);
@@ -856,37 +827,39 @@ void HMI_HomePage_UpdateDisplay() {
    case TOE_SWITCH_OCTAVE:
    case TOE_SWITCH_VOLUME:
    case TOE_SWITCH_VOICE_PRESETS:
+      // Spacer on line 1
+      HMI_RenderLine(1, "--------------------", RENDER_LINE_LEFT);   
       // Preset name on line 2
       HMI_RenderLine(2, presetName, RENDER_LINE_LEFT);
       break;
    case TOE_SWITCH_PATTERN_PRESETS:
+      // Spacer on line 1
+      HMI_RenderLine(1, "--------------------", RENDER_LINE_LEFT);
       // TODO - Render the pattern preset line
       HMI_ClearLine(2);
       break;
    case TOE_SWITCH_ARP:
-      // Arpeggiator details in Line 2 insted of preset name
+      // Line 1 is root key and mode
+      snprintf(lineBuffer, DISPLAY_CHAR_WIDTH + 1, "%s %s",
+         ARP_MODES_GetNoteName(ARP_GetRootKey()), SEQ_SCALE_NameGet(ARP_GetModeScale()));
+      HMI_RenderLine(1, lineBuffer, RENDER_LINE_RIGHT);
+
+      // Line 2 is pattern name and bpm
       u16 bpm = ARP_GetBPM();
       // Truncate scale/mode name.  Had problems with snprintf for some reason so
       // went to memcpy instead.  
       // TODO: Figure out why snprintf didn't work.
-      const char* scaleName = SEQ_SCALE_NameGet(ARP_GetModeScale());
-      u8 truncLength = 9;
-      u8 nameLength = strlen(scaleName);
-      if (nameLength < truncLength) {
-         truncLength = nameLength;
-      }
-      memcpy(scratchBuffer, scaleName, truncLength);
-      scratchBuffer[truncLength] = '\0';
+      // const char* scaleName = SEQ_SCALE_NameGet(ARP_GetModeScale());
+      // u8 truncLength = 9;
+      // u8 nameLength = strlen(scaleName);
+      // if (nameLength < truncLength) {
+      //    truncLength = nameLength;
+      // }
+      memcpy(scratchBuffer, ARP_PAT_GetPatternName(ARP_PAT_GetCurrentPatternIndex()), 16);
+      scratchBuffer[16] = '\0';
 
-      snprintf(lineBuffer, DISPLAY_CHAR_WIDTH + 1, "%s %s %s %d",
-         ARP_MODES_GetNoteName(ARP_GetRootKey()), scratchBuffer, ARP_PAT_GetCurrentPatternShortName(), bpm);
-      HMI_RenderLine(2, lineBuffer, RENDER_LINE_LEFT);
-      break;
-   case TOE_SWITCH_CHORD:
-      // Show Root and ModeScale 
-      snprintf(lineBuffer, DISPLAY_CHAR_WIDTH + 1, "%s %s",
-         ARP_MODES_GetNoteName(ARP_GetRootKey()), SEQ_SCALE_NameGet(ARP_GetModeScale()));
-      HMI_RenderLine(2, lineBuffer, RENDER_LINE_LEFT);
+      snprintf(lineBuffer, DISPLAY_CHAR_WIDTH + 1, "%s %d",scratchBuffer, bpm);         
+      HMI_RenderLine(2, lineBuffer, RENDER_LINE_RIGHT);
       break;
    default:
 #ifdef DEBUG

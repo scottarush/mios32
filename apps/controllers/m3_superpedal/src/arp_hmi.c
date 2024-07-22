@@ -44,12 +44,12 @@
 // Total list of functions availabe in ARP Live mode.  Note that toe switches 1 and 8 are
 // dedicated to Octave decrement/increment respectively
 typedef enum arp_live_toe_functions_e {
-   ARP_LIVE_TOE_SELECT_KEY = 2,
-   ARP_LIVE_TOE_SELECT_MODAL_SCALE = 3,
-   ARP_LIVE_TOE_GEN_ORDER = 4,
-   // 5 is unused
-   ARP_LIVE_TOE_TEMPO_DECREMENT = 6,
-   ARP_LIVE_TOE_TEMPO_INCREMENT = 7,
+   ARP_TOE_SELECT_KEY = 2,
+   ARP_TOE_SELECT_MODE_SCALE = 3,
+   ARP_TOE_DECREMENT_TEMPO = 4,
+   ARP_TOE_INCREMENT_TEMPO = 5,
+   ARP_TOE_SET_ARP_MODE = 6
+   // 7 is unused
 } arp_live_toe_functions_t;
 
 
@@ -178,12 +178,12 @@ void ARP_HMI_ARPPatternPage_RotaryEncoderChanged(s8 increment) {
    else if (index >= NUM_PATTERNS) {
       index = NUM_PATTERNS - 1;
    }
-   if (index == lastARPPatternIndex){
+   if (index == lastARPPatternIndex) {
       return;
    }
-   lastARPPatternIndex= index;
+   lastARPPatternIndex = index;
    // Activate the pattern, but don't set it as current until/unless user selects encoder.  
-   ARP_PAT_ActivatePattern(lastARPPatternIndex);      
+   ARP_PAT_ActivatePattern(lastARPPatternIndex);
 
    // force an update to the current page display
    pCurrentPage->pUpdateDisplayCallback();
@@ -293,25 +293,11 @@ const char* ARP_HMI_GetClockModeText(arp_clock_mode_t mode) {
 // Sets/updates the indicators for the Arp mode
 /////////////////////////////////////////////////////////////////////////////
 void ARP_HMI_UpdateArpIndicators() {
-   // Set the stomp indicator to Red if running, Green if paused
-   indicator_color_t color = IND_COLOR_GREEN;
-   if (ARP_GetEnabled()) {
-      color = IND_COLOR_RED;
-   }
-   IND_SetIndicatorColor(IND_STOMP_4, color);
-   IND_SetIndicatorState(IND_STOMP_4, IND_ON, 100, IND_RAMP_NONE);
-
-   // TODO the rest
-   // IND_SetIndicatorState(1, IND_FLASH_BLIP);
-}
-
-/////////////////////////////////////////////////////////////////////////////
-// Sets/updates the indicators for the Arp Chord mode
-/////////////////////////////////////////////////////////////////////////////
-void ARP_HMI_UpdateChordIndicators() {
-   // Update stomp state according to the ARP mode
-   indicator_color_t color = IND_COLOR_GREEN;
-   if (ARP_GetEnabled()) {
+   // Update stomp indicator to Red if any mode active, or
+   // Green/Yellow depending on the the ARP mode
+   indicator_color_t color = IND_COLOR_RED;
+   if (!ARP_GetEnabled()) {
+      // Arp not running so set indicator to Green or Yellow for ARP vs. PAD
       switch (ARP_GetArpMode()) {
       case ARP_MODE_CHORD_ARP:
          color = IND_COLOR_GREEN;
@@ -320,21 +306,25 @@ void ARP_HMI_UpdateChordIndicators() {
          color = IND_COLOR_YELLOW;
          break;
       case ARP_MODE_KEYS:
-         color = IND_COLOR_RED;
+         // TODO - Find another color for Keys
+       //  color = IND_COLOR_RED;
          break;
       }
    }
-   IND_SetIndicatorColor(IND_STOMP_3, color);
-   IND_SetIndicatorState(IND_STOMP_3, IND_ON, 100, IND_RAMP_NONE);
+   IND_SetIndicatorColor(IND_STOMP_4, color);
+   IND_SetIndicatorState(IND_STOMP_4, IND_ON, 100, IND_RAMP_NONE);
+
+   // TODO the state of the Toe indicators
+   
 }
 
 /////////////////////////////////////////////////////////////////////////////
 // Helper to handle Arp live toe toggle. 
 /////////////////////////////////////////////////////////////////////////////
-void ARP_HMI_HandleArpLiveToeToggle(u8 toeNum, u8 pressed) {
+void ARP_HMI_HandleArpToeToggle(u8 toeNum, u8 pressed) {
    u16 bpm;
    switch (toeNum) {
-   case ARP_LIVE_TOE_SELECT_KEY:
+   case ARP_TOE_SELECT_KEY:
       /// Go to the dialog page
       snprintf(dialogPageTitle, DISPLAY_CHAR_WIDTH + 1, "%s", "SET ARP ROOT KEY");
       snprintf(dialogPageMessage1, DISPLAY_CHAR_WIDTH + 1, "%s", "Press Pedal to");
@@ -348,7 +338,7 @@ void ARP_HMI_HandleArpLiveToeToggle(u8 toeNum, u8 pressed) {
       // Set the pedal callback to get the selected root key
       PEDALS_SetSelectPedalCallback(&ARP_HMI_SelectRootKeyCallback);
       break;
-   case ARP_LIVE_TOE_SELECT_MODAL_SCALE:
+   case ARP_TOE_SELECT_MODE_SCALE:
       // Go to the dialog page
       snprintf(dialogPageTitle, DISPLAY_CHAR_WIDTH + 1, "%s", "SET ARP MODAL SCALE");
       snprintf(dialogPageMessage1, DISPLAY_CHAR_WIDTH + 1, "%s", "Press Brown Pedal to");
@@ -362,15 +352,34 @@ void ARP_HMI_HandleArpLiveToeToggle(u8 toeNum, u8 pressed) {
       // Set the pedal callback to get the selected root key
       PEDALS_SetSelectPedalCallback(&ARP_HMI_SelectModeScaleCallback);
       break;
-   case ARP_LIVE_TOE_TEMPO_INCREMENT:
+   case ARP_TOE_INCREMENT_TEMPO:
       bpm = ARP_GetBPM();
       bpm += TEMPO_CHANGE_STEP;
       ARP_SetBPM(bpm);
+      // Flash the indicator for confirmation
+      IND_SetTempIndicatorState(toeNum,IND_FLASH_FAST,IND_TEMP_FLASH_STATE_DEFAULT_DURATION,IND_OFF,100);      
       break;
-   case ARP_LIVE_TOE_TEMPO_DECREMENT:
+   case ARP_TOE_DECREMENT_TEMPO:
       bpm = ARP_GetBPM();
       bpm -= TEMPO_CHANGE_STEP;
       ARP_SetBPM(bpm);
+      // Flash the indicator for confirmation
+      IND_SetTempIndicatorState(toeNum,IND_FLASH_FAST,IND_TEMP_FLASH_STATE_DEFAULT_DURATION,IND_OFF,100);      
+      break;
+   case ARP_TOE_SET_ARP_MODE:
+      indicator_states_t targetState = IND_ON;
+      switch(ARP_GetArpMode()){
+         case ARP_MODE_CHORD_ARP:
+            ARP_SetArpMode(ARP_MODE_CHORD_PAD);
+            break;
+         case ARP_MODE_CHORD_PAD:
+            ARP_SetArpMode(ARP_MODE_CHORD_ARP);
+            targetState = IND_FLASH_SLOW;
+            break;
+         // TODO - Add in arp mode keys someday
+      }
+      // Flash the indicator for confirmation.  
+      IND_SetTempIndicatorState(toeNum,IND_FLASH_FAST,IND_TEMP_FLASH_STATE_DEFAULT_DURATION,targetState,100);
       break;
    }
    // Update the current display to reflect any content change
