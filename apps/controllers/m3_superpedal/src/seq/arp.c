@@ -83,6 +83,7 @@ s32 ARP_Init()
       arpSettings.bpm = 120.0;
       arpSettings.midi_ports = 0x0031;     // OUT1, OUT2, and USB
       arpSettings.midiChannel = 1;
+      arpSettings.synchDelay = 2;
       ARP_PersistData();
 
    }
@@ -109,8 +110,8 @@ s32 ARP_Init()
 // Global function to store persisted arpeggiator data
 /////////////////////////////////////////////////////////////////////////////
 s32 ARP_PersistData() {
-#ifdef DEBUG_ENABLED
-   DEBUG_MSG("ARP_PersistData: Writing persisted data:  sizeof(presets)=%d bytes", sizeof(persisted_pedal_confg_t));
+#ifdef DEBUG
+   DEBUG_MSG("ARP_PersistData: Writing persisted data:  sizeof(presets)=%d bytes", sizeof(persisted_arp_data_t));
 #endif
    s32 valid = PERSIST_StoreBlock(PERSIST_ARP_BLOCK, (unsigned char*)&arpSettings, sizeof(persisted_arp_data_t));
    if (valid < 0) {

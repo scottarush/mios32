@@ -32,7 +32,8 @@ typedef enum pageID_e {
    PAGE_EDIT_PATTERN_PRESET = 2,
    PAGE_MIDI_PROGRAM_SELECT = 3,
    PAGE_ARP_SETTINGS = 4,
-   PAGE_DIALOG = 5,
+   PAGE_ARP_PATTERN_SELECT = 5,
+   PAGE_DIALOG = 6,
 } pageID_t;
 
 struct page_s {

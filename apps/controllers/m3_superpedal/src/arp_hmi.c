@@ -195,7 +195,8 @@ void ARP_HMI_ARPPatternPage_RotaryEncoderChanged(s8 increment) {
 void ARP_HMI_ARPPatternPage_BackButtonCallback() {
    // On a back button press, user did not select a new pattern so restore the
    // current one
-   ARP_PAT_SetCurrentPattern(ARP_GetARPSettings()->arpPatternIndex);
+   lastARPPatternIndex = ARP_GetARPSettings()->arpPatternIndex;
+   ARP_PAT_ActivatePattern(lastARPPatternIndex);
 }
 
 /////////////////////////////////////////////////////////////////////////////

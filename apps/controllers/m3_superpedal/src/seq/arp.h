@@ -52,6 +52,9 @@ typedef struct persisted_arp_data_s {
    chord_extension_t chordExtension;
    int ppqn;
    double bpm;
+   // Synch delay in 1/4 note beats.  Used to delay a pattern buffer update to allow
+   // for enough time to transition keys/pedals seamlessly 
+   u8 synchDelay;
 } persisted_arp_data_t;
 
 

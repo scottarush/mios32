@@ -268,7 +268,7 @@ void HMI_InitPages() {
    arpSettingsPage.pBackPage = &homePage;
 
 
-   arpSettingsPage.pageID = PAGE_ARP_SETTINGS;
+   arpPatternPage.pageID = PAGE_ARP_PATTERN_SELECT;
    char* arpPatternTitle = { "ARP PATTERNS" };
    arpPatternPage.pPageTitle = arpPatternTitle;
    arpPatternPage.pUpdateDisplayCallback = ARP_HMI_ARPPatternPage_UpdateDisplay;
@@ -942,7 +942,7 @@ void HMI_HomePage_RotaryEncoderSelect() {
    case TOE_SWITCH_ARP:
       // Go to arp settings page
       arpSettingsPage.pBackPage = pCurrentPage;
-      pCurrentPage = & arpSettingsPage;
+      pCurrentPage = &arpSettingsPage;
       break;
    case TOE_SWITCH_PATTERN_PRESETS:
       // Goto Pattern select page
@@ -958,7 +958,7 @@ void HMI_HomePage_RotaryEncoderSelect() {
          dialogPage.pBackPage = pCurrentPage;
          pCurrentPage = &dialogPage;
       }
-      else{
+      else {
          // Already on about page
          return;
       }
@@ -1156,6 +1156,9 @@ void HMI_MIDIProgramSelectPage_BackButtonCallback() {
 // Helper to store persisted data 
 /////////////////////////////////////////////////////////////////////////////
 s32 HMI_PersistData() {
+#ifdef DEBUG
+   DEBUG_MSG("HMI_PersistData: Writing persisted data:  sizeof(presets)=%d bytes", sizeof(persisted_hmi_settings_t));
+#endif
    s32 valid = PERSIST_StoreBlock(PERSIST_HMI_BLOCK, (unsigned char*)&hmiSettings, sizeof(persisted_hmi_settings_t));
    if (valid < 0) {
       DEBUG_MSG("HMI_PersistData:  Error persisting setting to EEPROM");
