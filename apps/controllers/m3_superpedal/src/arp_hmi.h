@@ -40,7 +40,7 @@ typedef struct persisted_arp_hmi_data_s {
 
 extern s32 ARP_HMI_Init();
 
-extern void ARP_HMI_UpdateArpIndicators();
+extern void ARP_HMI_UpdateArpStompIndicator();
 extern void ARP_HMI_UpdateChordIndicators();
 
 extern void ARP_HMI_ARPSettings_UpdateDisplay();

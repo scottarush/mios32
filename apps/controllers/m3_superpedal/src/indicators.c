@@ -505,38 +505,48 @@ void IND_SetFullIndicatorState(indicator_id_t indicatorNum, indicator_states_t s
 
    //------------------------------------------------------------
    // Now set the output pin in either J10 or J5
-   indicator_color_t setColor = ptr->color;
-   if (setColor == IND_COLOR_YELLOW) {
-      setColor = IND_COLOR_RED;  // Set the RED one first
-   }
-   if (indicatorNum == IND_STOMP_1){
-      // STOMP_1 is on J5
-      if (setColor == IND_COLOR_RED) {
-         // Stomp 1 RED on A6
+   switch (ptr->color) {
+   case IND_COLOR_YELLOW:
+      if (indicatorNum == IND_STOMP_1) {
+         // Stomp 1 Green on A7
+         MIOS32_BOARD_J5_PinSet(7, outputState);
+         // Stomp 1 RED on A6 
          MIOS32_BOARD_J5_PinSet(6, outputState);
       }
       else {
-         // Stomp 1 Green on A7
-         MIOS32_BOARD_J5_PinSet(7, outputState);         
-#ifdef DEBUG
-         s32 pinState = MIOS32_BOARD_J5_PinGet(7);
-         DEBUG_MSG("IND_SetFullIndicatorState:  Set A7 to %d, read state %d, error=%d",outputState,pinState,error);
-#endif
-      }
-   }
-   else {
-      // The rest are on J10
-      MIOS32_BOARD_J10_PinSet(IND_GetJ10Pin(indicatorNum, setColor), outputState);
-   }
-   // Now set the Green one too if the color is yellow.
-   if (ptr->color == IND_COLOR_YELLOW) {
-      if (indicatorNum != IND_STOMP_1) {
+         // Set both in J10
          MIOS32_BOARD_J10_PinSet(IND_GetJ10Pin(indicatorNum, IND_COLOR_GREEN), outputState);
+         MIOS32_BOARD_J10_PinSet(IND_GetJ10Pin(indicatorNum, IND_COLOR_RED), outputState);
+      }
+      break;
+   case IND_COLOR_RED:
+      if (indicatorNum == IND_STOMP_1) {
+         // Stomp 1 RED on A6 
+         MIOS32_BOARD_J5_PinSet(6, outputState);
+         // Stomp 1 Green on A7 off in case previously set
+         MIOS32_BOARD_J5_PinSet(7, 0);
       }
       else {
+         // Set Red in J10
+         MIOS32_BOARD_J10_PinSet(IND_GetJ10Pin(indicatorNum, IND_COLOR_RED), outputState);
+         // Green off if previously set
+         MIOS32_BOARD_J10_PinSet(IND_GetJ10Pin(indicatorNum, IND_COLOR_GREEN), 0);
+      }
+      break;
+   case IND_COLOR_GREEN:
+      if (indicatorNum == IND_STOMP_1) {
          // Stomp 1 Green on A7
          MIOS32_BOARD_J5_PinSet(7, outputState);
+         // Red off if previously set
+         MIOS32_BOARD_J5_PinSet(6, 0);
       }
+      else {
+         // Set Green in J10
+         MIOS32_BOARD_J10_PinSet(IND_GetJ10Pin(indicatorNum, IND_COLOR_GREEN), outputState);
+         // Red off if previously set
+         MIOS32_BOARD_J10_PinSet(IND_GetJ10Pin(indicatorNum, IND_COLOR_RED), 0);
+      }
+      break;
    }
 }
 ///////////////////////////////////////////////////////////////////////////

@@ -339,8 +339,8 @@ void HMI_NotifyToeToggle(u8 toeNum, u8 pressed, s32 timestamp) {
    switch (hmiSettings.toeSwitchMode) {
    case TOE_SWITCH_OCTAVE:
       switch (toeNum) {
-      case 1:
-         // Toenum 1 always decrements.  Note that we don't have to check
+      case 7:
+         // Toenum 7 always decrements.  Note that we don't have to check
          // range here.  PEDALS will do that and will call HMI_NotifyOctaveChange iff
          // there was a change.
          PEDALS_SetOctave(PEDALS_GetOctave() - 1);
@@ -350,12 +350,12 @@ void HMI_NotifyToeToggle(u8 toeNum, u8 pressed, s32 timestamp) {
          PEDALS_SetOctave(PEDALS_GetOctave() + 1);
          break;
       default:
-         // Toe switch numbers 2 through 7 are fixed starting at MIN_DIRECT_OCTAVE_NUMBER
+         // Toe switch numbers 1 through 6 are fixed starting at MIN_DIRECT_OCTAVE_NUMBER
          PEDALS_SetOctave(toeNum - 2 + MIN_DIRECT_OCTAVE_NUMBER);
          break;
       }
       // Note that we don't have to call HMI_UpdateIndicators because this will be 
-      // call in HMI_NotifyOctaveChange
+      // called in HMI_NotifyOctaveChange
 
       // Flash the indicator for confirmation
       IND_SetTempIndicatorState(toeNum,IND_FLASH_FAST,IND_TEMP_FLASH_STATE_DEFAULT_DURATION,IND_OFF,100);    
@@ -381,16 +381,16 @@ void HMI_NotifyToeToggle(u8 toeNum, u8 pressed, s32 timestamp) {
       break;
    case TOE_SWITCH_ARP:
       switch (toeNum) {
-      case 1:
-         // Toe 1 decrements
+      case 7:
+         // Toe 7 decrements
          PEDALS_SetOctave(PEDALS_GetOctave() - 1);
          break;
       case 8:
-         // Toe3 increments
+         // Toe 8 increments
          PEDALS_SetOctave(PEDALS_GetOctave() + 1);
          break;
       default:
-         // switches 2-7 handled by separate module/function
+         // switches 1-6 handled by separate module/function
          ARP_HMI_HandleArpToeToggle(toeNum, pressed);
       }
       break;
@@ -469,7 +469,7 @@ void HMI_NotifyStompToggle(u8 stompNum, u8 pressed, s32 timestamp) {
       DEBUG_MSG("HMI_NotifyStompToggle:  Invalid setting %d for stompNum %d", hmiSettings.stompSwitchSetting[stompNum - 1], stompNum);
       return;
    }
-   // Update the toe switch indicators and the display in case the mode changed.
+   // Update the indicators and the display in case the mode changed.
    HMI_UpdateIndicators();
 
    // And persist the data in case anything changed
@@ -538,7 +538,7 @@ void HMI_HandleVoicePresetsToeToggle(u8 toeNum) {
    }
 }
 /////////////////////////////////////////////////////////////////////////////
-// Helper to restore the indicators based on the toe switch mode.
+// Helper to update the toe indicators
 /////////////////////////////////////////////////////////////////////////////
 void HMI_UpdateIndicators() {
    IND_ClearAll();
@@ -578,8 +578,8 @@ void HMI_UpdateIndicators() {
          IND_SetBlipIndicator(8, 0, 2.0, 100);
       }
       else {
-         // Call separate function in ARP_HMI to handle toe indicators 2-7 and stomp indicator
-         ARP_HMI_UpdateArpIndicators();
+         // Call separate function in ARP_HMI to handle toe indicators 1-6 and stomp indicator
+         ARP_HMI_UpdateArpStompIndicator();
       }
       break;
    case TOE_SWITCH_VOICE_PRESETS:

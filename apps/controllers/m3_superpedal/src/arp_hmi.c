@@ -41,15 +41,15 @@
 // ARP-HMI specific Switch types and non-persisted variables
 //----------------------------------------------------------------------------
 
-// Total list of functions availabe in ARP Live mode.  Note that toe switches 1 and 8 are
+// Total list of functions availabe in ARP Live mode.  Note that toe switches 7 and 8 are
 // dedicated to Octave decrement/increment respectively
 typedef enum arp_live_toe_functions_e {
-   ARP_TOE_SELECT_KEY = 2,
-   ARP_TOE_SELECT_MODE_SCALE = 3,
-   ARP_TOE_DECREMENT_TEMPO = 4,
-   ARP_TOE_INCREMENT_TEMPO = 5,
+   ARP_TOE_SELECT_KEY = 1,
+   ARP_TOE_SELECT_MODE_SCALE = 2,
+   ARP_TOE_DECREMENT_TEMPO = 3,
+   ARP_TOE_INCREMENT_TEMPO = 4,
+   // 5 is unused
    ARP_TOE_SET_ARP_MODE = 6
-   // 7 is unused
 } arp_live_toe_functions_t;
 
 
@@ -290,32 +290,41 @@ const char* ARP_HMI_GetClockModeText(arp_clock_mode_t mode) {
 }
 
 /////////////////////////////////////////////////////////////////////////////
-// Sets/updates the indicators for the Arp mode
+// Updates the state of the arp stomp indicator
 /////////////////////////////////////////////////////////////////////////////
-void ARP_HMI_UpdateArpIndicators() {
-   // Update stomp indicator to Red if any mode active, or
-   // Green/Yellow depending on the the ARP mode
+void ARP_HMI_UpdateArpStompIndicator(){
    indicator_color_t color = IND_COLOR_RED;
-   if (!ARP_GetEnabled()) {
       // Arp not running so set indicator to Green or Yellow for ARP vs. PAD
       switch (ARP_GetArpMode()) {
       case ARP_MODE_CHORD_ARP:
-         color = IND_COLOR_GREEN;
+         // In chord mode, 
+         if (ARP_GetEnabled()){
+            // Red for arpeggiator running
+            // TODO - Flash it in synch with BPM.
+            color = IND_COLOR_RED;
+         }
+         else{
+            // Chord mode, but not running so show green
+            color = IND_COLOR_GREEN;
+         }
          break;
       case ARP_MODE_CHORD_PAD:
-         color = IND_COLOR_YELLOW;
+         // Pad mode is solid yellow when enabled
+         if (ARP_GetEnabled()){
+            color = IND_COLOR_YELLOW;
+         }
+         else{
+            // Green when not.
+            color = IND_COLOR_GREEN;
+         }
          break;
       case ARP_MODE_KEYS:
          // TODO - Find another color for Keys
        //  color = IND_COLOR_RED;
          break;
       }
-   }
    IND_SetIndicatorColor(IND_STOMP_4, color);
    IND_SetIndicatorState(IND_STOMP_4, IND_ON, 100, IND_RAMP_NONE);
-
-   // TODO the state of the Toe indicators
-   
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -380,6 +389,8 @@ void ARP_HMI_HandleArpToeToggle(u8 toeNum, u8 pressed) {
       }
       // Flash the indicator for confirmation.  
       IND_SetTempIndicatorState(toeNum,IND_FLASH_FAST,IND_TEMP_FLASH_STATE_DEFAULT_DURATION,targetState,100);
+      // Also update the stomp indicator
+      ARP_HMI_UpdateArpStompIndicator();
       break;
    }
    // Update the current display to reflect any content change
