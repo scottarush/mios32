@@ -40,8 +40,6 @@
 #define LONG_PRESS_TIME_MS 3000
 #define DISPLAY_CHAR_WIDTH 20
 
-#define MIN_DIRECT_OCTAVE_NUMBER 0
-
 
 //----------------------------------------------------------------------------
 // Global display Page variable declarations
@@ -134,7 +132,7 @@ u8 HMI_DebounceSwitchChange(switchState_t* pState, u8 pressed, s32 timestamp);
 /////////////////////////////////////////////////////////////////////////////
 // called at Init to initialize the HMI
 /////////////////////////////////////////////////////////////////////////////
-void HMI_Init(u8 resetDefaults) {   
+void HMI_Init(u8 resetDefaults) {
    int i = 0;
    for (i = 0; i < NUM_STOMP_SWITCHES;i++) {
       stompSwitchState[i].switchState = 0;
@@ -341,27 +339,30 @@ void HMI_NotifyToeToggle(u8 toeNum, u8 pressed, s32 timestamp) {
    // process the toe switch
    switch (hmiSettings.toeSwitchMode) {
    case TOE_SWITCH_OCTAVE:
+      s8 currentOctave = PEDALS_GetOctave();
       switch (toeNum) {
       case 7:
          // Toenum 7 always decrements.  Note that we don't have to check
          // range here.  PEDALS will do that and will call HMI_NotifyOctaveChange iff
          // there was a change.
-         PEDALS_SetOctave(PEDALS_GetOctave() - 1);
+         PEDALS_SetOctave(currentOctave - 1);
+         // Flash the indicator for confirmation, and then shut off
+         IND_SetTempIndicatorState(toeNum, IND_FLASH_FAST, IND_TEMP_FLASH_STATE_DEFAULT_DURATION, IND_OFF, 100);
          break;
       case 8:
          // Toenum 8 always increments
-         PEDALS_SetOctave(PEDALS_GetOctave() + 1);
+         PEDALS_SetOctave(currentOctave + 1);
+         // Flash the indicator for confirmation, and then shut off
+         IND_SetTempIndicatorState(toeNum, IND_FLASH_FAST, IND_TEMP_FLASH_STATE_DEFAULT_DURATION, IND_OFF, 100);
          break;
       default:
-         // Toe switch numbers 1 through 6 are fixed starting at MIN_DIRECT_OCTAVE_NUMBER
-         PEDALS_SetOctave(toeNum - 2 + MIN_DIRECT_OCTAVE_NUMBER);
+         // Toe switch numbers 1 through 6 are fixed from octaves 0 through 5
+         PEDALS_SetOctave(toeNum - 1);
+         // Note that we don't have to call HMI_UpdateIndicators for 1 through 6 because this will be 
+         // called in HMI_NotifyOctaveChange
          break;
       }
-      // Note that we don't have to call HMI_UpdateIndicators because this will be 
-      // called in HMI_NotifyOctaveChange
 
-      // Flash the indicator for confirmation
-      IND_SetTempIndicatorState(toeNum,IND_FLASH_FAST,IND_TEMP_FLASH_STATE_DEFAULT_DURATION,IND_OFF,100);    
       break;
    case TOE_SWITCH_VOLUME:
       // Get the volumeLevel corresponding to the pressed switch
@@ -372,8 +373,8 @@ void HMI_NotifyToeToggle(u8 toeNum, u8 pressed, s32 timestamp) {
       HMI_UpdateIndicators();
       // And update the current page display
       pCurrentPage->pUpdateDisplayCallback();
-      // Flash the indicator for confirmation
-      IND_SetTempIndicatorState(toeNum,IND_FLASH_FAST,IND_TEMP_FLASH_STATE_DEFAULT_DURATION,IND_OFF,100);    
+      // Flash the indicator for confirmation, but then leave on
+      IND_SetTempIndicatorState(toeNum, IND_FLASH_FAST, IND_TEMP_FLASH_STATE_DEFAULT_DURATION, IND_ON, 100);
       break;
    case TOE_SWITCH_VOICE_PRESETS:
       HMI_HandleVoicePresetsToeToggle(toeNum);
@@ -397,7 +398,7 @@ void HMI_NotifyToeToggle(u8 toeNum, u8 pressed, s32 timestamp) {
          ARP_HMI_HandleArpToeToggle(toeNum, pressed);
       }
       break;
-       default:
+   default:
    }
 }
 
@@ -556,28 +557,42 @@ void HMI_UpdateIndicators() {
       IND_SetIndicatorState(IND_STOMP_5, IND_ON, 100, IND_RAMP_NONE);
       break;
    case TOE_SWITCH_OCTAVE:
-      // For Octave, pedals 1 and 8 increment/decrement and indicators 2-7 are fixed starting
-      // at MIN_DIRECT_OCTAVE_NUMBER.  On the first click below this, indicator 1 is solid,
-      // one more click down it blips.  Same behavior on the top side with indicator 8.
-      if (octave < MIN_DIRECT_OCTAVE_NUMBER - 1) {
+      // Octaves are mapped from -2 to 8 with flashing 1 and 6 indicators for the < 0 and > 6
+      switch (octave) {
+      case -2:
+         IND_SetBlipIndicator(1, 0, 1.0, 100);
+         break;
+      case -1:
          IND_SetBlipIndicator(1, 0, 2.0, 100);
+         break;
+      case 0:
+      case 1:
+      case 2:
+      case 3:
+      case 4:
+      case 5:
+         // Direct indicators
+         IND_SetIndicatorState(octave + 1, IND_ON, 100, IND_RAMP_NONE);
+         break;
+      case 6:
+         IND_SetBlipIndicator(6, 0, 1.0, 100);
+         break;
+      case 7:
+         IND_SetBlipIndicator(6, 0, 2.0, 100);
+         break;
+      case 8:
+         IND_SetBlipIndicator(6, 0, 4.0, 100);
+         break;
       }
-      else if (octave > MIN_DIRECT_OCTAVE_NUMBER + 6) {
-         IND_SetBlipIndicator(8, 0, 2.0, 100);
-      }
-      else {
-         // Indicators 2 through 7 show direct octave.
-         IND_SetIndicatorState(octave - MIN_DIRECT_OCTAVE_NUMBER + 2, IND_ON, 100, IND_RAMP_NONE);
-      }
-      // Now set the stomp indicator to RED
+      // Set the stomp indicator to RED in case it wasn't already set to Octave mode.
       IND_SetIndicatorColor(IND_STOMP_5, IND_COLOR_RED);
       IND_SetIndicatorState(IND_STOMP_5, IND_ON, 100, IND_RAMP_NONE);
       break;
    case TOE_SWITCH_ARP:
-      if (octave < MIN_DIRECT_OCTAVE_NUMBER - 1) {
+      if (octave < -1) {
          IND_SetBlipIndicator(1, 0, 2.0, 100);
       }
-      else if (octave > MIN_DIRECT_OCTAVE_NUMBER + 6) {
+      else if (octave > 6) {
          IND_SetBlipIndicator(8, 0, 2.0, 100);
       }
       else {
@@ -831,7 +846,7 @@ void HMI_HomePage_UpdateDisplay() {
    case TOE_SWITCH_VOLUME:
    case TOE_SWITCH_VOICE_PRESETS:
       // Spacer on line 1
-      HMI_RenderLine(1, "--------------------", RENDER_LINE_LEFT);   
+      HMI_RenderLine(1, "--------------------", RENDER_LINE_LEFT);
       // Preset name on line 2
       HMI_RenderLine(2, presetName, RENDER_LINE_LEFT);
       break;
@@ -861,7 +876,7 @@ void HMI_HomePage_UpdateDisplay() {
       memcpy(scratchBuffer, ARP_PAT_GetPatternName(ARP_PAT_GetCurrentPatternIndex()), 16);
       scratchBuffer[16] = '\0';
 
-      snprintf(lineBuffer, DISPLAY_CHAR_WIDTH + 1, "%s %d",scratchBuffer, bpm);         
+      snprintf(lineBuffer, DISPLAY_CHAR_WIDTH + 1, "%s %d", scratchBuffer, bpm);
       HMI_RenderLine(2, lineBuffer, RENDER_LINE_RIGHT);
       break;
    default:
