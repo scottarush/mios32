@@ -24,7 +24,8 @@ typedef enum {
    PERSIST_HMI_BLOCK,
    PERSIST_MIDI_PRESETS_BLOCK,
    PERSIST_ARP_BLOCK,
-   PERSIST_ARP_HMI_BLOCK
+   PERSIST_ARP_HMI_BLOCK,
+   PERSIST_MIDI_ROUTER_BLOCK
 } persist_block_t;
 
 /////////////////////////////////////////////////////////////////////////////

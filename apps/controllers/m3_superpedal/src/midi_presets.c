@@ -52,13 +52,20 @@ persisted_midi_presets_t presets;
 /////////////////////////////////////////////////////////////////////////////
 void MIDI_PRESETS_PersistData();
 
-void MIDI_PRESETS_Init() {
-   // Restore settings from E^2 if they exist.  If not the initialize to defaults
-   s32 valid = 0;
-   // Set the expected serializedID in the supplied block.  Update this ID whenever the persisted structure changes.  
-   presets.serializationID = 0x4D494401;   // 'MID1'
+/////////////////////////////////////////////////////////////////////////////
+// Initializes MIDI Presets.  
+// param:  resetDefaults if == 0 then reset defaults, otherwise restore from E2
+/////////////////////////////////////////////////////////////////////////////
+void MIDI_PRESETS_Init(u8 resetDefaults) {
+   s32 valid = -1;
+   if (resetDefaults == 0) {
+      // Restore settings from E^2 if they exist.  If not the initialize to defaults
 
-   valid = PERSIST_ReadBlock(PERSIST_MIDI_PRESETS_BLOCK, (unsigned char*)&presets, sizeof(presets));
+      // Set the expected serializedID in the supplied block.  Update this ID whenever the persisted structure changes.  
+      presets.serializationID = 0x4D494401;   // 'MID1'
+
+      valid = PERSIST_ReadBlock(PERSIST_MIDI_PRESETS_BLOCK, (unsigned char*)&presets, sizeof(presets));
+   }
    if (valid < 0) {
       DEBUG_MSG("MIDI_PRESETS_Init:  PERSIST_ReadBlock return invalid.   Reinitializing EEPROM Block");
       // Set default presets
@@ -140,7 +147,7 @@ const midi_preset_num_t* MIDI_PRESETS_ActivateMIDIPreset(const midi_preset_num_t
    midi_preset_t* ptr = &presets.generalMidiPresets[presetNum->bankNumber - 1][presetNum->presetBankIndex - 1];
 #ifdef DEBUG
    DEBUG_MSG("MIDI_PRESETS_ActivateGenMIDIPreset:  Activating preset# %d.%d, progNumber=%d",
-      presetNum->bankNumber,presetNum->presetBankIndex,ptr->programNumber);
+      presetNum->bankNumber, presetNum->presetBankIndex, ptr->programNumber);
 #endif
 
    MIDI_PRESETS_ActivateMIDIVoice(ptr->programNumber, ptr->midiBankNumber, ptr->midiPorts, ptr->midiChannel);
@@ -206,10 +213,10 @@ const midi_preset_t* MIDI_PRESETS_SetMIDIPreset(const midi_preset_num_t* presetN
       return NULL;
    }
    midi_preset_t* ptr = &presets.generalMidiPresets[presetNum->bankNumber - 1][presetNum->presetBankIndex - 1];
-   #ifdef DEBUG
+#ifdef DEBUG
    DEBUG_MSG("MIDI_PRESETS_SetGenMIDIPreset: Setting preset# %d.%d, progNumber=%d",
-      presetNum->bankNumber,presetNum->presetBankIndex,ptr->programNumber);
-   #endif
+      presetNum->bankNumber, presetNum->presetBankIndex, ptr->programNumber);
+#endif
    // TODO:  Validate programNumber, midiBankNumber, etc.
    ptr->programNumber = setPresetPtr->programNumber;
    ptr->midiBankNumber = setPresetPtr->midiBankNumber;
@@ -263,7 +270,7 @@ const midi_preset_t* MIDI_PRESETS_GetMidiPreset(const midi_preset_num_t* presetN
    }
    midi_preset_t* ptr = &presets.generalMidiPresets[presetNum->bankNumber - 1][presetNum->presetBankIndex - 1];
 #ifdef DEBUG
-//   DEBUG_MSG("MIDI_PRESETS_GetMidiPreset: bank%d index%d progNumber=%d", presetNum->bankNumber, presetNum->presetBankIndex, ptr->programNumber);
+   //   DEBUG_MSG("MIDI_PRESETS_GetMidiPreset: bank%d index%d progNumber=%d", presetNum->bankNumber, presetNum->presetBankIndex, ptr->programNumber);
 #endif
    return ptr;
 }

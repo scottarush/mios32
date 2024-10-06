@@ -134,7 +134,7 @@ u8 HMI_DebounceSwitchChange(switchState_t* pState, u8 pressed, s32 timestamp);
 /////////////////////////////////////////////////////////////////////////////
 // called at Init to initialize the HMI
 /////////////////////////////////////////////////////////////////////////////
-void HMI_Init(void) {
+void HMI_Init(u8 resetDefaults) {   
    int i = 0;
    for (i = 0; i < NUM_STOMP_SWITCHES;i++) {
       stompSwitchState[i].switchState = 0;
@@ -157,12 +157,15 @@ void HMI_Init(void) {
    pCurrentPage = &homePage;
 
    // Restore settings from E^2 if they exist.  If not then initialize to defaults
-   s32 valid = 0;
+   s32 valid = -1;
 
-   // Set the expected serializedID in the supplied block.  Update this ID whenever the persisted structure changes.  
-   hmiSettings.serializationID = 0x484D4901;   // 'HMI1'
+   if (resetDefaults == 0) {
 
-   valid = PERSIST_ReadBlock(PERSIST_HMI_BLOCK, (unsigned char*)&hmiSettings, sizeof(persisted_hmi_settings_t));
+      // Set the expected serializedID in the supplied block.  Update this ID whenever the persisted structure changes.  
+      hmiSettings.serializationID = 0x484D4901;   // 'HMI1'
+      valid = PERSIST_ReadBlock(PERSIST_HMI_BLOCK, (unsigned char*)&hmiSettings, sizeof(persisted_hmi_settings_t));
+   }
+
    if (valid < 0) {
       DEBUG_MSG("HMI_Init:  PERSIST_ReadBlock return invalid. Re-initing persisted settings to defaults");
 

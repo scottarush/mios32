@@ -81,12 +81,17 @@ static s16 lastARPPatternIndex = 0;
 /////////////////////////////////////////////////////////////////////////////
 // Initialisation
 /////////////////////////////////////////////////////////////////////////////
-s32 ARP_HMI_Init()
+s32 ARP_HMI_Init(u8 resetDefaults)
 {
-   // Set the expected serializedID in the supplied block.  Update this ID whenever the persisted structure changes.  
-   arpHMISettings.serializationID = 0x41484D31;   // 'AHM1'
+   s32 valid = -1;
 
-   s32 valid = PERSIST_ReadBlock(PERSIST_ARP_HMI_BLOCK, (unsigned char*)&arpHMISettings, sizeof(persisted_arp_hmi_data_t));
+   if (resetDefaults == 0) {
+
+      // Set the expected serializedID in the supplied block.  Update this ID whenever the persisted structure changes.  
+      arpHMISettings.serializationID = 0x41484D31;   // 'AHM1'
+
+      valid = PERSIST_ReadBlock(PERSIST_ARP_HMI_BLOCK, (unsigned char*)&arpHMISettings, sizeof(persisted_arp_hmi_data_t));
+   }
    if (valid < 0) {
       DEBUG_MSG("ARP_HMI_Init:  PERSIST_ReadBlock return invalid. Re-initing persisted settings to defaults");
 
@@ -292,37 +297,37 @@ const char* ARP_HMI_GetClockModeText(arp_clock_mode_t mode) {
 /////////////////////////////////////////////////////////////////////////////
 // Updates the state of the arp stomp indicator
 /////////////////////////////////////////////////////////////////////////////
-void ARP_HMI_UpdateArpStompIndicator(){
+void ARP_HMI_UpdateArpStompIndicator() {
    indicator_color_t color = IND_COLOR_RED;
-      // Arp not running so set indicator to Green or Yellow for ARP vs. PAD
-      switch (ARP_GetArpMode()) {
-      case ARP_MODE_CHORD_ARP:
-         // In chord mode, 
-         if (ARP_GetEnabled()){
-            // Red for arpeggiator running
-            // TODO - Flash it in synch with BPM.
-            color = IND_COLOR_RED;
-         }
-         else{
-            // Chord mode, but not running so show green
-            color = IND_COLOR_GREEN;
-         }
-         break;
-      case ARP_MODE_CHORD_PAD:
-         // Pad mode is solid yellow when enabled
-         if (ARP_GetEnabled()){
-            color = IND_COLOR_YELLOW;
-         }
-         else{
-            // Green when not.
-            color = IND_COLOR_GREEN;
-         }
-         break;
-      case ARP_MODE_KEYS:
-         // TODO - Find another color for Keys
-       //  color = IND_COLOR_RED;
-         break;
+   // Arp not running so set indicator to Green or Yellow for ARP vs. PAD
+   switch (ARP_GetArpMode()) {
+   case ARP_MODE_CHORD_ARP:
+      // In chord mode, 
+      if (ARP_GetEnabled()) {
+         // Red for arpeggiator running
+         // TODO - Flash it in synch with BPM.
+         color = IND_COLOR_RED;
       }
+      else {
+         // Chord mode, but not running so show green
+         color = IND_COLOR_GREEN;
+      }
+      break;
+   case ARP_MODE_CHORD_PAD:
+      // Pad mode is solid yellow when enabled
+      if (ARP_GetEnabled()) {
+         color = IND_COLOR_YELLOW;
+      }
+      else {
+         // Green when not.
+         color = IND_COLOR_GREEN;
+      }
+      break;
+   case ARP_MODE_KEYS:
+      // TODO - Find another color for Keys
+    //  color = IND_COLOR_RED;
+      break;
+   }
    IND_SetIndicatorColor(IND_STOMP_4, color);
    IND_SetIndicatorState(IND_STOMP_4, IND_ON, 100, IND_RAMP_NONE);
 }
@@ -366,29 +371,29 @@ void ARP_HMI_HandleArpToeToggle(u8 toeNum, u8 pressed) {
       bpm += TEMPO_CHANGE_STEP;
       ARP_SetBPM(bpm);
       // Flash the indicator for confirmation
-      IND_SetTempIndicatorState(toeNum,IND_FLASH_FAST,IND_TEMP_FLASH_STATE_DEFAULT_DURATION,IND_OFF,100);      
+      IND_SetTempIndicatorState(toeNum, IND_FLASH_FAST, IND_TEMP_FLASH_STATE_DEFAULT_DURATION, IND_OFF, 100);
       break;
    case ARP_TOE_DECREMENT_TEMPO:
       bpm = ARP_GetBPM();
       bpm -= TEMPO_CHANGE_STEP;
       ARP_SetBPM(bpm);
       // Flash the indicator for confirmation
-      IND_SetTempIndicatorState(toeNum,IND_FLASH_FAST,IND_TEMP_FLASH_STATE_DEFAULT_DURATION,IND_OFF,100);      
+      IND_SetTempIndicatorState(toeNum, IND_FLASH_FAST, IND_TEMP_FLASH_STATE_DEFAULT_DURATION, IND_OFF, 100);
       break;
    case ARP_TOE_SET_ARP_MODE:
       indicator_states_t targetState = IND_ON;
-      switch(ARP_GetArpMode()){
-         case ARP_MODE_CHORD_ARP:
-            ARP_SetArpMode(ARP_MODE_CHORD_PAD);
-            break;
-         case ARP_MODE_CHORD_PAD:
-            ARP_SetArpMode(ARP_MODE_CHORD_ARP);
-            targetState = IND_FLASH_SLOW;
-            break;
+      switch (ARP_GetArpMode()) {
+      case ARP_MODE_CHORD_ARP:
+         ARP_SetArpMode(ARP_MODE_CHORD_PAD);
+         break;
+      case ARP_MODE_CHORD_PAD:
+         ARP_SetArpMode(ARP_MODE_CHORD_ARP);
+         targetState = IND_FLASH_SLOW;
+         break;
          // TODO - Add in arp mode keys someday
       }
       // Flash the indicator for confirmation.  
-      IND_SetTempIndicatorState(toeNum,IND_FLASH_FAST,IND_TEMP_FLASH_STATE_DEFAULT_DURATION,targetState,100);
+      IND_SetTempIndicatorState(toeNum, IND_FLASH_FAST, IND_TEMP_FLASH_STATE_DEFAULT_DURATION, targetState, 100);
       // Also update the stomp indicator
       ARP_HMI_UpdateArpStompIndicator();
       break;

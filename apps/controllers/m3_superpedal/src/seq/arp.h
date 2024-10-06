@@ -62,7 +62,7 @@ typedef struct persisted_arp_data_s {
 // Prototypes
 /////////////////////////////////////////////////////////////////////////////
 
-extern s32 ARP_Init();
+extern s32 ARP_Init(u8);
 
 extern s32 ARP_Reset(void);
 

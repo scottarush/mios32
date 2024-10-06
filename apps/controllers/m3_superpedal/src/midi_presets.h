@@ -76,7 +76,7 @@ typedef struct persisted_midi_presets_s {
 // Prototypes
 /////////////////////////////////////////////////////////////////////////////
 
-extern void MIDI_PRESETS_Init();
+extern void MIDI_PRESETS_Init(u8);
 
 extern const char * MIDI_PRESETS_GetMIDIVoiceName(u8 progNum);
 extern u8 MIDI_PRESETS_GetNumMIDIVoices();

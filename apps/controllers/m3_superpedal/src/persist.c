@@ -28,8 +28,8 @@
 
 // Address for the blocks.  All in 16-bit word size
 
-#define PRESETS_ADDR_ROUTER_BEGIN 0
-#define MIDI_PRESETS_START_ADDR (PRESETS_ADDR_ROUTER_BEGIN+(MIDI_ROUTER_NUM_NODES*4))
+#define MIDI_ROUTER_START_ADDR 0
+#define MIDI_PRESETS_START_ADDR (MIDI_ROUTER_START_ADDR+(MIDI_ROUTER_NUM_NODES*4))
 #define HMI_START_ADDR (MIDI_PRESETS_START_ADDR+sizeof(persisted_midi_presets_t)/2)
 #define PEDALS_START_ADDR (HMI_START_ADDR+sizeof(persisted_hmi_settings_t)/2)
 #define ARP_START_ADDR (PEDALS_START_ADDR+sizeof(persisted_pedal_confg_t)/2)
@@ -54,7 +54,6 @@ s32 PERSIST_Init(u32 mode) {
 #ifdef DEBUG
       DEBUG_MSG("PERSIST_Init: EEPROM initialisation failed with status %d!\n", status);
 #endif
-
       /**
            // Reformat
            if ((status = EEPROM_Init(1)) < 0) {
@@ -65,8 +64,13 @@ s32 PERSIST_Init(u32 mode) {
         **/
    }
    else if (mode > 0) {
-      // E2 just got reformatted, write the MidiRouter settings
+      // E2 just got reformatted, re-init all the settings to their defaults
       PERSIST_StoreMIDIRouter();
+      MIDI_PRESETS_Init(1);
+      HMI_Init(1);
+      PEDALS_Init(1);
+      ARP_Init(1);
+      ARP_HMI_Init(1);
    }
    else {
       // Restore midi_router settings.  Need to call from here to avoid modifying the midi_router
@@ -253,8 +257,8 @@ void PERSIST_RestoreMidiRouter() {
    u8 node;
    midi_router_node_entry_t* n = &midi_router_node[0];
    for (node = 0; node < MIDI_ROUTER_NUM_NODES; ++node, ++n) {
-      u16 cfg1 = PERSIST_Read16(PRESETS_ADDR_ROUTER_BEGIN + node * 2 + 0);
-      u16 cfg2 = PERSIST_Read16(PRESETS_ADDR_ROUTER_BEGIN + node * 2 + 1);
+      u16 cfg1 = PERSIST_Read16(MIDI_ROUTER_START_ADDR + node * 2 + 0);
+      u16 cfg2 = PERSIST_Read16(MIDI_ROUTER_START_ADDR + node * 2 + 1);
 
       // default setup
       if (!cfg1 && !cfg2) {
@@ -285,8 +289,8 @@ s32 PERSIST_StoreMIDIRouter() {
       u16 cfg1 = n->src_port | ((u16)n->src_chn << 8);
       u16 cfg2 = n->dst_port | ((u16)n->dst_chn << 8);
 
-      status |= PERSIST_Write16(PRESETS_ADDR_ROUTER_BEGIN + node * 2 + 0, cfg1);
-      status |= PERSIST_Write16(PRESETS_ADDR_ROUTER_BEGIN + node * 2 + 1, cfg2);
+      status |= PERSIST_Write16(MIDI_ROUTER_START_ADDR + node * 2 + 0, cfg1);
+      status |= PERSIST_Write16(MIDI_ROUTER_START_ADDR + node * 2 + 1, cfg2);
    }
    return status;
 }

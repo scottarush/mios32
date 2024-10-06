@@ -151,10 +151,10 @@ void APP_Init(void) {
    // initialize MIDI handler for Sequencer used by Arpeggiator
    SEQ_MIDI_OUT_Init(0);
 
-   // initialize Arpeggiator and HMI
-   ARP_Init();
+   // initialize Arpeggiator and HMI.  Read last settings from E2
+   ARP_Init(0);
    ARP_PAT_Init();
-   ARP_HMI_Init();
+   ARP_HMI_Init(0);
 
    // init terminal
    TERMINAL_Init(0);
@@ -169,7 +169,7 @@ void APP_Init(void) {
    MIOS32_MIDI_SendDebugMessage("=================\n");
    MIOS32_MIDI_SendDebugMessage("\n");
 
-   // Init the persistence handler
+   // Init the persistence handler but don't reset settings
    if (PERSIST_Init(0) < 0) {
       MIOS32_MIDI_SendDebugMessage("Error initializing EEPROM");
    }
@@ -180,11 +180,11 @@ void APP_Init(void) {
    // init the indicators
    IND_Init();
 
-   // Init the MIDI Presets
-   MIDI_PRESETS_Init();
+   // Init the MIDI Presets.  Read settings from E2
+   MIDI_PRESETS_Init(0);
 
    // init the HMI last as it depends on above.
-   HMI_Init();
+   HMI_Init(0);
 
    // initial load of filesystem
    s32 status = FILE_Init(0);

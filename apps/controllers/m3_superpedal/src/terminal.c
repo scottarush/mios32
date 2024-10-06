@@ -188,15 +188,14 @@ s32 TERMINAL_ParseLine(char* input, void* _output_function)
    if (UIP_TERMINAL_ParseLine(input, _output_function) > 0)
       return 0; // command parsed by UIP Terminal
 
-   // if( KEYBOARD_TerminalParseLine(input, _output_function) > 0 )
-   //   return 0; // command parsed by Keyboard Terminal
-
    if (MIDIMON_TerminalParseLine(input, _output_function) > 0)
       return 0; // command parsed
 
-   if (MIDI_ROUTER_TerminalParseLine(input, _output_function) > 0)
+   if (MIDI_ROUTER_TerminalParseLine(input, _output_function) > 0){
+      // Assume settings have changed and persist them to EEPROM
+      PERSIST_StoreMIDIRouter();
       return 0; // command parsed
-
+   }
    if ((parameter = strtok_r(input, separators, &brkt))) {
       if (strcmp(parameter, "help") == 0) {
          out("Welcome to " MIOS32_LCD_BOOT_MSG_LINE1 "!");
@@ -210,7 +209,7 @@ s32 TERMINAL_ParseLine(char* input, void* _output_function)
          MIDIMON_TerminalHelp(_output_function);
          MIDI_ROUTER_TerminalHelp(_output_function);
          out("  clearee:                          Reformats EEPROM and re-Stores defaults.");
-         out("  reinit:                           reinits all components to load their EE settings");
+         out("  reinit:                           reinits all components to force load their EE settings");
          out("  reset:                            resets the MIDIbox (!)\n");
          out("  help:                             this page");
          out("  exit:                             (telnet only) exits the terminal");
@@ -285,24 +284,20 @@ s32 TERMINAL_ParseLine(char* input, void* _output_function)
       }
       else if (strcmp(parameter, "clearee") == 0) {
          s32 status = PERSIST_Init(1);
-         if (status >= 0) {
-            MIDI_PRESETS_Init();
-            HMI_Init();
-            PEDALS_Init();
-            ARP_Init();
-            ARP_HMI_Init();
-         }
-         else {
+         if (status < 0) {
             out("ERROR: failed to clear EEPROM (status %d)!", status);
          }
       }
       else if (strcmp(parameter, "reinit") == 0) {
          out("Re-Initing MIDI_PRESETS, HMI, PEDALS, & ARP");
-         MIDI_PRESETS_Init();
-         HMI_Init();
-         PEDALS_Init();
-         ARP_Init();
-         ARP_HMI_Init();
+         MIDI_PRESETS_Init(0);
+         HMI_Init(0);
+         PEDALS_Init(0);
+         ARP_Init(0);
+         ARP_HMI_Init(0);
+         // Init and then store midi router
+         MIDI_ROUTER_Init(0);         
+         PERSIST_StoreMIDIRouter();
       }
       else if (strcmp(parameter, "reset") == 0) {
          MIOS32_SYS_Reset();

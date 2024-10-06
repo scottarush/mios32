@@ -77,8 +77,9 @@ void PEDALS_SendAllNotesOff();
 
 /////////////////////////////////////////////////////////////////////////////
 // Initialize the pedal handler
+// param:  resetDefaults if == 0 then reset defaults, otherwise restore from E2
 /////////////////////////////////////////////////////////////////////////////
-void PEDALS_Init() {
+void PEDALS_Init(u8 resetDefaults) {
 
    // Initialize pedal configuration
 
@@ -87,8 +88,13 @@ void PEDALS_Init() {
    // Set the expected serializedID in the supplied block.  Update this ID whenever the persisted structure changes.  
    pedal_config.serializationID = 0x50454401;  // "PED1"
 
-   s32 valid = 0;
-   valid = PERSIST_ReadBlock(PERSIST_PEDALS_BLOCK, (unsigned char*)&pedal_config, sizeof(pedal_config));
+   s32 valid = -1;
+
+   if (resetDefaults == 0) {
+
+      valid = PERSIST_ReadBlock(PERSIST_PEDALS_BLOCK, (unsigned char*)&pedal_config, sizeof(pedal_config));
+
+   }
    if (valid < 0) {
       // EEPROM settings not valid.  Initialize defaults and save to E2
       DEBUG_MSG("PEDALS_Init:  PERSIST_ReadBlock return invalid.   Reinitializing EEPROM Block");
@@ -116,7 +122,7 @@ void PEDALS_Init() {
       pc->left_pedal_note_number = 23;
 
       // Persist defaults to EEPROM
-      PEDALS_PersistData();   
+      PEDALS_PersistData();
    }
    // Clear locals
    makePressed = 1;
@@ -195,7 +201,7 @@ void PEDALS_NotifyChange(u8 pedalNum, u8 pressed, u32 timestamp) {
    persisted_pedal_confg_t* pc = (persisted_pedal_confg_t*)&pedal_config;
 
 #ifdef DEBUG
-   DEBUG_MSG("PEDALS_NotifyChange: pedal %d %s.  time=%d",pedalNum, pressed > 0 ? "pressed" : "released",timestamp);
+   DEBUG_MSG("PEDALS_NotifyChange: pedal %d %s.  time=%d", pedalNum, pressed > 0 ? "pressed" : "released", timestamp);
 #endif
 
    u8 note_number = 0;
@@ -205,9 +211,9 @@ void PEDALS_NotifyChange(u8 pedalNum, u8 pressed, u32 timestamp) {
       return;
    }
    // Check if select pedal callback non-null.  If so, then forward the pedal number and clear for next time
-   if (selectPedalCallback != NULL){
+   if (selectPedalCallback != NULL) {
 #ifdef DEBUG
-   DEBUG_MSG("Pedal %d selected.  Calling selectPedalCallback 0x%x",pedalNum,selectPedalCallback);
+      DEBUG_MSG("Pedal %d selected.  Calling selectPedalCallback 0x%x", pedalNum, selectPedalCallback);
 #endif
       (*selectPedalCallback)(pedalNum);
       selectPedalCallback = NULL;
@@ -266,17 +272,17 @@ s32 PEDALS_SendNote(u8 note_number, u8 velocity, u8 pressed) {
 
    // Compute velocity and send to the Arpeggiator.  If consumed there then don't send to 
    u8 scaledVelocity = PEDALS_ScaleVelocity(velocity, PEDALS_GetVolume());
-   #ifdef DEBUG
-      DEBUG_MSG("PEDALS_SendNote: velocity=%d scaledVelocity=%d", velocity, scaledVelocity);
-   #endif   
+#ifdef DEBUG
+   DEBUG_MSG("PEDALS_SendNote: velocity=%d scaledVelocity=%d", velocity, scaledVelocity);
+#endif   
    u8 arpConsumed = 0;
-   if (!pressed){
-      arpConsumed = ARP_NotifyNoteOff(note_number,scaledVelocity);
+   if (!pressed) {
+      arpConsumed = ARP_NotifyNoteOff(note_number, scaledVelocity);
    }
-   else{
+   else {
       arpConsumed = ARP_NotifyNoteOn(note_number, scaledVelocity);
    }
-   if (arpConsumed){
+   if (arpConsumed) {
       return 0;  // ARP ate it.  No error
    }
    // Otherwise, send to MIDI ports
@@ -290,7 +296,7 @@ s32 PEDALS_SendNote(u8 note_number, u8 velocity, u8 pressed) {
          //DEBUG_MSG("midi tx:  port=0x%x",port);
          if (!pressed) {
             MIOS32_MIDI_SendNoteOff(port, pc->midi_chn - 1, sent_note, scaledVelocity);
-             // Clear from the internal noteOnNumbers list
+            // Clear from the internal noteOnNumbers list
             for (int i = 0;i < PEDALS_NOTE_ON_LIST_MAX;i++) {
                if (noteOnNumbersList[i] == sent_note) {
                   noteOnNumbersList[i] = 0;
@@ -299,7 +305,7 @@ s32 PEDALS_SendNote(u8 note_number, u8 velocity, u8 pressed) {
             }
          }
          else {
-   
+
             MIOS32_MIDI_SendNoteOn(port, pc->midi_chn - 1, sent_note, scaledVelocity);
             // Add to the internal noteOnNumbers list
             for (int i = 0;i < PEDALS_NOTE_ON_LIST_MAX;i++) {
@@ -401,11 +407,11 @@ u8 PEDALS_GetVolume() {
 // Sets pedal selection mode active.  The pedal number of the next NotifyChange 
 // will be forwarded to the provide callback function
 /////////////////////////////////////////////////////////////////////////////
-void PEDALS_SetSelectPedalCallback(GetSelectedPedal callback){
+void PEDALS_SetSelectPedalCallback(GetSelectedPedal callback) {
 #ifdef DEBUG
-   DEBUG_MSG("PEDALS_SetSelectPedalCallback:  Setting callback pointer 0x%x",callback);
+   DEBUG_MSG("PEDALS_SetSelectPedalCallback:  Setting callback pointer 0x%x", callback);
 #endif
-   selectPedalCallback = callback;   
+   selectPedalCallback = callback;
 }
 
 

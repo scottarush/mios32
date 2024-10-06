@@ -61,16 +61,18 @@ persisted_arp_data_t arpSettings;
 /////////////////////////////////////////////////////////////////////////////
 // Initialisation
 /////////////////////////////////////////////////////////////////////////////
-s32 ARP_Init()
+s32 ARP_Init(u8 resetDefaults)
 {
    // initialize the Notestack Stack will be cleared whenever no note is played anymore
    NOTESTACK_Init(&chordPadNotestack, NOTESTACK_MODE_PUSH_BOTTOM, &chordPadNotestackItems[0], NOTESTACK_SIZE);
 
-   // Restore settings from E^2 if they exist.  If not then initialize to defaults
-   s32 valid = 0;
-   // Set the expected serializedID in the supplied block.  Update this ID whenever the persisted structure changes.  
-   arpSettings.serializationID = 0x41525001;   // 'ARP1'
+   s32 valid = -1;
 
+   if (resetDefaults == 0) {
+      // Restore settings from E^2 if they exist.  If not then initialize to defaults
+     // Set the expected serializedID in the supplied block.  Update this ID whenever the persisted structure changes.  
+      arpSettings.serializationID = 0x41525001;   // 'ARP1'
+   }
    valid = PERSIST_ReadBlock(PERSIST_ARP_BLOCK, (unsigned char*)&arpSettings, sizeof(persisted_arp_data_t));
    if (valid < 0) {
       DEBUG_MSG("ARP_Init:  PERSIST_ReadBlock return invalid. Re-initing persisted settings to defaults");
@@ -188,7 +190,7 @@ static s32 ARP_PlayOffEvents(void)
       if (ARP_GetARPSettings()->midi_ports & mask) {
          // USB0/1/2/3, UART0/1/2/3, IIC0/1/2/3, OSC0/1/2/3
          mios32_midi_port_t port = 0x10 + ((i & 0xc) << 2) + (i & 3);
-         MIOS32_MIDI_SendCC(port, midiChannel, 123,0);
+         MIOS32_MIDI_SendCC(port, midiChannel, 123, 0);
       }
    }
 
@@ -245,14 +247,14 @@ s32 ARP_FillChordPadNoteStack(u8 rootNote, u8 velocity) {
    // Push the keys one by one onto the note stack from the root
    u8 numChordNotes = SEQ_CHORD_GetNumNotesByEnum(chord);
 #ifdef DEBUG
-  // DEBUG_MSG("ARP_FillChordPadNoteStack: Pushing chord: %s, chordPlayedNote=%d octave=%d numChordNotes=%d",
-    //  SEQ_CHORD_NameGetByEnum(chord), rootNote, octave, numChordNotes);
+   // DEBUG_MSG("ARP_FillChordPadNoteStack: Pushing chord: %s, chordPlayedNote=%d octave=%d numChordNotes=%d",
+     //  SEQ_CHORD_NameGetByEnum(chord), rootNote, octave, numChordNotes);
 #endif   
    for (u8 keyNum = 0;keyNum < numChordNotes;keyNum++) {
       s32 note = SEQ_CHORD_NoteGetByEnum(keyNum, chord, octave);
       if (note >= 0) {
          // add offset for the chordPlayedNote
-         note += (rootNote % 12);         
+         note += (rootNote % 12);
          NOTESTACK_Push(&chordPadNotestack, note, velocity);
       }
    }

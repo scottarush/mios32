@@ -38,7 +38,7 @@ typedef struct persisted_arp_hmi_data_s {
 // Prototypes
 /////////////////////////////////////////////////////////////////////////////
 
-extern s32 ARP_HMI_Init();
+extern s32 ARP_HMI_Init(u8);
 
 extern void ARP_HMI_UpdateArpStompIndicator();
 extern void ARP_HMI_UpdateChordIndicators();

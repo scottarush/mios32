@@ -130,7 +130,7 @@ typedef struct {
 // Prototypes
 /////////////////////////////////////////////////////////////////////////////
 
-extern void HMI_Init();
+extern void HMI_Init(u8);
 extern void HMI_NotifyStompToggle(u8 stompNum,u8 pressed,s32 timestamp);
 extern void HMI_NotifyToeToggle(u8 stompNum,u8 pressed,s32 timestamp);
 extern void HMI_NotifyBackToggle(u8 pressed,s32 timestamp);
