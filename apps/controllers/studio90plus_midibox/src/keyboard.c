@@ -973,7 +973,7 @@ static s32 KEYBOARD_MIDI_SendCtrl(u8 kb, u8 ctrl_number, u8 value) {
 				}
 				else if (ctrl_number == 128) {
 #if 0
-					u16 pb_value = (value == 0x40) ? 0x2000 : ((value << 7) | value);
+					u16 pb_value = (value == 0x40) ? 0x2000 : ((value << 7) | value);se
 #else
 					// allow some headroom for the middle position
 					u16 pb_value = (value >= 0x3f && value <= 0x41) ? 0x2000 : ((value << 7) | value);

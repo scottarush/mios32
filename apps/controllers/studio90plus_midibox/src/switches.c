@@ -3,96 +3,171 @@
  * Functions to read Studio 90 switches connected through J10.
  */
 
-/////////////////////////////////////////////////////////////////////////////
-// Include files
-/////////////////////////////////////////////////////////////////////////////
+ /////////////////////////////////////////////////////////////////////////////
+ // Include files
+ /////////////////////////////////////////////////////////////////////////////
 
 #include <mios32.h>
 #include "switches.h"
+#include "hmi.h"
 
-#define DEBOUNCE_COUNT 5
-#define SWITCH_PRESSED 1
-#define SWITCH_RELEASED 0
+//#define DEBUG
 
-void SWITCHPressed(u8);
-void SWITCHReleased(u8);
+#define DEBUG_MSG MIOS32_MIDI_SendDebugMessage
 
-static u8 lastSwitchState[NUM_STUDIO90_SWITCHES];
-static u8 debounceCount[NUM_STUDIO90_SWITCHES];
-static u8 switchState[NUM_STUDIO90_SWITCHES];
+#define NUM_SWITCHES 4
+
+// Defines for each switch in J10 with both a mask and index into the switches arrays below
+#define SWITCH_UP_BIT_MASK 0x0001     
+#define SWITCH_UP_INDEX 0
+
+#define SWITCH_DOWN_BIT_MASK 0x0004
+#define SWITCH_DOWN_INDEX 1
+
+#define SWITCH_ENTER_BIT_MASK 0x0002   
+#define SWITCH_ENTER_INDEX 2
+
+#define SWITCH_BACK_BIT_MASK 0x0008 
+#define SWITCH_BACK_INDEX 3
+
+
+// Debounce count as multiple of the read intervals.  Total debounce time = SWITCH_READ_TIME_MS * DEBOUNCE_COUNT
+#define DEBOUNCE_COUNT 3
+
+typedef enum {
+   SWITCH_PRESSED = 0,
+   SWITCH_RELEASED = 1
+} switch_state_t;
+
+
+void SWITCHES_SWITCHChanged(u8,u8,u32);
+
+static switch_state_t lastSwitchState[NUM_SWITCHES];
+static u8 debounceCount[NUM_SWITCHES];
+static switch_state_t switchState[NUM_SWITCHES];
 
 /////////////////////////////////////////////////////////////////////////////
 // called at Init to initialize the J10 inputs
 /////////////////////////////////////////////////////////////////////////////
 void SWITCHES_Init(void)
 {
-  // initialize all J10 pins to inputs and clear debounce arrays
-  int pin;
-  for(pin=0; pin < 16; ++pin) {
-    MIOS32_BOARD_J10_PinInit	(pin, MIOS32_BOARD_PIN_MODE_INPUT_PU);
-    switchState[pin] = SWITCH_RELEASED;
-    debounceCount[pin] = 0;
-  }
+   // initialize all J10 pins to inputs and clear debounce arrays
+   int pin;
+
+   for (pin = 0; pin < NUM_SWITCHES; ++pin) {
+      MIOS32_BOARD_J10_PinInit(pin, MIOS32_BOARD_PIN_MODE_INPUT_PD);
+      switchState[pin] = SWITCH_RELEASED;
+      lastSwitchState[pin] = SWITCH_RELEASED;
+      debounceCount[pin] = 0;
+   }
 }
 
 /////////////////////////////////////////////////////////////////////////////
 // called periodically to read and debounce the state of the switches
 // call rate should be at expected debounce .
 /////////////////////////////////////////////////////////////////////////////
-void SWITCHES_Read(){
-  u8 newPinState;
-  u8 pin;
+void SWITCHES_Read() {
+   // Get the time for use in long press detection
+   u32 timestamp = MIOS32_TIMESTAMP_Get();
 
-  newPinState = 0;
-  
-  for(pin=0; pin < NUM_STUDIO90_SWITCHES; pin++) {
-    newPinState = MIOS32_BOARD_J10_PinGet(pin);  
+   // Now read J10f for the raw pull-down pin states
+   s32 pinStates = MIOS32_BOARD_J10_Get();
 
-    // Was switch pressed on last cycle?
-    if (lastSwitchState[pin] > 0){
-      if (newPinState > 0){
-        // Still pressed.  Handle debounce if not yet handled.
-        if (switchState[pin]!= SWITCH_PRESSED) {
-          // See if count exceeded debounce threshold
-          if (debounceCount[pin] == DEBOUNCE_COUNT) {
-            // this is a valid transition so change to PRESSED
-            switchState[pin] = SWITCH_PRESSED;
-            // Call pressed handler
-            SWITCHPressed(pin);
+#ifdef DEBUG
+   DEBUG_MSG("SWITCHES_Read:  pinStates=0x%X",pinStates);
+#endif
+   
+   // Iterate through the switches
+   u32 index = 0;
+   u32 mask = 0;
+   switch_state_t newSwitchState = SWITCH_RELEASED;
+   for (index = 0;index < NUM_SWITCHES; index++) {
+      switch(index){
+         case SWITCH_UP_INDEX:
+            mask = SWITCH_UP_BIT_MASK;
+            break;
+        case SWITCH_DOWN_INDEX:
+            mask = SWITCH_DOWN_BIT_MASK;
+            break;
+        case SWITCH_ENTER_INDEX:
+            mask = SWITCH_ENTER_BIT_MASK;
+            break;
+        case SWITCH_BACK_INDEX:
+            mask = SWITCH_BACK_BIT_MASK;
+            break;
+         default:
+            DEBUG_MSG("SWITCHES_Read:  ERROR Invalid switch index=%d",index);
+            return;
+      }      
+      // Compute the state as a pull down
+      newSwitchState = ((pinStates & mask) > 0 ? SWITCH_PRESSED : SWITCH_RELEASED);
 
-          }
-          else{
-            // Debounce count not yet exceeded
-            debounceCount[pin] = debounceCount[pin] + 1;
-          }
-        }
-      }
-      else{
-          // Switch reporting released
-          if (switchState[pin] == SWITCH_PRESSED){
-            // set state back to released
-            switchState[pin] = SWITCH_RELEASED;
-            // Call release handler
-            SWITCHReleased(pin);
-            // reset debounce count for next time
-            debounceCount[pin] = 0;
-          }
-          else{
-            // Invalid release before debug count.  Reset counter and ignore
-            debounceCount[pin] = 0;
-          }
-        
-      }     
-    }   // lastSwitchState > 0
-    // Transfer last state
-    lastSwitchState[pin] = newPinState;
-  }  // for
+   #ifdef DEBUG
+      DEBUG_MSG("SWITCHES_Read:  index=%d state=%d",index,newSwitchState);
+   #endif
+
+      // Was switch pressed on last cycle?
+      if (lastSwitchState[index] == SWITCH_PRESSED) {
+         if (newSwitchState == SWITCH_PRESSED) {
+            // Still pressed.  Handle debounce if not yet handled.
+            if (switchState[index] != SWITCH_PRESSED) {
+               // See if count exceeded debounce threshold
+               if (debounceCount[index] == DEBOUNCE_COUNT) {
+                  // this is a valid transition so change to PRESSED
+                  switchState[index] = SWITCH_PRESSED;
+                  // Call pressed handler
+                  SWITCHES_SWITCHChanged(1, index,timestamp);
+
+               }
+               else {
+                  // Debounce count not yet exceeded
+                  debounceCount[index] = debounceCount[index] + 1;
+               }
+            }
+         }
+         else {
+            // Switch released
+            if (switchState[index] == SWITCH_PRESSED) {
+               // set state back to released
+               switchState[index] = SWITCH_RELEASED;
+               // Call release handler
+               SWITCHES_SWITCHChanged(0, index,timestamp);
+               // reset debounce count for next time
+               debounceCount[index] = 0;
+            }
+            else {
+               // Invalid release before press debounce counter expired.  Reset counter and ignore
+               debounceCount[index] = 0;
+            }
+
+         }
+      }   // lastSwitchState > 0
+      // Transfer last state
+      lastSwitchState[index] = newSwitchState;
+   }  // for
 }
 
-void SWITCHPressed(u8 switchIndex){
-  // TODO.  Switch case of functional switch press behavior.
-}
+void SWITCHES_SWITCHChanged(u8 pressed, u8 switchIndex,u32 timestamp) {
+   switch (switchIndex) {
+   case SWITCH_BACK_INDEX:
+      HMI_NotifyBackToggle(pressed, timestamp);
+      return;
+   case SWITCH_UP_INDEX:
+      HMI_NotifyUpToggle(pressed, timestamp);
+      return;
+   case SWITCH_DOWN_INDEX:
+      HMI_NotifyDownToggle(pressed, timestamp);
+      return;
+   case SWITCH_ENTER_INDEX:
+      HMI_NotifyEnterToggle(pressed, timestamp);
+      return;
+   default:
+      // Invalid index
+      DEBUG_MSG("Invalid switchIndex=%d, switchPressed=%d", switchIndex);
+      return;
+   }
 
-void SWITCHReleased(u8 switchIndex){
-  // TODO.  Switch case of functional switch release behavior.
+#ifdef DEBUG
+   DEBUG_MSG("SWITCHES_SWITCHChanged: index=%d timestamp=%d", switchIndex,timestamp);
+#endif
 }
