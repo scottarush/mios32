@@ -34,17 +34,12 @@
 // Debounce count as multiple of the read intervals.  Total debounce time = SWITCH_READ_TIME_MS * DEBOUNCE_COUNT
 #define DEBOUNCE_COUNT 3
 
-typedef enum {
-   SWITCH_PRESSED = 0,
-   SWITCH_RELEASED = 1
-} switch_state_t;
-
-
-void SWITCHES_SWITCHChanged(u8,u8,u32);
+void SWITCHES_SWITCHChanged(u8 switchIndex);
 
 static switch_state_t lastSwitchState[NUM_SWITCHES];
 static u8 debounceCount[NUM_SWITCHES];
 static switch_state_t switchState[NUM_SWITCHES];
+static u32 switchPressTimeStamps[NUM_SWITCHES];
 
 /////////////////////////////////////////////////////////////////////////////
 // called at Init to initialize the J10 inputs
@@ -116,7 +111,7 @@ void SWITCHES_Read() {
                   // this is a valid transition so change to PRESSED
                   switchState[index] = SWITCH_PRESSED;
                   // Call pressed handler
-                  SWITCHES_SWITCHChanged(1, index,timestamp);
+                  SWITCHES_SWITCHChanged(index);
 
                }
                else {
@@ -131,7 +126,7 @@ void SWITCHES_Read() {
                // set state back to released
                switchState[index] = SWITCH_RELEASED;
                // Call release handler
-               SWITCHES_SWITCHChanged(0, index,timestamp);
+               SWITCHES_SWITCHChanged(index);
                // reset debounce count for next time
                debounceCount[index] = 0;
             }
@@ -142,28 +137,33 @@ void SWITCHES_Read() {
 
          }
       }   // lastSwitchState > 0
+      if (lastSwitchState[index] == SWITCH_RELEASED){
+         // initialize press.  save the timestamp for use in press hold computation
+         switchPressTimeStamps[index] = timestamp;
+      }
       // Transfer last state
       lastSwitchState[index] = newSwitchState;
    }  // for
 }
 
-void SWITCHES_SWITCHChanged(u8 pressed, u8 switchIndex,u32 timestamp) {
+void SWITCHES_SWITCHChanged(u8 switchIndex) {
+   switch_state_t state = switchState[switchIndex];
    switch (switchIndex) {
    case SWITCH_BACK_INDEX:
-      HMI_NotifyBackToggle(pressed, timestamp);
+      HMI_NotifyBackToggle(state);
       return;
    case SWITCH_UP_INDEX:
-      HMI_NotifyUpToggle(pressed, timestamp);
+      HMI_NotifyUpToggle(state);
       return;
    case SWITCH_DOWN_INDEX:
-      HMI_NotifyDownToggle(pressed, timestamp);
+      HMI_NotifyDownToggle(state);
       return;
    case SWITCH_ENTER_INDEX:
-      HMI_NotifyEnterToggle(pressed, timestamp);
+      HMI_NotifyEnterToggle(state);
       return;
    default:
       // Invalid index
-      DEBUG_MSG("Invalid switchIndex=%d, switchPressed=%d", switchIndex);
+      DEBUG_MSG("Invalid switchIndex=%d", switchIndex);
       return;
    }
 

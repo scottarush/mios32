@@ -80,7 +80,6 @@ extern s32 KEYBOARD_NOTIFY_TOGGLE_HOOK(u8 kb, u8 note_number, u8 velocity);
 #endif
 
 static s32 KEYBOARD_MIDI_SendCtrl(u8 ctrl_number, u8 value);
-static char* KEYBOARD_GetNoteName(u8 note, char str[4]);
 static int KEYBOARD_GetVelocity(u16 delay, u16 delay_slowest, u16 delay_fastest);
 
 
@@ -771,7 +770,7 @@ void KEYBOARD_AIN_NotifyChange(u32 pin, u32 pin_value) {
 // API to set the current zone preset.  Values from the supplied preset will
 // be copied into the persisted keyboard currentzone preset
 /////////////////////////////////////////////////////////////////////////////
-void KEYBOARD_SetZonePreset(zone_preset_t* pPreset) {
+void KEYBOARD_SetCurrentZonePreset(zone_preset_t* pPreset) {
    keyboard_config_t* kc = (keyboard_config_t*)&keyboard_config;
 
    zone_preset_t* pCurrentPreset = &kc->current_zone_preset;
@@ -913,11 +912,17 @@ static s32 KEYBOARD_MIDI_SendCtrl(u8 ctrl_number, u8 value) {
 
    return 0; // no error
 }
+////////////////////////////////////////////////////////////////////////////
+//! Returns the current zone preset
+/////////////////////////////////////////////////////////////////////////////
+zone_preset_t * KEYBOARD_GetCurrentZonePreset(){
+   return &keyboard_config.current_zone_preset;
+}
 
 /////////////////////////////////////////////////////////////////////////////
-//! Help function to put the note name into a string (buffer has 3 chars + terminator)
+//! Global helper function to put the note name into a string (buffer has 3 chars + terminator)
 /////////////////////////////////////////////////////////////////////////////
-static char* KEYBOARD_GetNoteName(u8 note, char str[4]) {
+char* KEYBOARD_GetNoteName(u8 note, char str[4]) {
    const char note_tab[12][3] = { "c-", "c#", "d-", "d#", "e-", "f-", "f#", "g-", "g#", "a-", "a#", "b-" };
 
    // determine octave, note contains semitone number thereafter

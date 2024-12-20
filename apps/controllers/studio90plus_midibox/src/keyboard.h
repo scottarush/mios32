@@ -38,13 +38,15 @@
 // Global Types
 /////////////////////////////////////////////////////////////////////////////
 
-typedef enum zone_presets_e {
+typedef enum zone_preset_ids_e {
    SINGLE_ZONE = 0,
    DUAL_ZONE = 1,
    DUAL_ZONE_BASS = 2,
-   TRIPLE_ZONE_BASS = 3,
-   TRIPLE_ZONE = 4
+   TRIPLE_ZONE = 3,
+   TRIPLE_ZONE_BASS = 4
 } zone_preset_ids_t;
+
+#define NUM_ZONE_PRESETS 5
 
 typedef struct {
    u16 midiPorts;
@@ -126,7 +128,9 @@ extern s32 KEYBOARD_TerminalParseLine(char* input, void* _output_function);
 extern s32 KEYBOARD_TerminalPrintConfig(void* _output_function);
 extern s32 KEYBOARD_TerminalPrintDelays(void* _output_function);
 
-extern void KEYBOARD_SetZonePreset(zone_preset_t * pPreset);
+extern void KEYBOARD_SetCurrentZonePreset(zone_preset_t * pPreset);
+extern zone_preset_t * KEYBOARD_GetCurrentZonePreset();
+extern char* KEYBOARD_GetNoteName(u8 note, char str[4]);
 
 /////////////////////////////////////////////////////////////////////////////
 // Export global variables

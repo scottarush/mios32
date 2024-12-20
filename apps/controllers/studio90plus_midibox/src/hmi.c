@@ -20,7 +20,6 @@
 #include <stdio.h>
 
 #include "hmi.h"
-
 #include "persist.h"
 
 #define DEBUG_MSG MIOS32_MIDI_SendDebugMessage
@@ -37,10 +36,12 @@
 
 
 //----------------------------------------------------------------------------
-// Global display Page variable declarations
+// Page variable declarations
 //----------------------------------------------------------------------------
 struct page_s homePage;
 struct page_s dialogPage;
+struct page_s viewSplitPointsPage;
+struct page_s midiChannelsPage;
 struct page_s* pCurrentPage;
 
 
@@ -52,18 +53,22 @@ char dialogPageMessage1[DISPLAY_CHAR_WIDTH + 1];
 char dialogPageMessage2[DISPLAY_CHAR_WIDTH + 1];
 
 
+// Switch types and buffers
 typedef struct switchState_s {
    u8 switchState;
    s32 switchPressTimeStamp;
    u8 handled;
 } switchState_t;
 
-
-
 static switchState_t backSwitchState;
 static switchState_t enterSwitchState;
 static switchState_t upSwitchState;
 static switchState_t downSwitchState;
+
+// Names of presets for display indeed by zone_preset_ids_t
+static const char* zonePresetNames[] = { "Single Zone","Dual Zone","Dual Zone Bass","Triple Zone","Triple Zone Bass" };
+
+
 
 // Persisted data to E2
 static persisted_hmi_settings_t hmiSettings;
@@ -77,18 +82,18 @@ void HMI_HomePage_UpdateDisplay();
 
 s32 HMI_PersistData();
 
-u8 HMI_DebounceSwitchChange(switchState_t* pState, u8 pressed, s32 timestamp);
+char * HMI_RenderSplitPointString(zone_preset_t * pPreset,char line[DISPLAY_CHAR_WIDTH+1]);
+void HMI_InitPresetDefaults();
 
 /////////////////////////////////////////////////////////////////////////////
 // called at Init to initialize the HMI
 /////////////////////////////////////////////////////////////////////////////
 void HMI_Init(u8 resetDefaults) {
-   int i = 0;
- 
+
    backSwitchState.switchState = 0;
    backSwitchState.handled = 0;
 
-  pCurrentPage = &homePage;
+   pCurrentPage = &homePage;
 
    // Restore settings from E^2 if they exist.  If not then initialize to defaults
    s32 valid = -1;
@@ -97,13 +102,15 @@ void HMI_Init(u8 resetDefaults) {
 
       // Set the expected serializedID in the supplied block.  Update this ID whenever the persisted structure changes.  
       hmiSettings.serializationID = 0x484D4901;   // 'HMI1'
-   //   valid = PERSIST_ReadBlock(PERSIST_HMI_BLOCK, (unsigned char*)&hmiSettings, sizeof(persisted_hmi_settings_t));
+      valid = PERSIST_ReadBlock(PERSIST_HMI_BLOCK, (unsigned char*)&hmiSettings, sizeof(persisted_hmi_settings_t));
    }
-
+   // Check if invalid read or we are resetting defaults
    if (valid < 0) {
       DEBUG_MSG("HMI_Init:  PERSIST_ReadBlock return invalid. Re-initing persisted settings to defaults");
 
-//      HMI_PersistData();
+      HMI_InitPresetDefaults();
+
+      HMI_PersistData();
    }
    // Now that settings are init'ed/restored,  synch the HMI
 
@@ -116,6 +123,101 @@ void HMI_Init(u8 resetDefaults) {
    // Init the home page display
    HMI_HomePage_UpdateDisplay();
 }
+
+/////////////////////////////////////////////////////////////////////////////
+//  Helper initializes the zone_preset defaults
+/////////////////////////////////////////////////////////////////////////////
+void HMI_InitPresetDefaults() {
+   // default ports
+   u16 defMidiPorts = 0x3033;  // USB and two UARTs
+
+   // Single zone
+   zone_preset_t* pPreset = &hmiSettings.zone_presets[SINGLE_ZONE];
+   pPreset->numZones = 1;
+   zone_params_t* pZone = &pPreset->zoneParams[0];
+   pZone->midiPorts = defMidiPorts;
+   pZone->midiChannel = 1;
+   pZone->startNoteNum = 1;
+   pZone->transposeOffset = 0;
+
+   //---------------------------------------
+   // Dual_Zone split at middle C
+   pPreset = &hmiSettings.zone_presets[DUAL_ZONE];
+   pPreset->numZones = 2;
+   pZone = &pPreset->zoneParams[0];
+   pZone->midiPorts = defMidiPorts;
+   pZone->midiChannel = 1;
+   pZone->startNoteNum = 1;
+   pZone->transposeOffset = 0;
+
+   pZone = &pPreset->zoneParams[1];
+   pZone->midiPorts = defMidiPorts;
+   pZone->midiChannel = 2;
+   pZone->startNoteNum = 60;
+   pZone->transposeOffset = 0;
+
+   //---------------------------------------
+   // Dual_Zone Bass with two left octaves
+   pPreset = &hmiSettings.zone_presets[DUAL_ZONE_BASS];
+   pPreset->numZones = 2;
+   pZone = &pPreset->zoneParams[0];
+   pZone->midiPorts = defMidiPorts;
+   pZone->midiChannel = 1;
+   pZone->startNoteNum = 1;
+   pZone->transposeOffset = 0;
+
+   pZone = &pPreset->zoneParams[1];
+   pZone->midiPorts = defMidiPorts;
+   pZone->midiChannel = 2;
+   pZone->startNoteNum = 25;
+   pZone->transposeOffset = 0;
+
+   //---------------------------------------
+   // Triple zone split evenly
+   pPreset = &hmiSettings.zone_presets[TRIPLE_ZONE];
+   pPreset->numZones = 3;
+   pZone = &pPreset->zoneParams[0];
+   pZone->midiPorts = defMidiPorts;
+   pZone->midiChannel = 1;
+   pZone->startNoteNum = 1;
+   pZone->transposeOffset = 0;
+
+   pZone = &pPreset->zoneParams[1];
+   pZone->midiPorts = defMidiPorts;
+   pZone->midiChannel = 2;
+   pZone->startNoteNum = 29;
+   pZone->transposeOffset = 0;
+
+   pZone = &pPreset->zoneParams[2];
+   pZone->midiPorts = defMidiPorts;
+   pZone->midiChannel = 3;
+   pZone->startNoteNum = 58;
+   pZone->transposeOffset = 0;
+
+   //---------------------------------------
+    // Triple zone bass with two left octaves and two top octaves
+   pPreset = &hmiSettings.zone_presets[TRIPLE_ZONE_BASS];
+   pPreset->numZones = 3;
+   pZone = &pPreset->zoneParams[0];
+   pZone->midiPorts = defMidiPorts;
+   pZone->midiChannel = 1;
+   pZone->startNoteNum = 1;
+   pZone->transposeOffset = 0;
+
+   pZone = &pPreset->zoneParams[1];
+   pZone->midiPorts = defMidiPorts;
+   pZone->midiChannel = 2;
+   pZone->startNoteNum = 25;
+   pZone->transposeOffset = 0;
+
+   pZone = &pPreset->zoneParams[2];
+   pZone->midiPorts = defMidiPorts;
+   pZone->midiChannel = 3;
+   pZone->startNoteNum = 65;
+   pZone->transposeOffset = 0;
+
+}
+
 /////////////////////////////////////////////////////////////////////////////
 // Initializes the HMI pages
 /////////////////////////////////////////////////////////////////////////////
@@ -139,92 +241,46 @@ void HMI_InitPages() {
    dialogPageMessage1[0] = '\0';
    dialogPageMessage2[0] = '\0';
 }
-/////////////////////////////////////////////////////////////////////////////
-// Helper does debounce and long press detection on a switch
-// returns 0 if should be ignored.
-// returns +1 if change valid
-u8 HMI_DebounceSwitchChange(switchState_t* pState, u8 pressed, s32 timestamp) {
-   if (pressed) {
-      // Transition from release to press. Check if timestamp from last press
-      // is greater than debounce interval.
-      s32 delta = timestamp - pState->switchPressTimeStamp;
-      if (delta > DEBOUNCE_TIME_MS) {
-         // It is so this is a valid initial press.
-         pState->switchPressTimeStamp = timestamp;
-         pState->switchState = 0;
-         return 1;
-      }
-      else {
-         // This is a bounce press so ignore it.
-         return 0;
-      }
-   }
-   else {
-      // Release.  For now, just ignore it
-      return 0;
-   }
-}
 
 ////////////////////////////////////////////////////////////////////////////
 // Called on a change in the Down switch
-// pressed = 1 for switch pressed, 0 = released
-// timestamp
+// param: state state of the switch
 /////////////////////////////////////////////////////////////////////////////
-void HMI_NotifyDownToggle(u8 pressed, s32 timestamp) {
-   if (pressed)
-      HMI_RenderLine(0,"Down Switch Pressed",RENDER_LINE_CENTER);
-   else
-      HMI_RenderLine(0,"Down Switch Released",RENDER_LINE_CENTER);   
+void HMI_NotifyDownToggle(switch_state_t state) {
+   if (downSwitchState.switchState == SWITCH_RELEASED){
+      // TODO
+   }
 }
 
 ////////////////////////////////////////////////////////////////////////////
 // Called on a change in the Up switch
-// pressed = 1 for switch pressed, 0 = released
-// timestamp
+// param: state state of the switch
 /////////////////////////////////////////////////////////////////////////////
-void HMI_NotifyUpToggle(u8 pressed, s32 timestamp) {
-  if (pressed)
-      HMI_RenderLine(0,"Up Switch Pressed",RENDER_LINE_CENTER);
+void HMI_NotifyUpToggle(switch_state_t state) {
+   if (state == SWITCH_PRESSED)
+      HMI_RenderLine(0, "Up Switch Pressed", RENDER_LINE_CENTER);
    else
-      HMI_RenderLine(0,"Up Switch Released",RENDER_LINE_CENTER);   
+      HMI_RenderLine(0, "Up Switch Released", RENDER_LINE_CENTER);
 }
 
 ////////////////////////////////////////////////////////////////////////////
 // Called on a change in the Enter switch
-// pressed = 1 for switch pressed, 0 = released
-// timestamp
+// param: state state of the switch
 /////////////////////////////////////////////////////////////////////////////
-void HMI_NotifyEnterToggle(u8 pressed, s32 timestamp) {
-  if (pressed)
-      HMI_RenderLine(0,"Enter Switch Pressed",RENDER_LINE_CENTER);
+void HMI_NotifyEnterToggle(switch_state_t state) {
+   if (state == SWITCH_PRESSED)
+      HMI_RenderLine(0, "Enter Switch Pressed", RENDER_LINE_CENTER);
    else
-      HMI_RenderLine(0,"Enter Switch Released",RENDER_LINE_CENTER);   
+      HMI_RenderLine(0, "Enter Switch Released", RENDER_LINE_CENTER);
 }
 
 ////////////////////////////////////////////////////////////////////////////
 // Called on a change in the Back switch
-// pressed = 1 for switch pressed, 0 = released
-// timestamp
+// param: state state of the switch
 /////////////////////////////////////////////////////////////////////////////
-void HMI_NotifyBackToggle(u8 pressed, s32 timestamp) {
-  if (pressed)
-      HMI_RenderLine(0,"Back Switch Pressed",RENDER_LINE_CENTER);
-   else
-      HMI_RenderLine(0,"Back Switch Released",RENDER_LINE_CENTER);   
+void HMI_NotifyBackToggle(switch_state_t state) {
 
-   // TODO:  Add long-press handling, but requires change to app.c architecture to 
-   // poll DIN for continued presses.  Right now the below will never detect
-   // a long press because this function is only called on switch press and release.
-
-   u8 longPress = 0;
-
-   // Debounce the switch. Ignore unless a valid press greater than debounce interval
-   u8 valid = HMI_DebounceSwitchChange(&backSwitchState, pressed, timestamp);
-   if (!valid) {
-      return;
-   }
-
-   if (longPress && !backSwitchState.handled) {
+   if ((state == SWITCH_LONG_PRESSED) && !backSwitchState.handled) {
       // Go back to home page 
       pCurrentPage = &homePage;
       // And force an update to the current page display
@@ -313,8 +369,8 @@ void HMI_RenderLine(u8 lineNum, const char* pLineText, renderline_justify_t rend
 
 ///////////////////////////////////////////////////
 // Recalls a zone preset
-void HMI_RecallZonePreset(u8 presetNum){
-   
+void HMI_RecallZonePreset(u8 presetNum) {
+
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -329,14 +385,15 @@ void HMI_ClearLine(u8 lineNum) {
 ////////////////////////////////////////////////////////////////////////////
 void HMI_HomePage_UpdateDisplay() {
 
-
    char lineBuffer[DISPLAY_CHAR_WIDTH + 1];
-   char scratchBuffer[DISPLAY_CHAR_WIDTH + 1];
 
-   HMI_RenderLine(0, "Display Test Line 0", RENDER_LINE_RIGHT);
+   zone_preset_t* pPreset = KEYBOARD_GetCurrentZonePreset();
+   const char* pName = &zonePresetNames[pPreset->presetID][0];
 
-   HMI_RenderLine(1, "Display Test Line 1", RENDER_LINE_RIGHT);
+   HMI_RenderLine(0, pName, RENDER_LINE_CENTER);
 
+   char * pLineTwo = HMI_RenderSplitPointString(pPreset,lineBuffer);
+   HMI_RenderLine(1,pLineTwo,RENDER_LINE_LEFT);
 }
 ////////////////////////////////////////////////////////////////////////////
 // Callback to update the display on the Dialog page.
@@ -352,7 +409,33 @@ void HMI_DialogPage_UpdateDisplay() {
    HMI_RenderLine(3, dialogPageMessage2, RENDER_LINE_LEFT);
 }
 
+////////////////////////////////////////////////////////////////////////////
+// Helper renders the split point string
+////////////////////////////////////////////////////////////////////////////
+char * HMI_RenderSplitPointString(zone_preset_t * pPreset,char line[DISPLAY_CHAR_WIDTH+1]) {
 
+#define NOTE_NAME_LENGTH 3
+   char note_name[NOTE_NAME_LENGTH+1];
+
+   int index = 0;
+   int numSpaces = DISPLAY_CHAR_WIDTH - pPreset->numZones*NOTE_NAME_LENGTH;
+   numSpaces = numSpaces / pPreset->numZones;
+
+   for(int i=0;i < pPreset->numZones;i++){      
+      KEYBOARD_GetNoteName(pPreset->zoneParams[i].startNoteNum,note_name);
+      for(int j=0;j < NOTE_NAME_LENGTH;j++){
+         line[index++] = note_name[j];
+      }
+      if (i != pPreset->numZones -1){
+         for(int j=0;j < numSpaces;j++){
+            line[index++] = '-';
+         }
+      }
+   }
+   // Terminate the string
+   line[index] = '\0';
+   return line;
+}
 
 /////////////////////////////////////////////////////////////////////////////
 // Helper to store persisted data 

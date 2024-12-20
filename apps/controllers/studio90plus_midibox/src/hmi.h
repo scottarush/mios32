@@ -11,6 +11,7 @@
 #define _HMI_H
 
 #include "keyboard.h"
+#include "switches.h"
 
 /////////////////////////////////////////////////////////////////////////////
 // Global definitions
@@ -69,6 +70,9 @@ typedef struct {
    // First 4 bytes must be serialization version ID.  Big-ended order
    u32 serializationID;
 
+   // Zone presets
+   zone_preset_t zone_presets[NUM_ZONE_PRESETS];
+
 } persisted_hmi_settings_t;
 
 
@@ -77,10 +81,10 @@ typedef struct {
 /////////////////////////////////////////////////////////////////////////////
 
 extern void HMI_Init(u8);
-extern void HMI_NotifyDownToggle(u8 pressed, s32 timestamp);
-extern void HMI_NotifyUpToggle(u8 pressed, s32 timestamp);
-extern void HMI_NotifyBackToggle(u8 pressed,s32 timestamp);
-extern void HMI_NotifyEnterToggle(u8 pressed,s32 timestamp);
+extern void HMI_NotifyDownToggle(switch_state_t state);
+extern void HMI_NotifyUpToggle(switch_state_t state);
+extern void HMI_NotifyBackToggle(switch_state_t state);
+extern void HMI_NotifyEnterToggle(switch_state_t state);
 
 extern void HMI_DialogPage_UpdateDisplay();
 extern void HMI_RenderLine(u8, const char*, renderline_justify_t);
