@@ -24,7 +24,7 @@
 #include <midimon.h>
 
 #include "app.h"
-#include "presets.h"
+#include "keyboard_presets.h"
 #include "terminal.h"
 #include "uip_terminal.h"
 #include "tasks.h"
@@ -169,6 +169,7 @@ s32 TERMINAL_ParseLine(char* input, void* _output_function)
          MIDI_ROUTER_TerminalHelp(_output_function);
          out("  store:                            stores current config as preset");
          out("  restore:                          restores config from preset");
+         out("  clearee:                          Reformats EEPROM and re-Stores defaults.");
          out("  reset:                            resets the MIDIbox (!)\n");
          out("  help:                             this page");
          out("  exit:                             (telnet only) exits the terminal");
@@ -194,6 +195,13 @@ s32 TERMINAL_ParseLine(char* input, void* _output_function)
             out("ERROR: failed to restore presets from internal EEPROM (status %d)!", status);
          }
       }
+     else if (strcmp(parameter, "clearee") == 0) {
+         s32 status = PERSIST_Init(1);
+         if (status < 0) {
+            out("ERROR: failed to clear EEPROM (status %d)!", status);
+         }
+      }
+
       else if (strcmp(parameter, "reset") == 0) {
          MIOS32_SYS_Reset();
       }

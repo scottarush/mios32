@@ -10,6 +10,8 @@
 #ifndef _HMI_H
 #define _HMI_H
 
+#include "keyboard.h"
+
 /////////////////////////////////////////////////////////////////////////////
 // Global definitions
 /////////////////////////////////////////////////////////////////////////////
@@ -44,6 +46,7 @@ typedef enum renderline_justify_e {
 } renderline_justify_t;
 
 
+
 //----------------------------------------------------------------------------
 // Export Global Display page variables
 //----------------------------------------------------------------------------
@@ -57,7 +60,6 @@ extern char dialogPageTitle[DISPLAY_CHAR_WIDTH + 1];
 extern char dialogPageMessage1[DISPLAY_CHAR_WIDTH + 1];
 // Buffer for dialog Page Message Line 2
 extern char dialogPageMessage2[DISPLAY_CHAR_WIDTH + 1];
-
 
 //----------------------------------------------------------------------------
 // Persisted data to E^2 

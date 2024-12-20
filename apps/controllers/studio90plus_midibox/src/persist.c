@@ -13,6 +13,7 @@
 #include <midi_router.h>
 #include "persist.h"
 
+#include "keyboard_presets.h"
 
 #include "hmi.h" 
 
@@ -23,8 +24,7 @@
 #endif
 
 // Address for the blocks.  All in 16-bit word size
-
-#define MIDI_ROUTER_START_ADDR 0
+#define MIDI_ROUTER_START_ADDR (KEYBOARD_PRESETS_END_ADDR)
 #define HMI_START_ADDR (MIDI_ROUTER_START_ADDR+(MIDI_ROUTER_NUM_NODES*4))
 //#define HMI_START_ADDR (HMI_START_ADDR+sizeof(persisted_hmi_settings_t)/2)
 
@@ -59,12 +59,17 @@ s32 PERSIST_Init(u32 mode) {
    else if (mode > 0) {
       // E2 just got reformatted, re-init all the settings to their defaults
       PERSIST_StoreMIDIRouter();
+      // Store keyboard presets defaults
+      PRESETS_Init(1);
+      // And HMI
       HMI_Init(1);
    }
    else {
       // Restore midi_router settings.  Need to call from here to avoid modifying the midi_router
       // module that doesn't support persist.c
       PERSIST_RestoreMidiRouter();
+      // Restore keyboard settings for same reason
+      PRESETS_Init(0);
    }
 
    return status;
@@ -271,3 +276,4 @@ s32 PERSIST_StoreMIDIRouter() {
    }
    return status;
 }
+

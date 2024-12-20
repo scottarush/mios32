@@ -32,7 +32,7 @@
 
 #include "hmi.h"
 #include "app.h"
-#include "presets.h"
+#include "keyboard_presets.h"
 #include "terminal.h"
 #include "tasks.h"
 #include "uip_task.h"
@@ -352,6 +352,7 @@ static s32 NOTIFY_MIDI_TimeOut(mios32_midi_port_t port) {
    return 0;
 }
 
+/**
 /////////////////////////////////////////////////////////////////////////////
 // Keyboard notification hook from Keyboard module.  We'll send our own
 // Midi notes from here.  
@@ -380,4 +381,6 @@ s32 KEYBOARD_NOTIFY_TOGGLE_HOOK(u8 kb, u8 note_number, u8 velocity, u8 depressed
    }
    return 0;
 }
+
+**/
 
