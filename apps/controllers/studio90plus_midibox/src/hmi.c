@@ -463,7 +463,7 @@ static char* HMI_RenderSplitPointString(zone_preset_t* pPreset, char line[DISPLA
       }
       if (i != pPreset->numZones - 1) {
          for (int j = 0;j < numSpaces;j++) {
-            line[index++] = '-';
+            line[index++] = '_';
          }
       }
    }
