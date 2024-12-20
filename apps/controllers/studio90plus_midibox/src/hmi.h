@@ -35,7 +35,9 @@ struct page_s {
    pageID_t pageID;
    char* pPageTitle;
    void (*pUpdateDisplayCallback)();
-    void (*pBackButtonCallback)();
+   void (*pBackButtonCallback)();
+   void (*pEnterButtonCallback)();
+   void (*pUpDownButtonCallback)(u8 up);
    struct page_s* pBackPage;
 };
 

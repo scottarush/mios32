@@ -53,22 +53,11 @@ char dialogPageMessage1[DISPLAY_CHAR_WIDTH + 1];
 char dialogPageMessage2[DISPLAY_CHAR_WIDTH + 1];
 
 
-// Switch types and buffers
-typedef struct switchState_s {
-   u8 switchState;
-   s32 switchPressTimeStamp;
-   u8 handled;
-} switchState_t;
-
-static switchState_t backSwitchState;
-static switchState_t enterSwitchState;
-static switchState_t upSwitchState;
-static switchState_t downSwitchState;
-
 // Names of presets for display indeed by zone_preset_ids_t
 static const char* zonePresetNames[] = { "Single Zone","Dual Zone","Dual Zone Bass","Triple Zone","Triple Zone Bass" };
 
-
+// need handled flags for all switches with long press and hold functionality
+static u8 backSwitchHandled;
 
 // Persisted data to E2
 static persisted_hmi_settings_t hmiSettings;
@@ -82,17 +71,17 @@ void HMI_HomePage_UpdateDisplay();
 
 s32 HMI_PersistData();
 
-char * HMI_RenderSplitPointString(zone_preset_t * pPreset,char line[DISPLAY_CHAR_WIDTH+1]);
+static char* HMI_RenderSplitPointString(zone_preset_t* pPreset, char line[DISPLAY_CHAR_WIDTH + 1]);
 void HMI_InitPresetDefaults();
+static void HMI_HomePage_UpDownCallback(u8 up);
+
 
 /////////////////////////////////////////////////////////////////////////////
 // called at Init to initialize the HMI
 /////////////////////////////////////////////////////////////////////////////
 void HMI_Init(u8 resetDefaults) {
 
-   backSwitchState.switchState = 0;
-   backSwitchState.handled = 0;
-
+   backSwitchHandled = 0;
    pCurrentPage = &homePage;
 
    // Restore settings from E^2 if they exist.  If not then initialize to defaults
@@ -114,7 +103,7 @@ void HMI_Init(u8 resetDefaults) {
    }
    // Now that settings are init'ed/restored,  synch the HMI
 
-   // Init the display pages now that settings are restored
+   // Init the display pages
    HMI_InitPages();
 
    // Clear the display and update
@@ -137,17 +126,18 @@ void HMI_InitPresetDefaults() {
    zone_params_t* pZone = &pPreset->zoneParams[0];
    pZone->midiPorts = defMidiPorts;
    pZone->midiChannel = 1;
-   pZone->startNoteNum = 1;
+   pZone->startNoteNum = 21;  // A-1
    pZone->transposeOffset = 0;
 
    //---------------------------------------
    // Dual_Zone split at middle C
    pPreset = &hmiSettings.zone_presets[DUAL_ZONE];
+   pPreset->presetID = DUAL_ZONE;
    pPreset->numZones = 2;
    pZone = &pPreset->zoneParams[0];
    pZone->midiPorts = defMidiPorts;
    pZone->midiChannel = 1;
-   pZone->startNoteNum = 1;
+   pZone->startNoteNum = 21;
    pZone->transposeOffset = 0;
 
    pZone = &pPreset->zoneParams[1];
@@ -159,61 +149,64 @@ void HMI_InitPresetDefaults() {
    //---------------------------------------
    // Dual_Zone Bass with two left octaves
    pPreset = &hmiSettings.zone_presets[DUAL_ZONE_BASS];
+   pPreset->presetID = DUAL_ZONE_BASS;
    pPreset->numZones = 2;
    pZone = &pPreset->zoneParams[0];
    pZone->midiPorts = defMidiPorts;
    pZone->midiChannel = 1;
-   pZone->startNoteNum = 1;
+   pZone->startNoteNum = 21;
    pZone->transposeOffset = 0;
 
    pZone = &pPreset->zoneParams[1];
    pZone->midiPorts = defMidiPorts;
    pZone->midiChannel = 2;
-   pZone->startNoteNum = 25;
+   pZone->startNoteNum = 45;
    pZone->transposeOffset = 0;
 
    //---------------------------------------
    // Triple zone split evenly
    pPreset = &hmiSettings.zone_presets[TRIPLE_ZONE];
+   pPreset->presetID = TRIPLE_ZONE;
    pPreset->numZones = 3;
    pZone = &pPreset->zoneParams[0];
    pZone->midiPorts = defMidiPorts;
    pZone->midiChannel = 1;
-   pZone->startNoteNum = 1;
+   pZone->startNoteNum = 21;
    pZone->transposeOffset = 0;
 
    pZone = &pPreset->zoneParams[1];
    pZone->midiPorts = defMidiPorts;
    pZone->midiChannel = 2;
-   pZone->startNoteNum = 29;
+   pZone->startNoteNum = 50;
    pZone->transposeOffset = 0;
 
    pZone = &pPreset->zoneParams[2];
    pZone->midiPorts = defMidiPorts;
    pZone->midiChannel = 3;
-   pZone->startNoteNum = 58;
+   pZone->startNoteNum = 79;
    pZone->transposeOffset = 0;
 
    //---------------------------------------
     // Triple zone bass with two left octaves and two top octaves
    pPreset = &hmiSettings.zone_presets[TRIPLE_ZONE_BASS];
+   pPreset->presetID = TRIPLE_ZONE_BASS;
    pPreset->numZones = 3;
    pZone = &pPreset->zoneParams[0];
    pZone->midiPorts = defMidiPorts;
    pZone->midiChannel = 1;
-   pZone->startNoteNum = 1;
+   pZone->startNoteNum = 21;
    pZone->transposeOffset = 0;
 
    pZone = &pPreset->zoneParams[1];
    pZone->midiPorts = defMidiPorts;
    pZone->midiChannel = 2;
-   pZone->startNoteNum = 25;
+   pZone->startNoteNum = 45;
    pZone->transposeOffset = 0;
 
    pZone = &pPreset->zoneParams[2];
    pZone->midiPorts = defMidiPorts;
    pZone->midiChannel = 3;
-   pZone->startNoteNum = 65;
+   pZone->startNoteNum = 85;
    pZone->transposeOffset = 0;
 
 }
@@ -228,6 +221,8 @@ void HMI_InitPages() {
    homePage.pPageTitle = pHomeTitle;
    homePage.pUpdateDisplayCallback = HMI_HomePage_UpdateDisplay;
    homePage.pBackButtonCallback = NULL;
+   homePage.pEnterButtonCallback = NULL;
+   homePage.pUpDownButtonCallback = HMI_HomePage_UpDownCallback;
    homePage.pBackPage = NULL;
 
 
@@ -235,6 +230,8 @@ void HMI_InitPages() {
    dialogPage.pPageTitle = dialogPageTitle;
    dialogPageTitle[0] = '\0';
    dialogPage.pBackButtonCallback = NULL;
+   dialogPage.pEnterButtonCallback = NULL;
+   dialogPage.pUpDownButtonCallback = NULL;
    dialogPage.pUpdateDisplayCallback = HMI_DialogPage_UpdateDisplay;
    dialogPage.pBackPage = NULL;
 
@@ -247,8 +244,10 @@ void HMI_InitPages() {
 // param: state state of the switch
 /////////////////////////////////////////////////////////////////////////////
 void HMI_NotifyDownToggle(switch_state_t state) {
-   if (downSwitchState.switchState == SWITCH_RELEASED){
-      // TODO
+   if (state != SWITCH_PRESSED)
+      return;
+   if (pCurrentPage->pUpDownButtonCallback != NULL) {
+      pCurrentPage->pUpDownButtonCallback(0);
    }
 }
 
@@ -257,10 +256,11 @@ void HMI_NotifyDownToggle(switch_state_t state) {
 // param: state state of the switch
 /////////////////////////////////////////////////////////////////////////////
 void HMI_NotifyUpToggle(switch_state_t state) {
-   if (state == SWITCH_PRESSED)
-      HMI_RenderLine(0, "Up Switch Pressed", RENDER_LINE_CENTER);
-   else
-      HMI_RenderLine(0, "Up Switch Released", RENDER_LINE_CENTER);
+   if (state != SWITCH_PRESSED)
+      return;
+   if (pCurrentPage->pUpDownButtonCallback != NULL) {
+      pCurrentPage->pUpDownButtonCallback(1);
+   }
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -268,10 +268,9 @@ void HMI_NotifyUpToggle(switch_state_t state) {
 // param: state state of the switch
 /////////////////////////////////////////////////////////////////////////////
 void HMI_NotifyEnterToggle(switch_state_t state) {
-   if (state == SWITCH_PRESSED)
-      HMI_RenderLine(0, "Enter Switch Pressed", RENDER_LINE_CENTER);
-   else
-      HMI_RenderLine(0, "Enter Switch Released", RENDER_LINE_CENTER);
+   if (pCurrentPage->pEnterButtonCallback != NULL) {
+      pCurrentPage->pEnterButtonCallback(1);
+   }
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -279,14 +278,20 @@ void HMI_NotifyEnterToggle(switch_state_t state) {
 // param: state state of the switch
 /////////////////////////////////////////////////////////////////////////////
 void HMI_NotifyBackToggle(switch_state_t state) {
+   if ((state == SWITCH_RELEASED) && backSwitchHandled){
+      // Clear for next press
+      backSwitchHandled = 0;
+      return;
+   }
 
-   if ((state == SWITCH_LONG_PRESSED) && !backSwitchState.handled) {
+   // On a long press go back to home page 
+   if (state == SWITCH_LONG_PRESSED) {
       // Go back to home page 
       pCurrentPage = &homePage;
       // And force an update to the current page display
       pCurrentPage->pUpdateDisplayCallback();
       // Set handled to ignore the pending release
-      backSwitchState.handled = 1;
+      backSwitchHandled = 1;
       return;
    }
 
@@ -294,7 +299,7 @@ void HMI_NotifyBackToggle(switch_state_t state) {
    if (pCurrentPage->pBackButtonCallback != NULL) {
       pCurrentPage->pBackButtonCallback();
    }
-   // If the back page is non-null then transition to that page.
+   // Else if the back page is non-null then pop back to that page
    if (pCurrentPage->pBackPage != NULL) {
       pCurrentPage = pCurrentPage->pBackPage;
 
@@ -392,8 +397,8 @@ void HMI_HomePage_UpdateDisplay() {
 
    HMI_RenderLine(0, pName, RENDER_LINE_CENTER);
 
-   char * pLineTwo = HMI_RenderSplitPointString(pPreset,lineBuffer);
-   HMI_RenderLine(1,pLineTwo,RENDER_LINE_LEFT);
+   char* pLineTwo = HMI_RenderSplitPointString(pPreset, lineBuffer);
+   HMI_RenderLine(1, pLineTwo, RENDER_LINE_LEFT);
 }
 ////////////////////////////////////////////////////////////////////////////
 // Callback to update the display on the Dialog page.
@@ -408,26 +413,56 @@ void HMI_DialogPage_UpdateDisplay() {
    HMI_RenderLine(2, dialogPageMessage1, RENDER_LINE_LEFT);
    HMI_RenderLine(3, dialogPageMessage2, RENDER_LINE_LEFT);
 }
+////////////////////////////////////////////////////////////////////////////
+// Up/Down Callback for the home page
+////////////////////////////////////////////////////////////////////////////
+static void HMI_HomePage_UpDownCallback(u8 up) {
+   zone_preset_t * pPreset = KEYBOARD_GetCurrentZonePreset();
+   int nextPresetID = pPreset->presetID;
+   if (up){
+      nextPresetID++;
+   }
+   else{
+      nextPresetID--;
+   }
+   if ((nextPresetID < 0) || (nextPresetID >= NUM_ZONE_PRESETS)){
+      return;  // Already at ends
+   }
+   // Otherwise set the keyboard driver to the newPreset from the HMI persisted settings
+   zone_preset_t * pNewPreset = NULL;
+   for(int i=0;i < NUM_ZONE_PRESETS;i++){
+      pNewPreset = &hmiSettings.zone_presets[i];
+//      DEBUG_MSG("presetid=%d",pNewPreset->presetID);
+      if (pNewPreset->presetID == nextPresetID){
+         KEYBOARD_SetCurrentZonePreset(pNewPreset);
+         HMI_HomePage_UpdateDisplay();
+         return;
+      }
+   }
+   // Shouldn't ever happen
+   DEBUG_MSG("HMI_HomePage_UpDownCallback:  ERROR.  Invalid nextPresetID=%d",nextPresetID);
+}
+
 
 ////////////////////////////////////////////////////////////////////////////
 // Helper renders the split point string
 ////////////////////////////////////////////////////////////////////////////
-char * HMI_RenderSplitPointString(zone_preset_t * pPreset,char line[DISPLAY_CHAR_WIDTH+1]) {
+static char* HMI_RenderSplitPointString(zone_preset_t* pPreset, char line[DISPLAY_CHAR_WIDTH + 1]) {
 
 #define NOTE_NAME_LENGTH 3
-   char note_name[NOTE_NAME_LENGTH+1];
+   char note_name[NOTE_NAME_LENGTH + 1];
 
    int index = 0;
-   int numSpaces = DISPLAY_CHAR_WIDTH - pPreset->numZones*NOTE_NAME_LENGTH;
+   int numSpaces = DISPLAY_CHAR_WIDTH - pPreset->numZones * NOTE_NAME_LENGTH;
    numSpaces = numSpaces / pPreset->numZones;
 
-   for(int i=0;i < pPreset->numZones;i++){      
-      KEYBOARD_GetNoteName(pPreset->zoneParams[i].startNoteNum,note_name);
-      for(int j=0;j < NOTE_NAME_LENGTH;j++){
+   for (int i = 0;i < pPreset->numZones;i++) {
+      KEYBOARD_GetNoteName(pPreset->zoneParams[i].startNoteNum, note_name);
+      for (int j = 0;j < NOTE_NAME_LENGTH;j++) {
          line[index++] = note_name[j];
       }
-      if (i != pPreset->numZones -1){
-         for(int j=0;j < numSpaces;j++){
+      if (i != pPreset->numZones - 1) {
+         for (int j = 0;j < numSpaces;j++) {
             line[index++] = '-';
          }
       }

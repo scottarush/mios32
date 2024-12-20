@@ -189,7 +189,7 @@ s32 KEYBOARD_Init(u32 mode) {
       kc->current_zone_preset.numZones = 1;
       kc->current_zone_preset.zoneParams[0].midiPorts = 0x3033;  // USB and both UARTS -> MIDI
       kc->current_zone_preset.zoneParams[0].midiChannel = 1;
-      kc->current_zone_preset.zoneParams[0].startNoteNum = 1;
+      kc->current_zone_preset.zoneParams[0].startNoteNum = 21;
       kc->current_zone_preset.zoneParams[0].transposeOffset = 0;
 
    }
@@ -773,8 +773,10 @@ void KEYBOARD_AIN_NotifyChange(u32 pin, u32 pin_value) {
 void KEYBOARD_SetCurrentZonePreset(zone_preset_t* pPreset) {
    keyboard_config_t* kc = (keyboard_config_t*)&keyboard_config;
 
+   // Copy over the supply preset to the current preset
    zone_preset_t* pCurrentPreset = &kc->current_zone_preset;
    pCurrentPreset->numZones = pPreset->numZones;
+   pCurrentPreset->presetID = pPreset->presetID;
    for (int i = 0;i < pPreset->numZones;i++) {
       zone_params_t * pCurrentPresetZoneParams = &pCurrentPreset->zoneParams[i];
       zone_params_t * pPresetZoneParams = &pPreset->zoneParams[i];
@@ -783,6 +785,10 @@ void KEYBOARD_SetCurrentZonePreset(zone_preset_t* pPreset) {
       pCurrentPresetZoneParams->startNoteNum = pPresetZoneParams->startNoteNum;
       pCurrentPresetZoneParams->transposeOffset = pPresetZoneParams->transposeOffset;
    }
+   // Update EEPROM
+   PRESETS_StoreAll();
+
+   // TODO:  send all note offs to avoid a hung not if zone changed while key pressed
 }
 
 

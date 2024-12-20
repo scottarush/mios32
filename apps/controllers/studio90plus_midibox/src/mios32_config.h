@@ -10,9 +10,14 @@
 #ifndef _MIOS32_CONFIG_H
 #define _MIOS32_CONFIG_H
 
+// This disables the boot message to the LCD display (still goes to the terminal)
+// Otherwise it overwrites the one in the call trace from APP_Init() since APP_Init is
+// called in programming_models/traditional/main.c before the MIOS32 boot messages
+#define MIOS32_LCD_BOOT_MSG_DELAY 0
+
 // The boot message which is print during startup and returned on a SysEx query
 #define MIOS32_LCD_BOOT_MSG_LINE1 "Studio 90 Plus Midibox"
-#define MIOS32_LCD_BOOT_MSG_LINE2 "(C) 2015 T.Klose, 2024 S. Rush"
+#define MIOS32_LCD_BOOT_MSG_LINE2 "(C) 2024 T.Klose, S. Rush"
 
 
 // Following settings allow to customize the USB device descriptor
@@ -39,14 +44,6 @@
 // EEPROM emulation
 // SIZE == 2048 halfwords -> 4096 bytes
 #define EEPROM_EMULATED_SIZE 2048
-
-// magic number in EEPROM - if it doesn't exist at address 0x00..0x03, the EEPROM will be cleared
-#define EEPROM_MAGIC_NUMBER 0x47114228
-// to consider an older format (see presets.c)
-#define EEPROM_MAGIC_NUMBER_OLDFORMAT1 0x47114224
-#define EEPROM_MAGIC_NUMBER_OLDFORMAT2 0x47114225
-#define EEPROM_MAGIC_NUMBER_OLDFORMAT3 0x47114226
-#define EEPROM_MAGIC_NUMBER_OLDFORMAT4 0x47114227
 
 // AIN configuration:
 // Pin mapping on MBHP_CORE_LPC17 module:
