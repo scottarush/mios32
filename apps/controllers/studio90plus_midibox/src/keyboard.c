@@ -26,6 +26,7 @@
 
 #include "keyboard.h"
 
+#include "keyboard_presets.h"
 
 /////////////////////////////////////////////////////////////////////////////
 // Local defines
@@ -94,8 +95,7 @@ s32 KEYBOARD_Init(u32 mode) {
 
    ain_cali_mode_pin = 0;
 
-   int kb;
-         int i;
+       int i;
 
    keyboard_config_t* kc = (keyboard_config_t*)&keyboard_config;
    if (init_configuration) {
@@ -207,7 +207,6 @@ void KEYBOARD_SRIO_ServicePrepare(void) {
    if (!(++timestamp))
       ++timestamp;
 
-   int kb;
    keyboard_config_t* kc = (keyboard_config_t*)&keyboard_config;
 
    // optional scan optimization for break/make: if break not active, we don't need to scan make
@@ -264,7 +263,6 @@ void KEYBOARD_SRIO_ServicePrepare(void) {
 /////////////////////////////////////////////////////////////////////////////
 void KEYBOARD_SRIO_ServiceFinish(void) {
    // check DINs
-   int kb;
    keyboard_config_t* kc = (keyboard_config_t*)&keyboard_config;
    u16 sr_value = 0;
 
@@ -936,15 +934,26 @@ char* KEYBOARD_GetNoteName(u8 note, char str[4]) {
    note %= 12;
 
    str[0] = octave >= 2 ? (note_tab[note][0] + 'A' - 'a') : note_tab[note][0];
+   u8 octaveNumIndex = 2;
+   if (note_tab[note][1] == '-'){
+      // not a sharp or flag so put the octave number start at 2 for positive octaves
+      octaveNumIndex = 1;
+   }
    str[1] = note_tab[note][1];
 
    switch (octave) {
-   case 0:  str[2] = '2'; break; // -2
-   case 1:  str[2] = '1'; break; // -1
-   default: str[2] = '0' + (octave - 2); // 0..7
+   case 0:  
+      str[2] = '2'; 
+      break; // -2
+   case 1:  
+      str[2] = '1'; 
+      str[3] = 0;
+      break; // -1
+   default: 
+      str[octaveNumIndex] = '0' + (octave - 2); // 0..7
+      str[2] = 0;
    }
 
-   str[3] = 0;
 
    return str;
 }
