@@ -66,9 +66,10 @@ static u16 din_value_changed[MATRIX_NUM_ROWS];
 static u16 timestamp;
 static u16 din_activated_timestamp[KEYBOARD_NUM_PINS];
 
-
-
 static u8 ain_cali_mode_pin;
+
+// Callback for key learning
+void (*pKeyLearningCallback)(u8 noteNumber);
 
 /////////////////////////////////////////////////////////////////////////////
 // Local Prototypes
@@ -92,6 +93,7 @@ static int KEYBOARD_GetVelocity(u16 delay, u16 delay_slowest, u16 delay_fastest)
 s32 KEYBOARD_Init(u32 mode) {
    u8 init_configuration = mode == 0;
 
+   pKeyLearningCallback = NULL;
 
    ain_cali_mode_pin = 0;
 
@@ -763,6 +765,31 @@ void KEYBOARD_AIN_NotifyChange(u32 pin, u32 pin_value) {
    }
 }
 
+////////////////////////////////////////////////////////////////////////////
+// API to set the callback for key learning.  Until called again with NULL
+// the callback will be called with each Note On.
+/////////////////////////////////////////////////////////////////////////////
+void KEYBOARD_SetKeyLearningCallback(void (*pCallback)(u8 noteNumber)) {
+   DEBUG_MSG("KEYBOARD_SetKeyLearningCallback:  callback registered");
+   pKeyLearningCallback = pCallback;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// Utility copies one zone preset to another
+/////////////////////////////////////////////////////////////////////////////
+void KEYBOARD_CopyZonePreset(zone_preset_t * pSource, zone_preset_t * pDest){
+   pDest->numZones = pSource->numZones;
+   pDest->presetID = pSource->presetID;
+   for (int i = 0;i < pSource->numZones;i++) {
+      zone_params_t * pDestZoneParams = &pDest->zoneParams[i];
+      zone_params_t * pSourceZoneParams = &pSource->zoneParams[i];
+      pDestZoneParams->midiChannel = pSourceZoneParams->midiChannel;
+      pDestZoneParams->midiPorts = pSourceZoneParams->midiPorts;
+      pDestZoneParams->startNoteNum = pSourceZoneParams->startNoteNum;
+      pDestZoneParams->transposeOffset = pSourceZoneParams->transposeOffset;
+   }
+}
+
 
 /////////////////////////////////////////////////////////////////////////////
 // API to set the current zone preset.  Values from the supplied preset will
@@ -773,16 +800,9 @@ void KEYBOARD_SetCurrentZonePreset(zone_preset_t* pPreset) {
 
    // Copy over the supply preset to the current preset
    zone_preset_t* pCurrentPreset = &kc->current_zone_preset;
-   pCurrentPreset->numZones = pPreset->numZones;
-   pCurrentPreset->presetID = pPreset->presetID;
-   for (int i = 0;i < pPreset->numZones;i++) {
-      zone_params_t * pCurrentPresetZoneParams = &pCurrentPreset->zoneParams[i];
-      zone_params_t * pPresetZoneParams = &pPreset->zoneParams[i];
-      pCurrentPresetZoneParams->midiChannel = pPresetZoneParams->midiChannel;
-      pCurrentPresetZoneParams->midiPorts = pPresetZoneParams->midiPorts;
-      pCurrentPresetZoneParams->startNoteNum = pPresetZoneParams->startNoteNum;
-      pCurrentPresetZoneParams->transposeOffset = pPresetZoneParams->transposeOffset;
-   }
+
+   KEYBOARD_CopyZonePreset(pPreset,pCurrentPreset);
+
    // Update EEPROM
    PRESETS_StoreAll();
 
@@ -831,8 +851,19 @@ static int KEYBOARD_GetVelocity(u16 delay, u16 delay_slowest, u16 delay_fastest)
 static s32 KEYBOARD_MIDI_SendNote(u8 note_number, u8 velocity, u8 depressed) {
    keyboard_config_t* kc = (keyboard_config_t*)&keyboard_config;
 
-   u8 sent_note = note_number;
+   s32 sent_note = note_number;
 
+   // if key learning callback is set and this is an on note, then just forward the
+   // note and return.
+   // TODO:  Find a way to sound a note without leaving stuck notes. This happens because on a zone change
+   // that 'hides' the selected note, the Release comes out on another note number
+   if (pKeyLearningCallback != NULL){
+      if (!depressed){
+         pKeyLearningCallback(sent_note);
+         return 0;
+      }
+   }
+   // Otherwise decode the zone and send the note
    u16 midiPort = 0;
    u8 midiChannel = 1;
    if (kc->current_zone_preset.numZones == 1) {
@@ -853,6 +884,14 @@ static s32 KEYBOARD_MIDI_SendNote(u8 note_number, u8 velocity, u8 depressed) {
                // Either the last zone or the note is in this one
                midiPort = pZoneParams->midiPorts;
                midiChannel = pZoneParams->midiChannel;
+               // And add the transpose offset
+               sent_note = sent_note + pZoneParams->transposeOffset;
+               if (sent_note < 0){
+                  sent_note = 0;  // Shouldn't happen
+               }
+               else if (sent_note > 127){
+                  sent_note = 127;  // Shouldn't happen
+               }
                break;
             }
          }
@@ -934,26 +973,18 @@ char* KEYBOARD_GetNoteName(u8 note, char str[4]) {
    note %= 12;
 
    str[0] = octave >= 2 ? (note_tab[note][0] + 'A' - 'a') : note_tab[note][0];
-   u8 octaveNumIndex = 2;
-   if (note_tab[note][1] == '-'){
-      // not a sharp or flag so put the octave number start at 2 for positive octaves
-      octaveNumIndex = 1;
-   }
    str[1] = note_tab[note][1];
 
-   switch (octave) {
-   case 0:  
-      str[2] = '2'; 
-      break; // -2
-   case 1:  
-      str[2] = '1'; 
-      str[3] = 0;
-      break; // -1
-   default: 
-      str[octaveNumIndex] = '0' + (octave - 2); // 0..7
-      str[2] = 0;
+   if (str[1] == '-'){
+      // overwrite octave here
+      str[1] = '0' + (octave - 2); // 0..7
+      str[2] = '\0';
    }
-
+   else{
+      // keep sharp and put octave at end
+      str[2] = '0' + (octave - 2); // 0..7
+      str[3] = '\0';
+   }
 
    return str;
 }

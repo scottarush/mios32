@@ -51,7 +51,7 @@ typedef enum zone_preset_ids_e {
 typedef struct {
    u16 midiPorts;
    u8 midiChannel;
-   u8 startNoteNum;
+   s16 startNoteNum;
    s16 transposeOffset;  
 } zone_params_t;
 
@@ -129,8 +129,14 @@ extern s32 KEYBOARD_TerminalPrintConfig(void* _output_function);
 extern s32 KEYBOARD_TerminalPrintDelays(void* _output_function);
 
 extern void KEYBOARD_SetCurrentZonePreset(zone_preset_t * pPreset);
+extern void KEYBOARD_SetKeyLearningCallback(void (*pCallback)(u8 noteNumber));
+
 extern zone_preset_t * KEYBOARD_GetCurrentZonePreset();
+extern void KEYBOARD_CopyZonePreset(zone_preset_t * pSource, zone_preset_t * pDest);
+
+
 extern char* KEYBOARD_GetNoteName(u8 note, char str[4]);
+
 
 /////////////////////////////////////////////////////////////////////////////
 // Export global variables

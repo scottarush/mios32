@@ -31,13 +31,21 @@ typedef enum pageID_e {
    PAGE_DIALOG = 1,
 } pageID_t;
 
+typedef enum flash_state_e {
+   FLASH_OFF = 0,
+   FLASH_STATE_ONE = 1,
+   FLASH_STATE_TWO = 2
+} flash_state_t;
+
 struct page_s {
    pageID_t pageID;
-   char* pPageTitle;
    void (*pUpdateDisplayCallback)();
    void (*pBackButtonCallback)();
    void (*pEnterButtonCallback)();
    void (*pUpDownButtonCallback)(u8 up);
+   void (*pTimerCallback)();
+   int timerCounter;
+   flash_state_t nextFlashState;
    struct page_s* pBackPage;
 };
 
@@ -83,6 +91,7 @@ typedef struct {
 /////////////////////////////////////////////////////////////////////////////
 
 extern void HMI_Init(u8);
+extern void HMI_1msTick();
 extern void HMI_NotifyDownToggle(switch_state_t state);
 extern void HMI_NotifyUpToggle(switch_state_t state);
 extern void HMI_NotifyBackToggle(switch_state_t state);

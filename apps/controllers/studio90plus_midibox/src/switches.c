@@ -24,15 +24,17 @@
 #define SWITCH_DOWN_BIT_MASK 0x0004
 #define SWITCH_DOWN_INDEX 1
 
-#define SWITCH_ENTER_BIT_MASK 0x0002   
+#define SWITCH_ENTER_BIT_MASK 0x0008   
 #define SWITCH_ENTER_INDEX 2
 
-#define SWITCH_BACK_BIT_MASK 0x0008 
+#define SWITCH_BACK_BIT_MASK 0x0002 
 #define SWITCH_BACK_INDEX 3
 
 
 // Debounce count as multiple of the read intervals.  Total debounce time = SWITCH_READ_TIME_MS * DEBOUNCE_COUNT
 #define DEBOUNCE_COUNT 3
+
+#define LONG_PRESS_TIME_MS 3000
 
 void SWITCHES_SWITCHChanged(u8 switchIndex);
 
@@ -67,10 +69,6 @@ void SWITCHES_Read() {
 
    // Now read J10f for the raw pull-down pin states
    s32 pinStates = MIOS32_BOARD_J10_Get();
-
-#ifdef DEBUG
-   DEBUG_MSG("SWITCHES_Read:  pinStates=0x%X",pinStates);
-#endif
    
    // Iterate through the switches
    u32 index = 0;
@@ -96,10 +94,6 @@ void SWITCHES_Read() {
       }      
       // Compute the state as a pull down
       newSwitchState = ((pinStates & mask) > 0 ? SWITCH_PRESSED : SWITCH_RELEASED);
-
-   #ifdef DEBUG
-      DEBUG_MSG("SWITCHES_Read:  index=%d state=%d",index,newSwitchState);
-   #endif
 
       // Was switch pressed on last cycle?
       if (lastSwitchState[index] == SWITCH_PRESSED) {
@@ -147,6 +141,9 @@ void SWITCHES_Read() {
 }
 
 void SWITCHES_SWITCHChanged(u8 switchIndex) {
+   #ifdef DEBUG
+   DEBUG_MSG("SWITCHES_SWITCHChanged:  switchIndex=%d",switchIndex);
+   #endif
    switch_state_t state = switchState[switchIndex];
    switch (switchIndex) {
    case SWITCH_BACK_INDEX:
@@ -166,8 +163,4 @@ void SWITCHES_SWITCHChanged(u8 switchIndex) {
       DEBUG_MSG("Invalid switchIndex=%d", switchIndex);
       return;
    }
-
-#ifdef DEBUG
-   DEBUG_MSG("SWITCHES_SWITCHChanged: index=%d timestamp=%d", switchIndex,timestamp);
-#endif
 }

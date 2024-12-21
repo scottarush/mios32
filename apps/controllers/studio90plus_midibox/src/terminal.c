@@ -25,6 +25,7 @@
 
 #include "app.h"
 #include "keyboard_presets.h"
+#include "persist.h"
 #include "terminal.h"
 #include "uip_terminal.h"
 #include "tasks.h"
@@ -196,6 +197,7 @@ s32 TERMINAL_ParseLine(char* input, void* _output_function)
          }
       }
      else if (strcmp(parameter, "clearee") == 0) {
+         // Call the global persist init function
          s32 status = PERSIST_Init(1);
          if (status < 0) {
             out("ERROR: failed to clear EEPROM (status %d)!", status);

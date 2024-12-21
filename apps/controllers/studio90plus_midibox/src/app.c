@@ -109,7 +109,7 @@ void APP_Init(void) {
    // init the HMI
    HMI_Init(0);
 
-  // read EEPROM content
+   // read EEPROM content
    PRESETS_Init(0);
 
    // init MIDI port/router handling
@@ -175,11 +175,11 @@ void APP_Tick(void) {
    AINSER_Handler(APP_AINSER_NotifyChange);
 
    // Read the switches if counter has expired
-   if (switchReadCounter >= SWITCH_READ_TIME_MS){
+   if (switchReadCounter >= SWITCH_READ_TIME_MS) {
       SWITCHES_Read();
-      switchReadCounter = 0;      
+      switchReadCounter = 0;
    }
-   else{
+   else {
       switchReadCounter++;
    }
 }
@@ -285,6 +285,7 @@ static void APP_AINSER_NotifyChange(u32 module, u32 pin, u32 pin_value) {
 
 /////////////////////////////////////////////////////////////////////////////
 // This task is called periodically each mS to check for keyboard MIDI events
+// and also calls a general HMI tick used for things like display flash timing.
 /////////////////////////////////////////////////////////////////////////////
 static void TASK_Period_1mS(void* pvParameters) {
    portTickType xLastExecutionTime;
@@ -310,13 +311,15 @@ static void TASK_Period_1mS(void* pvParameters) {
 
       // update AINs with current value
       // the keyboard driver will only send events on value changes
-      {
-         int pin;
 
-         for (pin = 0; pin < 8; ++pin) {
-            KEYBOARD_AIN_NotifyChange(pin, MIOS32_AIN_PinGet(pin));
-         }
+      int pin;
+
+      for (pin = 0; pin < 8; ++pin) {
+         KEYBOARD_AIN_NotifyChange(pin, MIOS32_AIN_PinGet(pin));
       }
+
+      // Tick the HMI
+      HMI_1msTick();
    }
 }
 
@@ -355,9 +358,9 @@ static s32 NOTIFY_MIDI_TimeOut(mios32_midi_port_t port) {
 /**
 /////////////////////////////////////////////////////////////////////////////
 // Keyboard notification hook from Keyboard module.  We'll send our own
-// Midi notes from here.  
+// Midi notes from here.
 //
-// Not used here becuase it was not properly defined in keyboard.c.  
+// Not used here becuase it was not properly defined in keyboard.c.
 // The depressed param wasn't included so we can't do the Off/On forwarding.
 // For now, just modify the keyboard module for diagnostics.
 /////////////////////////////////////////////////////////////////////////////
