@@ -770,7 +770,7 @@ void KEYBOARD_AIN_NotifyChange(u32 pin, u32 pin_value) {
 // the callback will be called with each Note On.
 /////////////////////////////////////////////////////////////////////////////
 void KEYBOARD_SetKeyLearningCallback(void (*pCallback)(u8 noteNumber)) {
-   DEBUG_MSG("KEYBOARD_SetKeyLearningCallback:  callback registered");
+ //  DEBUG_MSG("KEYBOARD_SetKeyLearningCallback:  callback registered");
    pKeyLearningCallback = pCallback;
 }
 

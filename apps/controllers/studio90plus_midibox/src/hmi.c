@@ -44,6 +44,7 @@
 struct page_s homePage;
 struct page_s dialogPage;
 struct page_s splitLearningPage;
+struct page_s midiConfigPage;
 struct page_s* pCurrentPage;
 
 
@@ -55,6 +56,9 @@ char dialogPageMessage2[DISPLAY_CHAR_WIDTH + 1];
 
 // Names of presets for display indeed by zone_preset_ids_t
 static const char* zonePresetNames[] = { "Single Zone","Dual Zone","Dual Zone Bass","Triple Zone","Triple Zone Bass" };
+
+// Names of midi configs.  Indexes must match midi_config_e enum constants
+static const char* midiConfigNames[NUM_MIDI_CONFIGS] = {"Ascending","Descending"};
 
 // need handled flags for all switches with long press and hold functionality
 static u8 backSwitchHandled;
@@ -78,6 +82,12 @@ void HMI_HomePage_UpdateDisplay();
 void HMI_SplitLearningPage_TimerCallback();
 void HMI_SplitLearningPage_UpdateDisplay();
 void HMI_SplitLearningPage_BackCallback();
+void HMI_SplitLearningPage_EnterCallback();
+
+void HMI_MidiConfigPage_UpDownCallback(u8 up);
+void HMI_MidiConfigPage_UpdateDisplay();
+void HMI_MidiConfigPage_EnterCallback();
+
 void HMI_HomePage_EnterCallback();
 void HMI_KeyLearningCallback(u8 noteNumber);
 
@@ -137,6 +147,8 @@ void HMI_InitPresetDefaults() {
    // Single zone
    zone_preset_t* pPreset = &hmiSettings.zone_presets[SINGLE_ZONE];
    pPreset->numZones = 1;
+   pPreset->midiConfig = MIDI_CONFIG_ASCENDING;
+
    zone_params_t* pZone = &pPreset->zoneParams[0];
    pZone->midiPorts = defMidiPorts;
    pZone->midiChannel = 1;
@@ -148,6 +160,8 @@ void HMI_InitPresetDefaults() {
    pPreset = &hmiSettings.zone_presets[DUAL_ZONE];
    pPreset->presetID = DUAL_ZONE;
    pPreset->numZones = 2;
+   pPreset->midiConfig = MIDI_CONFIG_ASCENDING;
+
    pZone = &pPreset->zoneParams[0];
    pZone->midiPorts = defMidiPorts;
    pZone->midiChannel = 1;
@@ -165,6 +179,8 @@ void HMI_InitPresetDefaults() {
    pPreset = &hmiSettings.zone_presets[DUAL_ZONE_BASS];
    pPreset->presetID = DUAL_ZONE_BASS;
    pPreset->numZones = 2;
+   pPreset->midiConfig = MIDI_CONFIG_ASCENDING;
+
    pZone = &pPreset->zoneParams[0];
    pZone->midiPorts = defMidiPorts;
    pZone->midiChannel = 1;
@@ -182,6 +198,8 @@ void HMI_InitPresetDefaults() {
    pPreset = &hmiSettings.zone_presets[TRIPLE_ZONE];
    pPreset->presetID = TRIPLE_ZONE;
    pPreset->numZones = 3;
+   pPreset->midiConfig = MIDI_CONFIG_ASCENDING;
+
    pZone = &pPreset->zoneParams[0];
    pZone->midiPorts = defMidiPorts;
    pZone->midiChannel = 1;
@@ -205,6 +223,8 @@ void HMI_InitPresetDefaults() {
    pPreset = &hmiSettings.zone_presets[TRIPLE_ZONE_BASS];
    pPreset->presetID = TRIPLE_ZONE_BASS;
    pPreset->numZones = 3;
+   pPreset->midiConfig = MIDI_CONFIG_ASCENDING;
+
    pZone = &pPreset->zoneParams[0];
    pZone->midiPorts = defMidiPorts;
    pZone->midiChannel = 1;
@@ -241,15 +261,25 @@ void HMI_InitPages() {
    homePage.pUpDownButtonCallback = HMI_HomePage_UpDownCallback;
    homePage.pBackPage = NULL;
 
-   splitLearningPage.pageID = PAGE_DIALOG;
+   splitLearningPage.pageID = PAGE_SPLIT_LEARNING;
    splitLearningPage.pBackButtonCallback = HMI_SplitLearningPage_BackCallback;
-   splitLearningPage.pEnterButtonCallback = NULL;
+   splitLearningPage.pEnterButtonCallback = HMI_SplitLearningPage_EnterCallback;
    splitLearningPage.pUpDownButtonCallback = NULL;
    splitLearningPage.pTimerCallback = HMI_SplitLearningPage_TimerCallback;
    splitLearningPage.nextFlashState = FLASH_OFF;
    splitLearningPage.timerCounter = -1;
    splitLearningPage.pUpdateDisplayCallback = HMI_SplitLearningPage_UpdateDisplay;
    splitLearningPage.pBackPage = NULL;
+
+   midiConfigPage.pageID = PAGE_MIDI_CONFIG;
+   midiConfigPage.pBackButtonCallback = NULL;
+   midiConfigPage.pEnterButtonCallback = HMI_MidiConfigPage_EnterCallback;
+   midiConfigPage.pUpDownButtonCallback = HMI_MidiConfigPage_UpDownCallback;
+   midiConfigPage.pTimerCallback = NULL;
+   midiConfigPage.nextFlashState = FLASH_OFF;
+   midiConfigPage.timerCounter = -1;
+   midiConfigPage.pUpdateDisplayCallback = HMI_MidiConfigPage_UpdateDisplay;
+   midiConfigPage.pBackPage = &homePage;
 
 
    dialogPage.pageID = PAGE_DIALOG;
@@ -424,12 +454,6 @@ void HMI_RenderLine(u8 lineNum, const char* pLineText, renderline_justify_t rend
    MIOS32_LCD_PrintString(lineBuffer);
 }
 
-///////////////////////////////////////////////////
-// Recalls a zone preset
-void HMI_RecallZonePreset(u8 presetNum) {
-
-}
-
 /////////////////////////////////////////////////////////////////////////////
 // Helper function to clear a line
 /////////////////////////////////////////////////////////////////////////////
@@ -572,6 +596,61 @@ void HMI_SplitLearningPage_UpdateDisplay() {
 
 }
 
+////////////////////////////////////////////////////////////////////////////
+// Midi Config Page display update
+////////////////////////////////////////////////////////////////////////////
+void HMI_MidiConfigPage_UpdateDisplay() {
+   HMI_RenderLine(0, "Midi Config", RENDER_LINE_CENTER);
+
+   const char * pConfigString = midiConfigNames[KEYBOARD_GetCurrentZonePreset()->midiConfig];
+   HMI_RenderLine(1, pConfigString, RENDER_LINE_CENTER);
+}
+
+////////////////////////////////////////////////////////////////////////////
+// Midi Config Up/Down Callback 
+////////////////////////////////////////////////////////////////////////////
+void HMI_MidiConfigPage_UpDownCallback(u8 up) {
+   // For midi configs, don't need to enumerate presets, just pull the 
+   // current one from the keyboard.
+   zone_preset_t * pPreset = KEYBOARD_GetCurrentZonePreset();
+   if (!up){
+      if (pPreset->midiConfig == NUM_MIDI_CONFIGS-1)
+         return;
+      else {
+         pPreset->midiConfig++;
+      }
+   }
+   else{
+     if (pPreset->midiConfig == 0)
+         return;
+      else {
+         pPreset->midiConfig--;
+      }
+   }
+   // MidiConfig changed.  Reset the midichannels on the zones of the current preset
+   u8 channel = 1;
+   if (pPreset->midiConfig == MIDI_CONFIG_DESCENDING){
+      for(int i=pPreset->numZones-1;i >= 0;i--){
+         pPreset->zoneParams[i].midiChannel = channel;
+         channel++;
+      }
+   }
+   else{
+      for(int i=0;i < pPreset->numZones;i++){
+        pPreset->zoneParams[i].midiChannel = channel;
+        channel++;
+      }
+   }
+   HMI_PersistData();
+   HMI_MidiConfigPage_UpdateDisplay();
+}
+////////////////////////////////////////////////////////////////////////////
+// Enter on MidiConfigPage goes back to home
+////////////////////////////////////////////////////////////////////////////
+void HMI_MidiConfigPage_EnterCallback(){
+   pCurrentPage = &homePage;
+   pCurrentPage->pUpdateDisplayCallback();   
+}
 
 ////////////////////////////////////////////////////////////////////////////
 // Back callback on split learning cancels learning.
@@ -585,7 +664,24 @@ void HMI_SplitLearningPage_BackCallback() {
    pCurrentPage = &homePage;
    pCurrentPage->pUpdateDisplayCallback();
 }
+////////////////////////////////////////////////////////////////////////////
+// Enter on SplitLearningPage goes to midi config if number of current # zones > 1
+////////////////////////////////////////////////////////////////////////////
+void HMI_SplitLearningPage_EnterCallback(){
+   zone_preset_t * pPreset = KEYBOARD_GetCurrentZonePreset();
+   if (pPreset->numZones == 1){
+      // just return.  Can't change config on single zone
+      return;
+   }
 
+   // Unregister the key learning callback
+   KEYBOARD_SetKeyLearningCallback(NULL);
+   // clear out the timer count in the split learning page to avoid another flash
+   splitLearningPage.timerCounter = -1;
+
+   pCurrentPage = &midiConfigPage;
+   pCurrentPage->pUpdateDisplayCallback();   
+}
 ////////////////////////////////////////////////////////////////////////////
 // Callback to update the display on the Dialog page.
 // dialogPageTitle, Message1, and Message2 must be filled prior to entry

@@ -29,6 +29,8 @@
 typedef enum pageID_e {
    PAGE_HOME = 0,
    PAGE_DIALOG = 1,
+   PAGE_SPLIT_LEARNING = 2,
+   PAGE_MIDI_CONFIG = 3
 } pageID_t;
 
 typedef enum flash_state_e {
@@ -36,6 +38,7 @@ typedef enum flash_state_e {
    FLASH_STATE_ONE = 1,
    FLASH_STATE_TWO = 2
 } flash_state_t;
+
 
 struct page_s {
    pageID_t pageID;

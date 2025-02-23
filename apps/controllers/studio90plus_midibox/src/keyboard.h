@@ -45,8 +45,14 @@ typedef enum zone_preset_ids_e {
    TRIPLE_ZONE = 3,
    TRIPLE_ZONE_BASS = 4
 } zone_preset_ids_t;
-
 #define NUM_ZONE_PRESETS 5
+
+
+typedef enum midi_config_e {
+   MIDI_CONFIG_ASCENDING = 0,
+   MIDI_CONFIG_DESCENDING = 1
+} midi_config_t;
+#define NUM_MIDI_CONFIGS 2
 
 typedef struct {
    u16 midiPorts;
@@ -59,6 +65,7 @@ typedef struct {
    zone_preset_ids_t presetID;
    u8 numZones;
    zone_params_t zoneParams[MAX_SPLIT_ZONES];
+   midi_config_t midiConfig;
  } zone_preset_t;
 
 typedef struct {
