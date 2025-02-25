@@ -48,6 +48,7 @@ struct page_s {
    void (*pUpDownButtonCallback)(u8 up);
    void (*pTimerCallback)();
    int timerCounter;
+   int flashTimeMS;
    flash_state_t nextFlashState;
    struct page_s* pBackPage;
 };
