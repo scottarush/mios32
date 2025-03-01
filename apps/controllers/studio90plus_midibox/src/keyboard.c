@@ -97,7 +97,7 @@ s32 KEYBOARD_Init(u32 mode) {
 
    ain_cali_mode_pin = 0;
 
-       int i;
+   int i;
 
    keyboard_config_t* kc = (keyboard_config_t*)&keyboard_config;
    if (init_configuration) {
@@ -612,6 +612,11 @@ static void KEYBOARD_NotifyToggle(u8 kb, u8 row, u8 column, u8 depressed) {
             u16 delay_fastest = (black_key && kc->delay_fastest_black_keys) ? kc->delay_fastest_black_keys : kc->delay_fastest;
             u16 delay_slowest = kc->delay_slowest;
 
+            // if keyboard calibration is enabled, then save the delay
+            if (kc->key_calibration) {
+               kc->delay_key[key] = delay;
+            }
+
             velocity = KEYBOARD_GetVelocity(delay, delay_slowest, delay_fastest);
             if (kc->verbose_level >= 2)
                DEBUG_MSG("PRESSED note=%s, delay=%d, velocity=%d (played from a %s key)\n",
@@ -770,19 +775,19 @@ void KEYBOARD_AIN_NotifyChange(u32 pin, u32 pin_value) {
 // the callback will be called with each Note On.
 /////////////////////////////////////////////////////////////////////////////
 void KEYBOARD_SetKeyLearningCallback(void (*pCallback)(u8 noteNumber)) {
- //  DEBUG_MSG("KEYBOARD_SetKeyLearningCallback:  callback registered");
+   //  DEBUG_MSG("KEYBOARD_SetKeyLearningCallback:  callback registered");
    pKeyLearningCallback = pCallback;
 }
 
 /////////////////////////////////////////////////////////////////////////////
 // Utility copies one zone preset to another
 /////////////////////////////////////////////////////////////////////////////
-void KEYBOARD_CopyZonePreset(zone_preset_t * pSource, zone_preset_t * pDest){
+void KEYBOARD_CopyZonePreset(zone_preset_t* pSource, zone_preset_t* pDest) {
    pDest->numZones = pSource->numZones;
    pDest->presetID = pSource->presetID;
    for (int i = 0;i < pSource->numZones;i++) {
-      zone_params_t * pDestZoneParams = &pDest->zoneParams[i];
-      zone_params_t * pSourceZoneParams = &pSource->zoneParams[i];
+      zone_params_t* pDestZoneParams = &pDest->zoneParams[i];
+      zone_params_t* pSourceZoneParams = &pSource->zoneParams[i];
       pDestZoneParams->midiChannel = pSourceZoneParams->midiChannel;
       pDestZoneParams->midiPorts = pSourceZoneParams->midiPorts;
       pDestZoneParams->startNoteNum = pSourceZoneParams->startNoteNum;
@@ -801,7 +806,7 @@ void KEYBOARD_SetCurrentZonePreset(zone_preset_t* pPreset) {
    // Copy over the supply preset to the current preset
    zone_preset_t* pCurrentPreset = &kc->current_zone_preset;
 
-   KEYBOARD_CopyZonePreset(pPreset,pCurrentPreset);
+   KEYBOARD_CopyZonePreset(pPreset, pCurrentPreset);
 
    // Update EEPROM
    PRESETS_StoreAll();
@@ -857,8 +862,8 @@ static s32 KEYBOARD_MIDI_SendNote(u8 note_number, u8 velocity, u8 depressed) {
    // note and return.
    // TODO:  Find a way to sound a note without leaving stuck notes. This happens because on a zone change
    // that 'hides' the selected note, the Release comes out on another note number
-   if (pKeyLearningCallback != NULL){
-      if (!depressed){
+   if (pKeyLearningCallback != NULL) {
+      if (!depressed) {
          pKeyLearningCallback(sent_note);
          return 0;
       }
@@ -886,10 +891,10 @@ static s32 KEYBOARD_MIDI_SendNote(u8 note_number, u8 velocity, u8 depressed) {
                midiChannel = pZoneParams->midiChannel;
                // And add the transpose offset
                sent_note = sent_note + pZoneParams->transposeOffset;
-               if (sent_note < 0){
+               if (sent_note < 0) {
                   sent_note = 0;  // Shouldn't happen
                }
-               else if (sent_note > 127){
+               else if (sent_note > 127) {
                   sent_note = 127;  // Shouldn't happen
                }
                break;
@@ -958,7 +963,7 @@ static s32 KEYBOARD_MIDI_SendCtrl(u8 ctrl_number, u8 value) {
 ////////////////////////////////////////////////////////////////////////////
 //! Returns the current zone preset
 /////////////////////////////////////////////////////////////////////////////
-zone_preset_t * KEYBOARD_GetCurrentZonePreset(){
+zone_preset_t* KEYBOARD_GetCurrentZonePreset() {
    return &keyboard_config.current_zone_preset;
 }
 
@@ -975,12 +980,12 @@ char* KEYBOARD_GetNoteName(u8 note, char str[4]) {
    str[0] = octave >= 2 ? (note_tab[note][0] + 'A' - 'a') : note_tab[note][0];
    str[1] = note_tab[note][1];
 
-   if (str[1] == '-'){
+   if (str[1] == '-') {
       // overwrite octave here
       str[1] = '0' + (octave - 2); // 0..7
       str[2] = '\0';
    }
-   else{
+   else {
       // keep sharp and put octave at end
       str[2] = '0' + (octave - 2); // 0..7
       str[3] = '\0';
@@ -1129,698 +1134,683 @@ s32 KEYBOARD_TerminalParseLine(char* input, void* _output_function) {
    }
    else {
       if (strcmp(parameter, "kb") == 0 || strcmp(parameter, "keyboard") == 0) {
-
-         if ((parameter = strtok_r(NULL, separators, &brkt))) {
-            if (strcmp(parameter, "delays") == 0) {
-               KEYBOARD_TerminalPrintDelays(_output_function);
-            }
-            else {
-               out("Unknown command after %s!", parameter);
-            }
-            return 1; // command taken
-         }
-
+         // Print out current parameters
          KEYBOARD_TerminalPrintConfig(_output_function);
       }
+      else if (strcmp(parameter, "delays") == 0) {
+         // Print the captured key delays
+         KEYBOARD_TerminalPrintDelays(_output_function);
+      }
       else if (strcmp(parameter, "set") == 0) {
+         keyboard_config_t* kc = (keyboard_config_t*)&keyboard_config;
+
          if (!(parameter = strtok_r(NULL, separators, &brkt))) {
-            out("Missing parameter after 'set'!");
+            out("Missing parameter name and value after 'set '!");
             return 1; // command taken
          }
 
-         if (strcmp(parameter, "kb") != 0 && strcmp(parameter, "keyboard") != 0) {
-            input_line_parsed = 0; // input line has to be restored
+         /////////////////////////////////////////////////////////////////////
+         if (strcmp(parameter, "note_offset") == 0) {
+            if (!(parameter = strtok_r(NULL, separators, &brkt))) {
+               out("Please specify the Note offset!");
+               return 1; // command taken
+            }
+
+            int offset = get_dec(parameter);
+
+            if (offset < 0 || offset > 127) {
+               out("Note Offset should be in the range between 0 and 127!");
+               return 1; // command taken
+            }
+            else {
+               kc->note_offset = offset;
+               out("Note Offset %d", kc->note_offset);
+            }
+
          }
-         else {
-            keyboard_config_t* kc = (keyboard_config_t*)&keyboard_config;
+         else if (strcmp(parameter, "din_key_offset") == 0) {
+            if (!(parameter = strtok_r(NULL, separators, &brkt))) {
+               out("Please specify the key offset!");
+               return 1; // command taken
+            }
+
+            int offset = get_dec(parameter);
+
+            if (offset < 0 || offset > 127) {
+               out("Key Offset should be in the range between 0 and 127!");
+               return 1; // command taken
+            }
+            else {
+               kc->din_key_offset = offset;
+               out("DIN Key Offset %d", kc->din_key_offset);
+               KEYBOARD_Init(1); // re-init runtime variables, don't touch configuration
+            }
+            /////////////////////////////////////////////////////////////////////
+         }
+         else if (strcmp(parameter, "debug") == 0) {
+            if (!(parameter = strtok_r(NULL, separators, &brkt))) {
+               out("Please specify on or off (alternatively 1 or 0)");
+               return 1; // command taken
+            }
+
+            int on_off = get_on_off(parameter);
+
+            if (on_off < 0) {
+               out("Expecting 'on' or 'off' (alternatively 1 or 0)!");
+            }
+            else {
+               kc->verbose_level = on_off ? 2 : 1;
+
+               out("debug mode %s", on_off ? "enabled" : "disabled");
+            }
+            /////////////////////////////////////////////////////////////////////
+         }
+         else if (strcmp(parameter, "rows") == 0) {
+            if (!(parameter = strtok_r(NULL, separators, &brkt))) {
+               out("Please specify the number of rows (0..%d)", MATRIX_NUM_ROWS);
+               return 1; // command taken
+            }
+
+            int rows = get_dec(parameter);
+
+            if (rows < 0 || rows > MATRIX_NUM_ROWS) {
+               out("Rows should be in the range between 0 (off) and %d", MATRIX_NUM_ROWS);
+               return 1; // command taken
+            }
+            else {
+               kc->num_rows = rows;
+               out("%d rows will be scanned!", kc->num_rows);
+               KEYBOARD_Init(1); // re-init runtime variables, don't touch configuration
+            }
+            /////////////////////////////////////////////////////////////////////
+         }
+         else if (strcmp(parameter, "dout_sr1") == 0) {
+            if (!(parameter = strtok_r(NULL, separators, &brkt))) {
+               out("Please specify the DOUT number to which the first column is assigned (0..%d)", MIOS32_SRIO_ScanNumGet());
+               return 1; // command taken
+            }
+
+            int sr = get_dec(parameter);
+
+            if (sr < 0 || sr > MATRIX_NUM_ROWS) {
+               out("Shift register should be in the range between 0 (off) and %d", MIOS32_SRIO_ScanNumGet());
+               return 1; // command taken
+            }
+            else {
+               kc->dout_sr1 = sr;
+               out("dout_sr1 assigned to %d!", kc->dout_sr1);
+               KEYBOARD_Init(1); // re-init runtime variables, don't touch configuration
+            }
+            /////////////////////////////////////////////////////////////////////
+         }
+         else if (strcmp(parameter, "dout_sr2") == 0) {
+            if (!(parameter = strtok_r(NULL, separators, &brkt))) {
+               out("Please specify the DOUT number to which the first column is assigned (0..%d)", MIOS32_SRIO_ScanNumGet());
+               return 1; // command taken
+            }
+
+            int sr = get_dec(parameter);
+
+            if (sr < 0 || sr > MATRIX_NUM_ROWS) {
+               out("Shift register should be in the range between 0 (off) and %d", MIOS32_SRIO_ScanNumGet());
+               return 1; // command taken
+            }
+            else {
+               kc->dout_sr2 = sr;
+               out("dout_sr2 assigned to %d!", kc->dout_sr2);
+               KEYBOARD_Init(1); // re-init runtime variables, don't touch configuration
+            }
+            /////////////////////////////////////////////////////////////////////
+         }
+         else if (strcmp(parameter, "din_sr1") == 0) {
+            if (!(parameter = strtok_r(NULL, separators, &brkt))) {
+               out("Please specify the DIN number to which the first column is assigned (0..%d)", MIOS32_SRIO_ScanNumGet());
+               return 1; // command taken
+            }
+
+            int sr = get_dec(parameter);
+
+            if (sr < 0 || sr > MATRIX_NUM_ROWS) {
+               out("Shift register should be in the range between 0 (off) and %d", MIOS32_SRIO_ScanNumGet());
+               return 1; // command taken
+            }
+            else {
+               kc->din_sr1 = sr;
+               out("din_sr1 assigned to %d!", kc->din_sr1);
+               KEYBOARD_Init(1); // re-init runtime variables, don't touch configuration
+            }
+            /////////////////////////////////////////////////////////////////////
+         }
+         else if (strcmp(parameter, "din_sr2") == 0) {
+            if (!(parameter = strtok_r(NULL, separators, &brkt))) {
+               out("Please specify the DIN number to which the first column is assigned (0..%d)", MIOS32_SRIO_ScanNumGet());
+               return 1; // command taken
+            }
+
+            int sr = get_dec(parameter);
+
+            if (sr < 0 || sr > MATRIX_NUM_ROWS) {
+               out("Shift register should be in the range between 0 (off) and %d", MIOS32_SRIO_ScanNumGet());
+               return 1; // command taken
+            }
+            else {
+               kc->din_sr2 = sr;
+               out("din_sr2 assigned to %d!", kc->din_sr2);
+               KEYBOARD_Init(1); // re-init runtime variables, don't touch configuration
+            }
+            /////////////////////////////////////////////////////////////////////
+         }
+         else if (strcmp(parameter, "velocity") == 0) {
+            if (!(parameter = strtok_r(NULL, separators, &brkt))) {
+               out("Please specify on or off (alternatively 1 or 0)");
+               return 1; // command taken
+            }
+
+            int on_off = get_on_off(parameter);
+
+            if (on_off < 0) {
+               out("Expecting 'on' or 'off' (alternatively 1 or 0)!");
+            }
+            else {
+               kc->scan_velocity = on_off;
+
+               out("velocity mode %s", on_off ? "enabled" : "disabled");
+               KEYBOARD_Init(1); // re-init runtime variables, don't touch configuration
+            }
+            /////////////////////////////////////////////////////////////////////
+         }
+         else if (strcmp(parameter, "release_velocity") == 0) {
+            if (!(parameter = strtok_r(NULL, separators, &brkt))) {
+               out("Please specify on or off (alternatively 1 or 0)");
+               return 1; // command taken
+            }
+
+            int on_off = get_on_off(parameter);
+
+            if (on_off < 0) {
+               out("Expecting 'on' or 'off' (alternatively 1 or 0)!");
+            }
+            else {
+               kc->scan_release_velocity = on_off;
+
+               out("release velocity mode %s", on_off ? "enabled" : "disabled");
+               KEYBOARD_Init(1); // re-init runtime variables, don't touch configuration
+            }
+            /////////////////////////////////////////////////////////////////////
+         }
+         else if (strcmp(parameter, "optimized") == 0) {
+            if (!(parameter = strtok_r(NULL, separators, &brkt))) {
+               out("Please specify on or off (alternatively 1 or 0)");
+               return 1; // command taken
+            }
+
+            int on_off = get_on_off(parameter);
+
+            if (on_off < 0) {
+               out("Expecting 'on' or 'off' (alternatively 1 or 0)!");
+            }
+            else {
+               kc->scan_optimized = on_off;
+
+               out("optimized scan %s", on_off ? "enabled" : "disabled");
+               KEYBOARD_Init(1); // re-init runtime variables, don't touch configuration
+            }
+            /////////////////////////////////////////////////////////////////////
+         }
+         else if (strcmp(parameter, "din_inverted") == 0) {
+            if (!(parameter = strtok_r(NULL, separators, &brkt))) {
+               out("Please specify on or off (alternatively 1 or 0)");
+               return 1; // command taken
+            }
+
+            int on_off = get_on_off(parameter);
+
+            if (on_off < 0) {
+               out("Expecting 'on' or 'off' (alternatively 1 or 0)!");
+            }
+            else {
+               kc->din_inverted = on_off;
+
+               out("DIN values are %sinverted", kc->din_inverted ? "" : "not ");
+               KEYBOARD_Init(1); // re-init runtime variables, don't touch configuration
+            }
+            /////////////////////////////////////////////////////////////////////
+         }
+         else if (strcmp(parameter, "break_inverted") == 0) {
+            if (!(parameter = strtok_r(NULL, separators, &brkt))) {
+               out("Please specify on or off (alternatively 1 or 0)");
+               return 1; // command taken
+            }
+
+            int on_off = get_on_off(parameter);
+
+            if (on_off < 0) {
+               out("Expecting 'on' or 'off' (alternatively 1 or 0)!");
+            }
+            else {
+               kc->break_inverted = on_off;
+
+               out("Break contacts are %sinverted", kc->break_inverted ? "" : "not ");
+               KEYBOARD_Init(1); // re-init runtime variables, don't touch configuration
+            }
+            /////////////////////////////////////////////////////////////////////
+         }
+         else if (strcmp(parameter, "make_debounced") == 0) {
+            if (!(parameter = strtok_r(NULL, separators, &brkt))) {
+               out("Please specify on or off (alternatively 1 or 0)");
+               return 1; // command taken
+            }
+
+            int on_off = get_on_off(parameter);
+
+            if (on_off < 0) {
+               out("Expecting 'on' or 'off' (alternatively 1 or 0)!");
+            }
+            else {
+               kc->make_debounced = on_off;
+
+               out("Make contact debouncing %s", kc->make_debounced ? "on" : "off");
+               KEYBOARD_Init(1); // re-init runtime variables, don't touch configuration
+            }
+            /////////////////////////////////////////////////////////////////////
+         }
+         else if (strcmp(parameter, "delay_fastest") == 0) {
+            if (!(parameter = strtok_r(NULL, separators, &brkt))) {
+               out("Please specify the fastest delay for velocity calculation!");
+               return 1; // command taken
+            }
+
+            int delay = get_dec(parameter);
+
+            if (delay < 0 || delay > 65535) {
+               out("Delay should be in the range between 0 and 65535");
+               return 1; // command taken
+            }
+            else {
+               kc->delay_fastest = delay;
+               out("delay_fastest set to %d!", kc->delay_fastest);
+            }
+            /////////////////////////////////////////////////////////////////////
+         }
+         else if (strcmp(parameter, "delay_fastest_black_keys") == 0) {
+            if (!(parameter = strtok_r(NULL, separators, &brkt))) {
+               out("Please specify the fastest delay for the black keys!");
+               return 1; // command taken
+            }
+
+            int delay = get_dec(parameter);
+
+            if (delay < 0 || delay > 65535) {
+               out("Delay should be in the range between 0 and 65535");
+               return 1; // command taken
+            }
+            else {
+               kc->delay_fastest_black_keys = delay;
+               out("delay_fastest_black_keys set to %d!", kc->delay_fastest_black_keys);
+            }
+            /////////////////////////////////////////////////////////////////////
+         }
+         else if (strcmp(parameter, "delay_fastest_release") == 0) {
+            if (!(parameter = strtok_r(NULL, separators, &brkt))) {
+               out("Please specify the fastest delay for release velocity calculation!");
+               return 1; // command taken
+            }
+
+            int delay = get_dec(parameter);
+
+            if (delay < 0 || delay > 65535) {
+               out("Delay should be in the range between 0 and 65535");
+               return 1; // command taken
+            }
+            else {
+               kc->delay_fastest_release = delay;
+               out("delay_fastest_release set to %d!", kc->delay_fastest_release);
+            }
+            /////////////////////////////////////////////////////////////////////
+         }
+         else if (strcmp(parameter, "delay_fastest_release_black_keys") == 0) {
+            if (!(parameter = strtok_r(NULL, separators, &brkt))) {
+               out("Please specify the fastest delay for release of black keys!");
+               return 1; // command taken
+            }
+
+            int delay = get_dec(parameter);
+
+            if (delay < 0 || delay > 65535) {
+               out("Delay should be in the range between 0 and 65535");
+               return 1; // command taken
+            }
+            else {
+               kc->delay_fastest_release_black_keys = delay;
+               out("delay_fastest_release_black_keys set to %d!", kc->delay_fastest_release_black_keys);
+            }
+            /////////////////////////////////////////////////////////////////////
+         }
+         else if (strcmp(parameter, "delay_slowest") == 0) {
+            if (!(parameter = strtok_r(NULL, separators, &brkt))) {
+               out("Please specify the slowest delay for velocity calculation!");
+               return 1; // command taken
+            }
+
+            int delay = get_dec(parameter);
+
+            if (delay < 0 || delay > 65535) {
+               out("Delay should be in the range between 0 and 65535");
+               return 1; // command taken
+            }
+            else {
+               kc->delay_slowest = delay;
+               out("delay_slowest set to %d!", kc->delay_slowest);
+            }
+            /////////////////////////////////////////////////////////////////////
+         }
+         else if (strcmp(parameter, "delay_slowest_release") == 0) {
+            if (!(parameter = strtok_r(NULL, separators, &brkt))) {
+               out("Please specify the slowest release delay for velocity calculation!");
+               return 1; // command taken
+            }
+
+            int delay = get_dec(parameter);
+
+            if (delay < 0 || delay > 65535) {
+               out("Delay should be in the range between 0 and 65535");
+               return 1; // command taken
+            }
+            else {
+               kc->delay_slowest_release = delay;
+               out("delay_slowest_release set to %d!", kc->delay_slowest_release);
+            }
+         }
+         else if (strcmp(parameter, "key_calibration_value") == 0) {
+            int key;
+            int value;
+
+            if (!(parameter = strtok_r(NULL, separators, &brkt)) ||
+               ((key = get_dec(parameter)) < 0 || key >= KEYBOARD_MAX_KEYS)) {
+               out("Invalid <key> value, expect 0..%d!", KEYBOARD_MAX_KEYS - 1);
+               return 1; // command taken
+            }
+
+            if (!(parameter = strtok_r(NULL, separators, &brkt)) ||
+               ((value = get_dec(parameter)) < 0 || value >= 65535)) {
+               out("Invalid <delay> value, expect 0..65535!");
+               return 1; // command taken
+            }
+
+            kc->delay_key[key] = value;
+            out("Delay of key #%d set to %d", key, value);
+
+            /////////////////////////////////////////////////////////////////////
+         }
+         else if (strcmp(parameter, "key_calibration") == 0 || strcmp(parameter, "key_calibrate") == 0) {
+            int value;
+            int clean = -1;
+            if (!(parameter = strtok_r(NULL, separators, &brkt)) ||
+               ((value = get_on_off(parameter)) < 0 && (clean = strcmp(parameter, "clean")) != 0)) {
+               out("Please specify on, off or clean!");
+               return 1; // command taken
+            }
+
+            if (clean == 0) { // matching string
+               int i;
+
+               for (i = 0; i < KEYBOARD_MAX_KEYS; ++i) {
+                  kc->delay_key[i] = 0;
+               }
+
+               out("Cleaned calibration data.");
+            }
+            else {
+               kc->key_calibration = value;
+
+               if (kc->key_calibration) {
+                  out("Key calibration enabled.");
+                  out("Press all keys with slowest velocity now.");
+                  out("Enter 'set key_calibration clean' to clean previous data");
+                  out("Enter 'set key_calibration off' to finish calibration");
+                  out("Enter 'delays' to display current measurement results");
+               }
+               else {
+                  out("Key calibration disabled.");
+                  out("Enter 'delays' to display measured delays.");
+               }
+            }
+            return 1; // command taken
+
+            /////////////////////////////////////////////////////////////////////
+         }
+         else if (strcmp(parameter, "ain_pitchwheel") == 0 ||
+            strcmp(parameter, "ain_modwheel") == 0 ||
+            strcmp(parameter, "ain_expression") == 0 ||
+            strcmp(parameter, "ain_sustain") == 0) {
+            u8 pitchwheel = strcmp(parameter, "ain_pitchwheel") == 0;
+            u8 modwheel = strcmp(parameter, "ain_modwheel") == 0;
+            u8 expression = strcmp(parameter, "ain_expression") == 0;
 
             if (!(parameter = strtok_r(NULL, separators, &brkt))) {
-               out("Missing parameter name and value after 'set '!");
+               out("Please specify J5.Ax number (0..7), AINSER number (128..135) or off!");
                return 1; // command taken
+            }
+
+            int ain = 0;
+            if (strcmp(parameter, "off") != 0) {
+               ain = get_dec(parameter);
+
+               if (ain < 0 || ain > 255) {
+                  out("AIN pin should be in the range of 0..255");
+                  return 1; // command taken
+               }
+               ain += 1;
+            }
+
+            char wheel_name[20];
+            if (pitchwheel) {
+               strcpy(wheel_name, "PitchWheel");
+               kc->ain_pin[KEYBOARD_AIN_PITCHWHEEL] = ain;
+            }
+            else if (modwheel) {
+               strcpy(wheel_name, "ModWheel");
+               kc->ain_pin[KEYBOARD_AIN_MODWHEEL] = ain;
+            }
+            else if (expression) {
+               strcpy(wheel_name, "Expression");
+               kc->ain_pin[KEYBOARD_AIN_EXPRESSION] = ain;
+            }
+            else {
+               strcpy(wheel_name, "Sustain Pedal");
+               kc->ain_pin[KEYBOARD_AIN_SUSTAIN] = ain;
+            }
+
+            if (ain) {
+               if (ain >= 128) {
+                  out("%s assigned to AINSER pin A%d!", wheel_name, ain - 1 - 128);
+               }
+               else {
+                  out("%s assigned to J5.A%d!", wheel_name, ain - 1);
+               }
+            }
+            else {
+               out("%s disabled!", wheel_name);
             }
 
             /////////////////////////////////////////////////////////////////////
-            if (strcmp(parameter, "note_offset") == 0) {
-               if (!(parameter = strtok_r(NULL, separators, &brkt))) {
-                  out("Please specify the Note offset!");
-                  return 1; // command taken
-               }
+         }
+         else if (strcmp(parameter, "ctrl_pitchwheel") == 0 ||
+            strcmp(parameter, "ctrl_modwheel") == 0 ||
+            strcmp(parameter, "ctrl_expression") == 0 ||
+            strcmp(parameter, "ctrl_sustain") == 0) {
+            u8 pitchwheel = strcmp(parameter, "ctrl_pitchwheel") == 0;
+            u8 modwheel = strcmp(parameter, "ctrl_modwheel") == 0;
+            u8 expression = strcmp(parameter, "ctrl_expression") == 0;
 
-               int offset = get_dec(parameter);
-
-               if (offset < 0 || offset > 127) {
-                  out("Note Offset should be in the range between 0 and 127!");
-                  return 1; // command taken
-               }
-               else {
-                  kc->note_offset = offset;
-                  out("Keyboard #%d: Note Offset %d", kc->note_offset);
-               }
-
-            }
-            else if (strcmp(parameter, "din_key_offset") == 0) {
-               if (!(parameter = strtok_r(NULL, separators, &brkt))) {
-                  out("Please specify the key offset!");
-                  return 1; // command taken
-               }
-
-               int offset = get_dec(parameter);
-
-               if (offset < 0 || offset > 127) {
-                  out("Key Offset should be in the range between 0 and 127!");
-                  return 1; // command taken
-               }
-               else {
-                  kc->din_key_offset = offset;
-                  out("Keyboard #%d: DIN Key Offset %d", kc->din_key_offset);
-                  KEYBOARD_Init(1); // re-init runtime variables, don't touch configuration
-               }
-               /////////////////////////////////////////////////////////////////////
-            }
-            else if (strcmp(parameter, "debug") == 0) {
-               if (!(parameter = strtok_r(NULL, separators, &brkt))) {
-                  out("Please specify on or off (alternatively 1 or 0)");
-                  return 1; // command taken
-               }
-
-               int on_off = get_on_off(parameter);
-
-               if (on_off < 0) {
-                  out("Expecting 'on' or 'off' (alternatively 1 or 0)!");
-               }
-               else {
-                  kc->verbose_level = on_off ? 2 : 1;
-
-                  out("Keyboard #%d: debug mode %s", on_off ? "enabled" : "disabled");
-               }
-               /////////////////////////////////////////////////////////////////////
-            }
-            else if (strcmp(parameter, "rows") == 0) {
-               if (!(parameter = strtok_r(NULL, separators, &brkt))) {
-                  out("Please specify the number of rows (0..%d)", MATRIX_NUM_ROWS);
-                  return 1; // command taken
-               }
-
-               int rows = get_dec(parameter);
-
-               if (rows < 0 || rows > MATRIX_NUM_ROWS) {
-                  out("Rows should be in the range between 0 (off) and %d", MATRIX_NUM_ROWS);
-                  return 1; // command taken
-               }
-               else {
-                  kc->num_rows = rows;
-                  out("Keyboard #%d: %d rows will be scanned!", kc->num_rows);
-                  KEYBOARD_Init(1); // re-init runtime variables, don't touch configuration
-               }
-               /////////////////////////////////////////////////////////////////////
-            }
-            else if (strcmp(parameter, "dout_sr1") == 0) {
-               if (!(parameter = strtok_r(NULL, separators, &brkt))) {
-                  out("Please specify the DOUT number to which the first column is assigned (0..%d)", MIOS32_SRIO_ScanNumGet());
-                  return 1; // command taken
-               }
-
-               int sr = get_dec(parameter);
-
-               if (sr < 0 || sr > MATRIX_NUM_ROWS) {
-                  out("Shift register should be in the range between 0 (off) and %d", MIOS32_SRIO_ScanNumGet());
-                  return 1; // command taken
-               }
-               else {
-                  kc->dout_sr1 = sr;
-                  out("Keyboard #%d: dout_sr1 assigned to %d!", kc->dout_sr1);
-                  KEYBOARD_Init(1); // re-init runtime variables, don't touch configuration
-               }
-               /////////////////////////////////////////////////////////////////////
-            }
-            else if (strcmp(parameter, "dout_sr2") == 0) {
-               if (!(parameter = strtok_r(NULL, separators, &brkt))) {
-                  out("Please specify the DOUT number to which the first column is assigned (0..%d)", MIOS32_SRIO_ScanNumGet());
-                  return 1; // command taken
-               }
-
-               int sr = get_dec(parameter);
-
-               if (sr < 0 || sr > MATRIX_NUM_ROWS) {
-                  out("Shift register should be in the range between 0 (off) and %d", MIOS32_SRIO_ScanNumGet());
-                  return 1; // command taken
-               }
-               else {
-                  kc->dout_sr2 = sr;
-                  out("Keyboard #%d: dout_sr2 assigned to %d!", kc->dout_sr2);
-                  KEYBOARD_Init(1); // re-init runtime variables, don't touch configuration
-               }
-               /////////////////////////////////////////////////////////////////////
-            }
-            else if (strcmp(parameter, "din_sr1") == 0) {
-               if (!(parameter = strtok_r(NULL, separators, &brkt))) {
-                  out("Please specify the DIN number to which the first column is assigned (0..%d)", MIOS32_SRIO_ScanNumGet());
-                  return 1; // command taken
-               }
-
-               int sr = get_dec(parameter);
-
-               if (sr < 0 || sr > MATRIX_NUM_ROWS) {
-                  out("Shift register should be in the range between 0 (off) and %d", MIOS32_SRIO_ScanNumGet());
-                  return 1; // command taken
-               }
-               else {
-                  kc->din_sr1 = sr;
-                  out("Keyboard #%d: din_sr1 assigned to %d!", kc->din_sr1);
-                  KEYBOARD_Init(1); // re-init runtime variables, don't touch configuration
-               }
-               /////////////////////////////////////////////////////////////////////
-            }
-            else if (strcmp(parameter, "din_sr2") == 0) {
-               if (!(parameter = strtok_r(NULL, separators, &brkt))) {
-                  out("Please specify the DIN number to which the first column is assigned (0..%d)", MIOS32_SRIO_ScanNumGet());
-                  return 1; // command taken
-               }
-
-               int sr = get_dec(parameter);
-
-               if (sr < 0 || sr > MATRIX_NUM_ROWS) {
-                  out("Shift register should be in the range between 0 (off) and %d", MIOS32_SRIO_ScanNumGet());
-                  return 1; // command taken
-               }
-               else {
-                  kc->din_sr2 = sr;
-                  out("Keyboard #%d: din_sr2 assigned to %d!", kc->din_sr2);
-                  KEYBOARD_Init(1); // re-init runtime variables, don't touch configuration
-               }
-               /////////////////////////////////////////////////////////////////////
-            }
-            else if (strcmp(parameter, "velocity") == 0) {
-               if (!(parameter = strtok_r(NULL, separators, &brkt))) {
-                  out("Please specify on or off (alternatively 1 or 0)");
-                  return 1; // command taken
-               }
-
-               int on_off = get_on_off(parameter);
-
-               if (on_off < 0) {
-                  out("Expecting 'on' or 'off' (alternatively 1 or 0)!");
-               }
-               else {
-                  kc->scan_velocity = on_off;
-
-                  out("Keyboard #%d: velocity mode %s", on_off ? "enabled" : "disabled");
-                  KEYBOARD_Init(1); // re-init runtime variables, don't touch configuration
-               }
-               /////////////////////////////////////////////////////////////////////
-            }
-            else if (strcmp(parameter, "release_velocity") == 0) {
-               if (!(parameter = strtok_r(NULL, separators, &brkt))) {
-                  out("Please specify on or off (alternatively 1 or 0)");
-                  return 1; // command taken
-               }
-
-               int on_off = get_on_off(parameter);
-
-               if (on_off < 0) {
-                  out("Expecting 'on' or 'off' (alternatively 1 or 0)!");
-               }
-               else {
-                  kc->scan_release_velocity = on_off;
-
-                  out("Keyboard #%d: release velocity mode %s", on_off ? "enabled" : "disabled");
-                  KEYBOARD_Init(1); // re-init runtime variables, don't touch configuration
-               }
-               /////////////////////////////////////////////////////////////////////
-            }
-            else if (strcmp(parameter, "optimized") == 0) {
-               if (!(parameter = strtok_r(NULL, separators, &brkt))) {
-                  out("Please specify on or off (alternatively 1 or 0)");
-                  return 1; // command taken
-               }
-
-               int on_off = get_on_off(parameter);
-
-               if (on_off < 0) {
-                  out("Expecting 'on' or 'off' (alternatively 1 or 0)!");
-               }
-               else {
-                  kc->scan_optimized = on_off;
-
-                  out("Keyboard #%d: optimized scan %s", on_off ? "enabled" : "disabled");
-                  KEYBOARD_Init(1); // re-init runtime variables, don't touch configuration
-               }
-               /////////////////////////////////////////////////////////////////////
-            }
-            else if (strcmp(parameter, "din_inverted") == 0) {
-               if (!(parameter = strtok_r(NULL, separators, &brkt))) {
-                  out("Please specify on or off (alternatively 1 or 0)");
-                  return 1; // command taken
-               }
-
-               int on_off = get_on_off(parameter);
-
-               if (on_off < 0) {
-                  out("Expecting 'on' or 'off' (alternatively 1 or 0)!");
-               }
-               else {
-                  kc->din_inverted = on_off;
-
-                  out("Keyboard #%d: DIN values are %sinverted", kc->din_inverted ? "" : "not ");
-                  KEYBOARD_Init(1); // re-init runtime variables, don't touch configuration
-               }
-               /////////////////////////////////////////////////////////////////////
-            }
-            else if (strcmp(parameter, "break_inverted") == 0) {
-               if (!(parameter = strtok_r(NULL, separators, &brkt))) {
-                  out("Please specify on or off (alternatively 1 or 0)");
-                  return 1; // command taken
-               }
-
-               int on_off = get_on_off(parameter);
-
-               if (on_off < 0) {
-                  out("Expecting 'on' or 'off' (alternatively 1 or 0)!");
-               }
-               else {
-                  kc->break_inverted = on_off;
-
-                  out("Keyboard #%d: Break contacts are %sinverted", kc->break_inverted ? "" : "not ");
-                  KEYBOARD_Init(1); // re-init runtime variables, don't touch configuration
-               }
-               /////////////////////////////////////////////////////////////////////
-            }
-            else if (strcmp(parameter, "make_debounced") == 0) {
-               if (!(parameter = strtok_r(NULL, separators, &brkt))) {
-                  out("Please specify on or off (alternatively 1 or 0)");
-                  return 1; // command taken
-               }
-
-               int on_off = get_on_off(parameter);
-
-               if (on_off < 0) {
-                  out("Expecting 'on' or 'off' (alternatively 1 or 0)!");
-               }
-               else {
-                  kc->make_debounced = on_off;
-
-                  out("Keyboard #%d: Make contact debouncing %s", kc->make_debounced ? "on" : "off");
-                  KEYBOARD_Init(1); // re-init runtime variables, don't touch configuration
-               }
-               /////////////////////////////////////////////////////////////////////
-            }
-            else if (strcmp(parameter, "delay_fastest") == 0) {
-               if (!(parameter = strtok_r(NULL, separators, &brkt))) {
-                  out("Please specify the fastest delay for velocity calculation!");
-                  return 1; // command taken
-               }
-
-               int delay = get_dec(parameter);
-
-               if (delay < 0 || delay > 65535) {
-                  out("Delay should be in the range between 0 and 65535");
-                  return 1; // command taken
-               }
-               else {
-                  kc->delay_fastest = delay;
-                  out("Keyboard #%d: delay_fastest set to %d!", kc->delay_fastest);
-               }
-               /////////////////////////////////////////////////////////////////////
-            }
-            else if (strcmp(parameter, "delay_fastest_black_keys") == 0) {
-               if (!(parameter = strtok_r(NULL, separators, &brkt))) {
-                  out("Please specify the fastest delay for the black keys!");
-                  return 1; // command taken
-               }
-
-               int delay = get_dec(parameter);
-
-               if (delay < 0 || delay > 65535) {
-                  out("Delay should be in the range between 0 and 65535");
-                  return 1; // command taken
-               }
-               else {
-                  kc->delay_fastest_black_keys = delay;
-                  out("Keyboard #%d: delay_fastest_black_keys set to %d!", kc->delay_fastest_black_keys);
-               }
-               /////////////////////////////////////////////////////////////////////
-            }
-            else if (strcmp(parameter, "delay_fastest_release") == 0) {
-               if (!(parameter = strtok_r(NULL, separators, &brkt))) {
-                  out("Please specify the fastest delay for release velocity calculation!");
-                  return 1; // command taken
-               }
-
-               int delay = get_dec(parameter);
-
-               if (delay < 0 || delay > 65535) {
-                  out("Delay should be in the range between 0 and 65535");
-                  return 1; // command taken
-               }
-               else {
-                  kc->delay_fastest_release = delay;
-                  out("Keyboard #%d: delay_fastest_release set to %d!", kc->delay_fastest_release);
-               }
-               /////////////////////////////////////////////////////////////////////
-            }
-            else if (strcmp(parameter, "delay_fastest_release_black_keys") == 0) {
-               if (!(parameter = strtok_r(NULL, separators, &brkt))) {
-                  out("Please specify the fastest delay for release of black keys!");
-                  return 1; // command taken
-               }
-
-               int delay = get_dec(parameter);
-
-               if (delay < 0 || delay > 65535) {
-                  out("Delay should be in the range between 0 and 65535");
-                  return 1; // command taken
-               }
-               else {
-                  kc->delay_fastest_release_black_keys = delay;
-                  out("Keyboard #%d: delay_fastest_release_black_keys set to %d!", kc->delay_fastest_release_black_keys);
-               }
-               /////////////////////////////////////////////////////////////////////
-            }
-            else if (strcmp(parameter, "delay_slowest") == 0) {
-               if (!(parameter = strtok_r(NULL, separators, &brkt))) {
-                  out("Please specify the slowest delay for velocity calculation!");
-                  return 1; // command taken
-               }
-
-               int delay = get_dec(parameter);
-
-               if (delay < 0 || delay > 65535) {
-                  out("Delay should be in the range between 0 and 65535");
-                  return 1; // command taken
-               }
-               else {
-                  kc->delay_slowest = delay;
-                  out("Keyboard #%d: delay_slowest set to %d!", kc->delay_slowest);
-               }
-               /////////////////////////////////////////////////////////////////////
-            }
-            else if (strcmp(parameter, "delay_slowest_release") == 0) {
-               if (!(parameter = strtok_r(NULL, separators, &brkt))) {
-                  out("Please specify the slowest release delay for velocity calculation!");
-                  return 1; // command taken
-               }
-
-               int delay = get_dec(parameter);
-
-               if (delay < 0 || delay > 65535) {
-                  out("Delay should be in the range between 0 and 65535");
-                  return 1; // command taken
-               }
-               else {
-                  kc->delay_slowest_release = delay;
-                  out("Keyboard #%d: delay_slowest_release set to %d!", kc->delay_slowest_release);
-               }
-            }
-            else if (strcmp(parameter, "key_calibration_value") == 0) {
-               int key;
-               int value;
-
-               if (!(parameter = strtok_r(NULL, separators, &brkt)) ||
-                  ((key = get_dec(parameter)) < 0 || key >= KEYBOARD_MAX_KEYS)) {
-                  out("Invalid <key> value, expect 0..%d!", KEYBOARD_MAX_KEYS - 1);
-                  return 1; // command taken
-               }
-
-               if (!(parameter = strtok_r(NULL, separators, &brkt)) ||
-                  ((value = get_dec(parameter)) < 0 || value >= 65535)) {
-                  out("Invalid <delay> value, expect 0..65535!");
-                  return 1; // command taken
-               }
-
-               kc->delay_key[key] = value;
-               out("Delay of key #%d set to %d", key, value);
-
-               /////////////////////////////////////////////////////////////////////
-            }
-            else if (strcmp(parameter, "key_calibration") == 0 || strcmp(parameter, "key_calibrate") == 0) {
-               int value;
-               int clean = -1;
-               if (!(parameter = strtok_r(NULL, separators, &brkt)) ||
-                  ((value = get_on_off(parameter)) < 0 && (clean = strcmp(parameter, "clean")) != 0)) {
-                  out("Please specify on, off or clean!");
-                  return 1; // command taken
-               }
-
-               if (clean == 0) { // matching string
-                  int i;
-
-                  for (i = 0; i < KEYBOARD_MAX_KEYS; ++i) {
-                     kc->delay_key[i] = 0;
-                  }
-
-                  out("Cleaned calibration data.");
-               }
-               else {
-                  kc->key_calibration = value;
-
-                  if (kc->key_calibration) {
-                     out("Key calibration enabled.");
-                     out("Press all keys with slowest velocity now.");
-                     out("Enter 'set key_calibration clean' to clean previous data");
-                     out("Enter 'set key_calibration off' to finish calibration");
-                     out("Enter 'delays' to display current measurement results");
-                  }
-                  else {
-                     out("Key calibration disabled.");
-                     out("Enter 'delays' to display measured delays.");
-                  }
-               }
+            if (!(parameter = strtok_r(NULL, separators, &brkt))) {
+               out("Please specify the CC number (or 128 for PitchBend or 129 for Aftertouch)!");
                return 1; // command taken
-
-               /////////////////////////////////////////////////////////////////////
             }
-            else if (strcmp(parameter, "ain_pitchwheel") == 0 ||
-               strcmp(parameter, "ain_modwheel") == 0 ||
-               strcmp(parameter, "ain_expression") == 0 ||
-               strcmp(parameter, "ain_sustain") == 0) {
-               u8 pitchwheel = strcmp(parameter, "ain_pitchwheel") == 0;
-               u8 modwheel = strcmp(parameter, "ain_modwheel") == 0;
-               u8 expression = strcmp(parameter, "ain_expression") == 0;
 
-               if (!(parameter = strtok_r(NULL, separators, &brkt))) {
-                  out("Please specify J5.Ax number (0..7), AINSER number (128..135) or off!");
-                  return 1; // command taken
-               }
+            int ctrl = get_dec(parameter);
 
-               int ain = 0;
-               if (strcmp(parameter, "off") != 0) {
-                  ain = get_dec(parameter);
-
-                  if (ain < 0 || ain > 255) {
-                     out("AIN pin should be in the range of 0..255");
-                     return 1; // command taken
-                  }
-                  ain += 1;
-               }
-
-               char wheel_name[20];
-               if (pitchwheel) {
-                  strcpy(wheel_name, "PitchWheel");
-                  kc->ain_pin[KEYBOARD_AIN_PITCHWHEEL] = ain;
-               }
-               else if (modwheel) {
-                  strcpy(wheel_name, "ModWheel");
-                  kc->ain_pin[KEYBOARD_AIN_MODWHEEL] = ain;
-               }
-               else if (expression) {
-                  strcpy(wheel_name, "Expression");
-                  kc->ain_pin[KEYBOARD_AIN_EXPRESSION] = ain;
-               }
-               else {
-                  strcpy(wheel_name, "Sustain Pedal");
-                  kc->ain_pin[KEYBOARD_AIN_SUSTAIN] = ain;
-               }
-
-               if (ain) {
-                  if (ain >= 128) {
-                     out("Keyboard #%d: %s assigned to AINSER pin A%d!", wheel_name, ain - 1 - 128);
-                  }
-                  else {
-                     out("Keyboard #%d: %s assigned to J5.A%d!", wheel_name, ain - 1);
-                  }
-               }
-               else {
-                  out("Keyboard #%d: %s disabled!", wheel_name);
-               }
-
-               /////////////////////////////////////////////////////////////////////
-            }
-            else if (strcmp(parameter, "ctrl_pitchwheel") == 0 ||
-               strcmp(parameter, "ctrl_modwheel") == 0 ||
-               strcmp(parameter, "ctrl_expression") == 0 ||
-               strcmp(parameter, "ctrl_sustain") == 0) {
-               u8 pitchwheel = strcmp(parameter, "ctrl_pitchwheel") == 0;
-               u8 modwheel = strcmp(parameter, "ctrl_modwheel") == 0;
-               u8 expression = strcmp(parameter, "ctrl_expression") == 0;
-
-               if (!(parameter = strtok_r(NULL, separators, &brkt))) {
-                  out("Please specify the CC number (or 128 for PitchBend or 129 for Aftertouch)!");
-                  return 1; // command taken
-               }
-
-               int ctrl = get_dec(parameter);
-
-               if (ctrl < 0 || ctrl > 129) {
-                  out("Controller Number should be in the range between 0 and 129!");
-                  return 1; // command taken
-               }
-               else {
-                  char wheel_name[20];
-                  if (pitchwheel) {
-                     strcpy(wheel_name, "PitchWheel");
-                     kc->ain_ctrl[KEYBOARD_AIN_PITCHWHEEL] = ctrl;
-                  }
-                  else if (modwheel) {
-                     strcpy(wheel_name, "ModWheel");
-                     kc->ain_ctrl[KEYBOARD_AIN_MODWHEEL] = ctrl;
-                  }
-                  else if (expression) {
-                     strcpy(wheel_name, "Expression");
-                     kc->ain_ctrl[KEYBOARD_AIN_EXPRESSION] = ctrl;
-                  }
-                  else {
-                     strcpy(wheel_name, "Sustain Pedal");
-                     kc->ain_ctrl[KEYBOARD_AIN_SUSTAIN] = ctrl;
-                  }
-
-                  if (ctrl < 128)
-                     out("Keyboard #%d: %s sends CC#%d", wheel_name, ctrl);
-                  else if (ctrl == 128)
-                     out("Keyboard #%d: %s sends PitchBend", wheel_name);
-                  else
-                     out("Keyboard #%d: %s sends Aftertouch", wheel_name);
-               }
-
-               /////////////////////////////////////////////////////////////////////
-            }
-            else if (strcmp(parameter, "ain_pitchwheel_inverted") == 0 ||
-               strcmp(parameter, "ain_modwheel_inverted") == 0 ||
-               strcmp(parameter, "ain_expression_inverted") == 0 ||
-               strcmp(parameter, "ain_sustain_inverted") == 0) {
-               u8 pitchwheel = strcmp(parameter, "ain_pitchwheel_inverted") == 0;
-               u8 modwheel = strcmp(parameter, "ain_modwheel_inverted") == 0;
-               u8 expression = strcmp(parameter, "ain_expression_inverted") == 0;
-
-               if (!(parameter = strtok_r(NULL, separators, &brkt))) {
-                  out("Please specify on or off!");
-                  return 1; // command taken
-               }
-
-               int value;
-               if ((value = get_on_off(parameter)) < 0) {
-                  out("Invalid value, please specify on or off!");
-                  return 1; // command taken
-               }
-
-               char wheel_name[20];
-               if (pitchwheel) {
-                  strcpy(wheel_name, "PitchWheel");
-                  kc->ain_inverted[KEYBOARD_AIN_PITCHWHEEL] = value;
-               }
-               else if (modwheel) {
-                  strcpy(wheel_name, "ModWheel");
-                  kc->ain_inverted[KEYBOARD_AIN_MODWHEEL] = value;
-               }
-               else if (expression) {
-                  strcpy(wheel_name, "Expression");
-                  kc->ain_inverted[KEYBOARD_AIN_EXPRESSION] = value;
-               }
-               else {
-                  strcpy(wheel_name, "Sustain Pedal");
-                  kc->ain_inverted[KEYBOARD_AIN_SUSTAIN] = value;
-               }
-
-               out("Keyboard #%d: %s controller inversion %s!", wheel_name, value ? "on" : "off");
-
-               /////////////////////////////////////////////////////////////////////
-            }
-            else if (strcmp(parameter, "calibration") == 0 || strcmp(parameter, "calibrate") == 0 ||
-               strcmp(parameter, "ain_calibration") == 0 || strcmp(parameter, "ain_calibrate") == 0) {
-
-               int pin = -1;
-               u8 invalid_mode = 0;
-               if (!(parameter = strtok_r(NULL, separators, &brkt))) {
-                  invalid_mode = 1;
-               }
-               else {
-                  if (strcmp(parameter, "off") == 0)
-                     pin = -1;
-                  else if (strcmp(parameter, "pitchwheel") == 0)
-                     pin = KEYBOARD_AIN_PITCHWHEEL;
-                  else if (strcmp(parameter, "modwheel") == 0)
-                     pin = KEYBOARD_AIN_MODWHEEL;
-                  else if (strcmp(parameter, "expression") == 0)
-                     pin = KEYBOARD_AIN_EXPRESSION;
-                  else if (strcmp(parameter, "sustain") == 0)
-                     pin = KEYBOARD_AIN_SUSTAIN;
-                  else
-                     invalid_mode = 1;
-               }
-
-               if (invalid_mode) {
-                  out("Please specify off, pitchwheel, modwheel, expression or sustain to disable/enable calibration mode!");
-                  return 1; // command taken
-               }
-
-               if (pin < 0) {
-                  ain_cali_mode_pin = 0; // off
-                  KEYBOARD_TerminalCaliMode(_output_function);
-               }
-               else {
-                  ain_cali_mode_pin = 1 + pin;
-                  KEYBOARD_TerminalCaliMode(_output_function);
-
-                  kc->ain_min[pin] = 0xff;
-                  kc->ain_max[pin] = 0x00;
-                  out("Please move the potentiomenter into both directions now!");
-                  out("The calibration will be finished by selection a new source, or with 'set calibration off'");
-                  out("Enter 'store' to save the calibration values");
-               }
-
-               /////////////////////////////////////////////////////////////////////
-            }
-            else if (strcmp(parameter, "ain_bandwidth_ms") == 0) {
-               if (!(parameter = strtok_r(NULL, separators, &brkt))) {
-                  out("Please specify the AIN bandwidth in milliseconds!");
-                  return 1; // command taken
-               }
-
-               int bandwidth_ms = get_dec(parameter);
-
-               if (bandwidth_ms < 0 || bandwidth_ms > 255) {
-                  out("Bandwidth delay should be in the range between 0..255");
-                  return 1; // command taken
-               }
-               else {
-                  kc->ain_bandwidth_ms = bandwidth_ms;
-                  out("Keyboard #%d: ain_bandwidth_ms set to %d!", kc->ain_bandwidth_ms);
-               }
-
-               /////////////////////////////////////////////////////////////////////
-            }
-            else if (strcmp(parameter, "ain_sustain_switch") == 0) {
-               if (!(parameter = strtok_r(NULL, separators, &brkt))) {
-                  out("Please specify on or off!");
-                  return 1; // command taken
-               }
-
-               int value;
-               if ((value = get_on_off(parameter)) < 0) {
-                  out("Please specify on or off!");
-                  return 1; // command taken
-               }
-
-               kc->ain_sustain_switch = value;
-
-               out("Sustain controller behaves like a %s", kc->ain_sustain_switch ? "switch" : "pot");
-
-               /////////////////////////////////////////////////////////////////////
+            if (ctrl < 0 || ctrl > 129) {
+               out("Controller Number should be in the range between 0 and 129!");
+               return 1; // command taken
             }
             else {
-               out("Unknown parameter for keyboard configuration - type 'help' to list available parameters!");
+               char wheel_name[20];
+               if (pitchwheel) {
+                  strcpy(wheel_name, "PitchWheel");
+                  kc->ain_ctrl[KEYBOARD_AIN_PITCHWHEEL] = ctrl;
+               }
+               else if (modwheel) {
+                  strcpy(wheel_name, "ModWheel");
+                  kc->ain_ctrl[KEYBOARD_AIN_MODWHEEL] = ctrl;
+               }
+               else if (expression) {
+                  strcpy(wheel_name, "Expression");
+                  kc->ain_ctrl[KEYBOARD_AIN_EXPRESSION] = ctrl;
+               }
+               else {
+                  strcpy(wheel_name, "Sustain Pedal");
+                  kc->ain_ctrl[KEYBOARD_AIN_SUSTAIN] = ctrl;
+               }
+
+               if (ctrl < 128)
+                  out("%s sends CC#%d", wheel_name, ctrl);
+               else if (ctrl == 128)
+                  out("%s sends PitchBend", wheel_name);
+               else
+                  out("%s sends Aftertouch", wheel_name);
+            }
+
+            /////////////////////////////////////////////////////////////////////
+         }
+         else if (strcmp(parameter, "ain_pitchwheel_inverted") == 0 ||
+            strcmp(parameter, "ain_modwheel_inverted") == 0 ||
+            strcmp(parameter, "ain_expression_inverted") == 0 ||
+            strcmp(parameter, "ain_sustain_inverted") == 0) {
+            u8 pitchwheel = strcmp(parameter, "ain_pitchwheel_inverted") == 0;
+            u8 modwheel = strcmp(parameter, "ain_modwheel_inverted") == 0;
+            u8 expression = strcmp(parameter, "ain_expression_inverted") == 0;
+
+            if (!(parameter = strtok_r(NULL, separators, &brkt))) {
+               out("Please specify on or off!");
                return 1; // command taken
             }
+
+            int value;
+            if ((value = get_on_off(parameter)) < 0) {
+               out("Invalid value, please specify on or off!");
+               return 1; // command taken
+            }
+
+            char wheel_name[20];
+            if (pitchwheel) {
+               strcpy(wheel_name, "PitchWheel");
+               kc->ain_inverted[KEYBOARD_AIN_PITCHWHEEL] = value;
+            }
+            else if (modwheel) {
+               strcpy(wheel_name, "ModWheel");
+               kc->ain_inverted[KEYBOARD_AIN_MODWHEEL] = value;
+            }
+            else if (expression) {
+               strcpy(wheel_name, "Expression");
+               kc->ain_inverted[KEYBOARD_AIN_EXPRESSION] = value;
+            }
+            else {
+               strcpy(wheel_name, "Sustain Pedal");
+               kc->ain_inverted[KEYBOARD_AIN_SUSTAIN] = value;
+            }
+
+            out("%s controller inversion %s!", wheel_name, value ? "on" : "off");
+
+            /////////////////////////////////////////////////////////////////////
          }
+         else if (strcmp(parameter, "calibration") == 0 || strcmp(parameter, "calibrate") == 0 ||
+            strcmp(parameter, "ain_calibration") == 0 || strcmp(parameter, "ain_calibrate") == 0) {
+
+            int pin = -1;
+            u8 invalid_mode = 0;
+            if (!(parameter = strtok_r(NULL, separators, &brkt))) {
+               invalid_mode = 1;
+            }
+            else {
+               if (strcmp(parameter, "off") == 0)
+                  pin = -1;
+               else if (strcmp(parameter, "pitchwheel") == 0)
+                  pin = KEYBOARD_AIN_PITCHWHEEL;
+               else if (strcmp(parameter, "modwheel") == 0)
+                  pin = KEYBOARD_AIN_MODWHEEL;
+               else if (strcmp(parameter, "expression") == 0)
+                  pin = KEYBOARD_AIN_EXPRESSION;
+               else if (strcmp(parameter, "sustain") == 0)
+                  pin = KEYBOARD_AIN_SUSTAIN;
+               else
+                  invalid_mode = 1;
+            }
+
+            if (invalid_mode) {
+               out("Please specify off, pitchwheel, modwheel, expression or sustain to disable/enable calibration mode!");
+               return 1; // command taken
+            }
+
+            if (pin < 0) {
+               ain_cali_mode_pin = 0; // off
+               KEYBOARD_TerminalCaliMode(_output_function);
+            }
+            else {
+               ain_cali_mode_pin = 1 + pin;
+               KEYBOARD_TerminalCaliMode(_output_function);
+
+               kc->ain_min[pin] = 0xff;
+               kc->ain_max[pin] = 0x00;
+               out("Please move the potentiomenter into both directions now!");
+               out("The calibration will be finished by selection a new source, or with 'set calibration off'");
+               out("Enter 'store' to save the calibration values");
+            }
+
+            /////////////////////////////////////////////////////////////////////
+         }
+         else if (strcmp(parameter, "ain_bandwidth_ms") == 0) {
+            if (!(parameter = strtok_r(NULL, separators, &brkt))) {
+               out("Please specify the AIN bandwidth in milliseconds!");
+               return 1; // command taken
+            }
+
+            int bandwidth_ms = get_dec(parameter);
+
+            if (bandwidth_ms < 0 || bandwidth_ms > 255) {
+               out("Bandwidth delay should be in the range between 0..255");
+               return 1; // command taken
+            }
+            else {
+               kc->ain_bandwidth_ms = bandwidth_ms;
+               out("ain_bandwidth_ms set to %d!", kc->ain_bandwidth_ms);
+            }
+
+            /////////////////////////////////////////////////////////////////////
+         }
+         else if (strcmp(parameter, "ain_sustain_switch") == 0) {
+            if (!(parameter = strtok_r(NULL, separators, &brkt))) {
+               out("Please specify on or off!");
+               return 1; // command taken
+            }
+
+            int value;
+            if ((value = get_on_off(parameter)) < 0) {
+               out("Please specify on or off!");
+               return 1; // command taken
+            }
+
+            kc->ain_sustain_switch = value;
+
+            out("Sustain controller behaves like a %s", kc->ain_sustain_switch ? "switch" : "pot");
+
+            /////////////////////////////////////////////////////////////////////
+         }
+         else {
+            out("Unknown parameter for keyboard configuration - type 'help' to list available parameters!");
+            return 1; // command taken
+         }
+
       }
       else {
          // out("Unknown command - type 'help' to list available commands!");
