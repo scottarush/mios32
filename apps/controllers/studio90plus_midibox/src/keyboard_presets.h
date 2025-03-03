@@ -82,10 +82,10 @@
 #define PRESETS_ADDR_DELAY_FASTEST_RELEASE_BLACK_KEYS 0x56 // 0xd6
 #define PRESETS_ADDR_DELAY_SLOWEST_RELEASE            0x57 // 0xd7
 
-// Current zone preset data
+// Current zone preset data.  Maximum # of zones = 4
 #define PRESETS_ADDR_NUMZONES       0x58 // 0xd8
 #define PRESETS_ADDR_NOTE_NUMBER_ARRAY     0x59 // 0x59 to 0x5c
-#define PRESETS_ADDR_TRANSPOSE_ARRAY       0x5D // 0x5d to 0x0x61
+#define PRESETS_ADDR_OCTAVE_OFFSET_ARRAY       0x5D // 0x5d to 0x0x61
 #define PRESETS_ADDR_MIDI_CHANNELS_ARRAY         0x62 // 0x62 to 0x65
 #define PRESETS_ADDR_MIDI_PORTS_ARRAY            0x65 // 0x65 to 0x68
 

@@ -192,7 +192,7 @@ s32 KEYBOARD_Init(u32 mode) {
       kc->current_zone_preset.zoneParams[0].midiPorts = 0x3033;  // USB and both UARTS -> MIDI
       kc->current_zone_preset.zoneParams[0].midiChannel = 1;
       kc->current_zone_preset.zoneParams[0].startNoteNum = 21;
-      kc->current_zone_preset.zoneParams[0].transposeOffset = 0;
+      kc->current_zone_preset.zoneParams[0].octaveOffset = 0;
 
    }
 
@@ -791,7 +791,7 @@ void KEYBOARD_CopyZonePreset(zone_preset_t* pSource, zone_preset_t* pDest) {
       pDestZoneParams->midiChannel = pSourceZoneParams->midiChannel;
       pDestZoneParams->midiPorts = pSourceZoneParams->midiPorts;
       pDestZoneParams->startNoteNum = pSourceZoneParams->startNoteNum;
-      pDestZoneParams->transposeOffset = pSourceZoneParams->transposeOffset;
+      pDestZoneParams->octaveOffset = pSourceZoneParams->octaveOffset;
    }
 }
 
@@ -871,9 +871,11 @@ static s32 KEYBOARD_MIDI_SendNote(u8 note_number, u8 velocity, u8 depressed) {
    // Otherwise decode the zone and send the note
    u16 midiPort = 0;
    u8 midiChannel = 1;
+   int octaveOffset = 0;
    if (kc->current_zone_preset.numZones == 1) {
       midiPort = kc->current_zone_preset.zoneParams[0].midiPorts;
       midiChannel = kc->current_zone_preset.zoneParams[0].midiChannel;
+      octaveOffset = kc->current_zone_preset.zoneParams[0].octaveOffset;
    }
    else {
       // Iterate through the zones to find the correct midiChannel and port on which
@@ -889,21 +891,23 @@ static s32 KEYBOARD_MIDI_SendNote(u8 note_number, u8 velocity, u8 depressed) {
                // Either the last zone or the note is in this one
                midiPort = pZoneParams->midiPorts;
                midiChannel = pZoneParams->midiChannel;
-               // And add the transpose offset
-               sent_note = sent_note + pZoneParams->transposeOffset;
-               if (sent_note < 0) {
-                  sent_note = 0;  // Shouldn't happen
-               }
-               else if (sent_note > 127) {
-                  sent_note = 127;  // Shouldn't happen
-               }
+               octaveOffset = pZoneParams->octaveOffset;
                break;
             }
          }
          // Otherwise check the next zone.
       }
    }
-   // Now send on the found ports and channel
+   // Add/subtract the octave offset for the zone and limit to valid notes
+   sent_note = sent_note + (octaveOffset * 12);
+   if (sent_note < 0) {
+      sent_note = 0;  
+   }
+   else if (sent_note > 127) {
+      sent_note = 127;  
+   }
+
+   // Now send the adjusted note on the found ports and channel
    int i;
    u16 mask = 1;
    for (i = 0; i < 16; ++i, mask <<= 1) {

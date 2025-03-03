@@ -30,7 +30,8 @@ typedef enum pageID_e {
    PAGE_HOME = 0,
    PAGE_DIALOG = 1,
    PAGE_SPLIT_LEARNING = 2,
-   PAGE_MIDI_CONFIG = 3
+   PAGE_MIDI_CONFIG = 3,
+   PAGE_OCTAVE = 4
 } pageID_t;
 
 typedef enum flash_state_e {
@@ -46,10 +47,6 @@ struct page_s {
    void (*pBackButtonCallback)();
    void (*pEnterButtonCallback)();
    void (*pUpDownButtonCallback)(u8 up);
-   void (*pTimerCallback)();
-   int timerCounter;
-   int flashTimeMS;
-   flash_state_t nextFlashState;
    struct page_s* pBackPage;
 };
 

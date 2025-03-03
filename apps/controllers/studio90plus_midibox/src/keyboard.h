@@ -51,7 +51,7 @@ typedef struct {
    u16 midiPorts;
    u8 midiChannel;
    s16 startNoteNum;
-   s16 transposeOffset;  
+   s16 octaveOffset;  
 } zone_params_t;
 
 typedef struct {

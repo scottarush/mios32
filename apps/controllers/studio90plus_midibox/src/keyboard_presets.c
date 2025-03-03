@@ -226,7 +226,7 @@ s32 PRESETS_StoreAll(void) {
    for (i = 0; i < kc->current_zone_preset.numZones;i++) {
       zone_params_t * zoneParams = &kc->current_zone_preset.zoneParams[i];
       status |= PRESETS_Write16(PRESETS_ADDR_NOTE_NUMBER_ARRAY + i, zoneParams->startNoteNum);
-      status |= PRESETS_Write16(PRESETS_ADDR_TRANSPOSE_ARRAY + i, zoneParams->transposeOffset);
+      status |= PRESETS_Write16(PRESETS_ADDR_OCTAVE_OFFSET_ARRAY + i, zoneParams->octaveOffset);
       status |= PRESETS_Write16(PRESETS_ADDR_MIDI_CHANNELS_ARRAY + i, zoneParams->midiChannel);
       status |= PRESETS_Write16(PRESETS_ADDR_MIDI_PORTS_ARRAY + i, zoneParams->midiPorts);
    }
