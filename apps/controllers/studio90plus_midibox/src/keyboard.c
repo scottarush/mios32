@@ -25,6 +25,7 @@
 #include <string.h>
 
 #include "keyboard.h"
+#include "velocity.h"
 
 #include "keyboard_presets.h"
 
@@ -83,7 +84,6 @@ extern s32 KEYBOARD_NOTIFY_TOGGLE_HOOK(u8 kb, u8 note_number, u8 velocity);
 
 static s32 KEYBOARD_MIDI_SendCtrl(u8 ctrl_number, u8 value);
 static int KEYBOARD_GetVelocity(u16 delay, u16 delay_slowest, u16 delay_fastest);
-
 
 /////////////////////////////////////////////////////////////////////////////
 //! Initialize the keyboard handler
@@ -792,6 +792,7 @@ void KEYBOARD_CopyZonePreset(zone_preset_t* pSource, zone_preset_t* pDest) {
       pDestZoneParams->midiPorts = pSourceZoneParams->midiPorts;
       pDestZoneParams->startNoteNum = pSourceZoneParams->startNoteNum;
       pDestZoneParams->octaveOffset = pSourceZoneParams->octaveOffset;
+      pDestZoneParams->velocityCurve = pSourceZoneParams->velocityCurve;
    }
 }
 
@@ -814,39 +815,26 @@ void KEYBOARD_SetCurrentZonePreset(zone_preset_t* pPreset) {
    // TODO:  send all note offs to avoid a hung not if zone changed while key pressed
 }
 
-
 /////////////////////////////////////////////////////////////////////////////
-// Help function to get MIDI velocity from measured delay
+// Help function to get raw MIDI velocity from measured delay
 /////////////////////////////////////////////////////////////////////////////
 static int KEYBOARD_GetVelocity(u16 delay, u16 delay_slowest, u16 delay_fastest) {
    int velocity = 127;
 
-#if 0
-   // see http://midibox.org/forums/topic/20693-midibox_ng-event-noteon-lost/?do=findComment&comment=180231
-   u16 prev_delay = delay;
-   if (delay < 2 * delay_fastest) {
-      delay = ((delay_slowest - delay_fastest) / (delay_fastest * delay_fastest)) * (delay * delay) - 2 * ((delay_slowest - delay_fastest) / delay_fastest) * delay + delay_slowest;
-   }
-   else {
-      delay = delay_slowest;
-   }
-   DEBUG_MSG("KB Delay %d -> %d\n", prev_delay, delay);
-#endif
-
-   if (delay > delay_fastest) {
+   if (delay > delay_fastest) {      
       // determine velocity depending on delay
       // lineary scaling - here we could also apply a curve table
       velocity = 127 - (((delay - delay_fastest) * 127) / (delay_slowest - delay_fastest));
-
-      // saturate to ensure that range 1..127 won't be exceeded
-      if (velocity < 1)
-         velocity = 1;
+      // saturate to ensure that range 0..127 won't be exceeded
+      if (velocity < 0)
+         velocity = 0;
       if (velocity > 127)
          velocity = 127;
-   }
-
+    }
    return velocity;
 }
+
+
 
 /////////////////////////////////////////////////////////////////////////////
 //! Help function to send a MIDI note over given ports\n
@@ -870,12 +858,14 @@ static s32 KEYBOARD_MIDI_SendNote(u8 note_number, u8 velocity, u8 depressed) {
    }
    // Otherwise decode the zone and send the note
    u16 midiPort = 0;
-   u8 midiChannel = 1;
+   u8 midiChannel = 1;   
    int octaveOffset = 0;
+   velocity_curve_t velocityCurve = VELOCITY_CURVE_LINEAR;
    if (kc->current_zone_preset.numZones == 1) {
       midiPort = kc->current_zone_preset.zoneParams[0].midiPorts;
       midiChannel = kc->current_zone_preset.zoneParams[0].midiChannel;
       octaveOffset = kc->current_zone_preset.zoneParams[0].octaveOffset;
+      velocityCurve = kc->current_zone_preset.zoneParams[0].velocityCurve;
    }
    else {
       // Iterate through the zones to find the correct midiChannel and port on which
@@ -892,6 +882,7 @@ static s32 KEYBOARD_MIDI_SendNote(u8 note_number, u8 velocity, u8 depressed) {
                midiPort = pZoneParams->midiPorts;
                midiChannel = pZoneParams->midiChannel;
                octaveOffset = pZoneParams->octaveOffset;
+               velocityCurve = pZoneParams->velocityCurve;
                break;
             }
          }
@@ -907,6 +898,9 @@ static s32 KEYBOARD_MIDI_SendNote(u8 note_number, u8 velocity, u8 depressed) {
       sent_note = 127;  
    }
 
+   // Look up the velocity from the curve for this zone.
+   int curvedVelocity = VELOCITY_LookupVelocity(velocity,velocityCurve);
+
    // Now send the adjusted note on the found ports and channel
    int i;
    u16 mask = 1;
@@ -916,9 +910,9 @@ static s32 KEYBOARD_MIDI_SendNote(u8 note_number, u8 velocity, u8 depressed) {
          mios32_midi_port_t port = 0x10 + ((i & 0xc) << 2) + (i & 3);
 
          if (depressed && kc->scan_release_velocity)
-            MIOS32_MIDI_SendNoteOff(port, midiChannel - 1, sent_note, velocity);
+            MIOS32_MIDI_SendNoteOff(port, midiChannel - 1, sent_note, curvedVelocity);
          else
-            MIOS32_MIDI_SendNoteOn(port, midiChannel - 1, sent_note, velocity);
+            MIOS32_MIDI_SendNoteOn(port, midiChannel - 1, sent_note, curvedVelocity);
       }
    }
 

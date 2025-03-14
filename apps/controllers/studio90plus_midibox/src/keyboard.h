@@ -1,4 +1,3 @@
-// $Id$
 /*
  * Header file for Keyboard handler
  *
@@ -14,6 +13,8 @@
 #ifndef _KEYBOARD_H
 #define _KEYBOARD_H
 
+
+#include "velocity.h"
 
  /////////////////////////////////////////////////////////////////////////////
  // Global definitions
@@ -52,6 +53,7 @@ typedef struct {
    u8 midiChannel;
    s16 startNoteNum;
    s16 octaveOffset;  
+   velocity_curve_t velocityCurve;
 } zone_params_t;
 
 typedef struct {
