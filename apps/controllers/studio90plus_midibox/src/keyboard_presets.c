@@ -229,6 +229,7 @@ s32 PRESETS_StoreAll(void) {
       status |= PRESETS_Write16(PRESETS_ADDR_OCTAVE_OFFSET_ARRAY + i, zoneParams->octaveOffset);
       status |= PRESETS_Write16(PRESETS_ADDR_MIDI_CHANNELS_ARRAY + i, zoneParams->midiChannel);
       status |= PRESETS_Write16(PRESETS_ADDR_MIDI_PORTS_ARRAY + i, zoneParams->midiPorts);
+      status |= PRESETS_Write16(PRESETS_ADDR_VELOCITY_CURVE_ARRAY + i, zoneParams->velocityCurve);
    }
 
    for (i = 0; i < KEYBOARD_AIN_NUM; ++i) {

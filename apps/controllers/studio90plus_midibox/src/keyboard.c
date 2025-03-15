@@ -193,7 +193,7 @@ s32 KEYBOARD_Init(u32 mode) {
       kc->current_zone_preset.zoneParams[0].midiChannel = 1;
       kc->current_zone_preset.zoneParams[0].startNoteNum = 21;
       kc->current_zone_preset.zoneParams[0].octaveOffset = 0;
-
+      kc->current_zone_preset.zoneParams[0].velocityCurve = VELOCITY_CURVE_CONVEX;
    }
 
    return 0; // no error
@@ -911,8 +911,10 @@ static s32 KEYBOARD_MIDI_SendNote(u8 note_number, u8 velocity, u8 depressed) {
 
          if (depressed && kc->scan_release_velocity)
             MIOS32_MIDI_SendNoteOff(port, midiChannel - 1, sent_note, curvedVelocity);
-         else
+         else{
+            DEBUG_MSG("KEYBOARD_MIDI_SendNote:  '%s': OnVelocity=%d, Curved=%d", VELOCITY_GetVelocityCurveName(velocityCurve), velocity, curvedVelocity);
             MIOS32_MIDI_SendNoteOn(port, midiChannel - 1, sent_note, curvedVelocity);
+         }
       }
    }
 

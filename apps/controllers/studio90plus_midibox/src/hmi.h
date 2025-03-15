@@ -28,10 +28,11 @@
 
 typedef enum pageID_e {
    PAGE_HOME = 0,
-   PAGE_DIALOG = 1,
+   PAGE_SELECT = 1,
    PAGE_SPLIT_LEARNING = 2,
    PAGE_MIDI_CONFIG = 3,
-   PAGE_OCTAVE = 4
+   PAGE_OCTAVE = 4,
+   PAGE_VELOCITY = 5
 } pageID_t;
 
 typedef enum flash_state_e {
@@ -98,7 +99,6 @@ extern void HMI_NotifyUpToggle(switch_state_t state);
 extern void HMI_NotifyBackToggle(switch_state_t state);
 extern void HMI_NotifyEnterToggle(switch_state_t state);
 
-extern void HMI_DialogPage_UpdateDisplay();
 extern void HMI_RenderLine(u8, const char*, renderline_justify_t);
 extern void HMI_ClearLine(u8 lineNum);
 

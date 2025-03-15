@@ -18,11 +18,14 @@ LCD       =     $(MIOS32_LCD)
 # pending future pull into mainline keyboard module.
 THUMB_SOURCE    = src/app.c \
 		  src/switches.c \
-		  src/presets.c \
+		  src/keyboard_presets.c \
 		  src/terminal.c \
 		  src/shell.c \
- 		  src/keyboard.c
-
+ 		  src/keyboard.c \
+		  src/velocity.c\
+		  src/hmi.c \
+		  src/persist.c
+		  
 # (following source stubs not relevant for Cortex M3 derivatives)
 THUMB_AS_SOURCE =
 ARM_SOURCE      =
@@ -40,6 +43,9 @@ LIBS =
 
 LD_FILE   = 	$(MIOS32_PATH)/etc/ld/$(FAMILY)/$(PROCESSOR).ld
 PROJECT   = 	studio90_plus_mbkb
+
+# Can't force a project output directory to work.   
+#PROJECT_OUT = ~/midibox/build_output/$(PROJECT)
 
 DEBUG     =	-g
 OPTIMIZE  =	-Os

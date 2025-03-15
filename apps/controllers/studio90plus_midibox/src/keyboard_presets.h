@@ -88,6 +88,7 @@
 #define PRESETS_ADDR_OCTAVE_OFFSET_ARRAY       0x5D // 0x5d to 0x0x61
 #define PRESETS_ADDR_MIDI_CHANNELS_ARRAY         0x62 // 0x62 to 0x65
 #define PRESETS_ADDR_MIDI_PORTS_ARRAY            0x65 // 0x65 to 0x68
+#define PRESETS_ADDR_VELOCITY_CURVE_ARRAY        0x69  // 0x69 to 0x7d
 
 #define PRESETS_ADDR_CALIDATA_BEGIN  0x70 // 128 halfwords (=256 bytes)
 #define PRESETS_ADDR_CALIDATA_END    0xEF
