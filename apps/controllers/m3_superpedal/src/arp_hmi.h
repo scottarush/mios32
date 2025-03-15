@@ -11,6 +11,8 @@
 #define _ARP_HMI_H
 
 
+#include "indicators.h"
+
 /////////////////////////////////////////////////////////////////////////////
 // Global definitions
 /////////////////////////////////////////////////////////////////////////////
@@ -40,11 +42,12 @@ typedef struct persisted_arp_hmi_data_s {
 
 extern s32 ARP_HMI_Init(u8);
 
-extern void ARP_HMI_UpdateArpStompIndicator();
-extern void ARP_HMI_UpdateChordIndicators();
+extern void ARP_HMI_UpdateArpStompIndicator(indicator_id_t indicator);
+extern void ARP_HMI_UpdateChordStompIndicator(indicator_id_t);
 
 extern void ARP_HMI_ARPSettings_UpdateDisplay();
 extern void ARP_HMI_HandleArpToeToggle(u8, u8);
+extern void ARP_HMI_HandleChordToeToggle(u8 toeNum, u8 pressed);
 extern s32 ARP_HMI_PersistData();
 extern void ARP_HMI_ARPSettingsPage_RotaryEncoderChanged(s8 increment);
 extern void ARP_HMI_ARPSettingsPage_RotaryEncoderSelected();

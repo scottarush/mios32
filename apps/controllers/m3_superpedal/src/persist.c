@@ -14,7 +14,6 @@
 #include "persist.h"
 
 
-#include "midi_presets.h"
 #include "pedals.h"
 #include "hmi.h" 
 #include "arp.h"
@@ -29,8 +28,7 @@
 // Address for the blocks.  All in 16-bit word size
 
 #define MIDI_ROUTER_START_ADDR 0
-#define MIDI_PRESETS_START_ADDR (MIDI_ROUTER_START_ADDR+(MIDI_ROUTER_NUM_NODES*4))
-#define HMI_START_ADDR (MIDI_PRESETS_START_ADDR+sizeof(persisted_midi_presets_t)/2)
+#define HMI_START_ADDR (MIDI_ROUTER_START_ADDR+(MIDI_ROUTER_NUM_NODES*4))
 #define PEDALS_START_ADDR (HMI_START_ADDR+sizeof(persisted_hmi_settings_t)/2)
 #define ARP_START_ADDR (PEDALS_START_ADDR+sizeof(persisted_pedal_confg_t)/2)
 #define ARP_HMI_START_ADDR (ARP_START_ADDR+sizeof(persisted_arp_data_t)/2)
@@ -66,7 +64,6 @@ s32 PERSIST_Init(u32 mode) {
    else if (mode > 0) {
       // E2 just got reformatted, re-init all the settings to their defaults
       PERSIST_StoreMIDIRouter();
-      MIDI_PRESETS_Init(1);
       HMI_Init(1);
       PEDALS_Init(1);
       ARP_Init(1);
@@ -191,9 +188,6 @@ s32 PERSIST_StoreBlock(persist_block_t blockType, const unsigned char* pData, u1
 u16 PERSIST_GetStartAddress(persist_block_t blockType) {
    u16 startAddress = 0;
    switch (blockType) {
-   case PERSIST_MIDI_PRESETS_BLOCK:
-      startAddress = MIDI_PRESETS_START_ADDR;
-      break;
    case PERSIST_HMI_BLOCK:
       startAddress = HMI_START_ADDR;
       break;

@@ -41,22 +41,32 @@
 // ARP-HMI specific Switch types and non-persisted variables
 //----------------------------------------------------------------------------
 
-// Total list of functions availabe in ARP Live mode.  Note that toe switches 7 and 8 are
-// dedicated to Octave decrement/increment respectively
-typedef enum arp_live_toe_functions_e {
+// Toe functions in ARP settings mode.  Note that toe switches 7 and 8 are
+// dedicated to Octave decrement/increment 
+typedef enum arp_settings_toe_functions_e {
    ARP_TOE_SELECT_KEY = 1,
    ARP_TOE_SELECT_MODE_SCALE = 2,
    ARP_TOE_DECREMENT_TEMPO = 3,
-   ARP_TOE_INCREMENT_TEMPO = 4,
-   // 5 is unused
-   ARP_TOE_SET_ARP_MODE = 6
-} arp_live_toe_functions_t;
+   ARP_TOE_INCREMENT_TEMPO = 4
+   // 5 and 6 are unused
+} arp_settings_toe_functions_t;
 
 
 typedef enum arp_settings_entries_e {
    ARP_SETTINGS_MIDI_CHANNEL = 0,
    ARP_SETTINGS_CLOCK_MODE = 1
 } arp_settings_entries_t;
+
+
+// Toe functions in Chord mode.  Note that toe switches 7 and 8 are
+// dedicated to Octave decrement/increment 
+typedef enum chord_settings_toe_functions_e {
+   CHORD_TOE_SELECT_KEY = 1,
+   CHORD_TOE_SELECT_MODE_SCALE = 2
+   // 3 & 4 are decement and increment common with ARP mode
+   // 5 and 6 are unused
+} chord_settings_toe_functions_t;
+
 
 const char* arpSettingsPageEntryTitles[] = { "Set Midi Out Channel","Set Clock Mode" };
 #define ARP_SETTINGS_PAGE_NUM_ENTRIES 2
@@ -297,9 +307,9 @@ const char* ARP_HMI_GetClockModeText(arp_clock_mode_t mode) {
 /////////////////////////////////////////////////////////////////////////////
 // Updates the state of the arp stomp indicator
 /////////////////////////////////////////////////////////////////////////////
-void ARP_HMI_UpdateArpStompIndicator() {
+void ARP_HMI_UpdateArpStompIndicator(indicator_id_t indicator) {
    indicator_color_t color = IND_COLOR_RED;
-   // Arp not running so set indicator to Green or Yellow for ARP vs. PAD
+   // Set indicator to Green if running, Red if stopped, Yellow if not in Arp mode (this is an error)
    switch (ARP_GetArpMode()) {
    case ARP_MODE_CHORD_ARP:
       // In chord mode, 
@@ -314,22 +324,49 @@ void ARP_HMI_UpdateArpStompIndicator() {
       }
       break;
    case ARP_MODE_CHORD_PAD:
-      // Pad mode is solid yellow when enabled
-      if (ARP_GetEnabled()) {
-         color = IND_COLOR_YELLOW;
-      }
-      else {
-         // Green when not.
-         color = IND_COLOR_GREEN;
-      }
+      // This is an error as chord pad has a different stomp
+      color = IND_COLOR_YELLOW;
       break;
    case ARP_MODE_KEYS:
       // TODO - Find another color for Keys
     //  color = IND_COLOR_RED;
       break;
    }
-   IND_SetIndicatorColor(IND_STOMP_4, color);
-   IND_SetIndicatorState(IND_STOMP_4, IND_ON, 100, IND_RAMP_NONE);
+
+   IND_SetIndicatorColor(indicator, color);
+   IND_SetIndicatorState(indicator, IND_ON, 100, IND_RAMP_NONE);
+}
+/////////////////////////////////////////////////////////////////////////////
+// Updates the state of the chord stomp indicator
+/////////////////////////////////////////////////////////////////////////////
+void ARP_HMI_UpdateChordStompIndicator(indicator_id_t indicator) {
+   indicator_color_t color = IND_COLOR_RED;
+   // Set chord stomp indicator to Red if running, green if pad mode
+   // yellow if arp not in chord mode (this is an error as Chord mode should already have been enabled)
+   switch (ARP_GetArpMode()) {
+   case ARP_MODE_CHORD_PAD:
+      // In chord mode, 
+      if (ARP_GetEnabled()) {
+         // Red for arpeggiator running
+         // TODO - Flash it in synch with BPM.
+         color = IND_COLOR_RED;
+      }
+      else {
+         // Chord mode,  not running so show green
+         color = IND_COLOR_GREEN;
+      }
+      break;
+   case ARP_MODE_CHORD_ARP:
+     // This is an error as are mode has a different stomp
+     color = IND_COLOR_YELLOW;
+     break;
+   case ARP_MODE_KEYS:
+      // TODO - Find another color for Keys
+    //  color = IND_COLOR_RED;
+      break;
+   }
+   IND_SetIndicatorColor(indicator, color);
+   IND_SetIndicatorState(indicator, IND_ON, 100, IND_RAMP_NONE);
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -380,23 +417,66 @@ void ARP_HMI_HandleArpToeToggle(u8 toeNum, u8 pressed) {
       // Flash the indicator for confirmation
       IND_SetTempIndicatorState(toeNum, IND_FLASH_FAST, IND_TEMP_FLASH_STATE_DEFAULT_DURATION, IND_OFF, 100);
       break;
-   case ARP_TOE_SET_ARP_MODE:
-      indicator_states_t targetState = IND_ON;
-      switch (ARP_GetArpMode()) {
-      case ARP_MODE_CHORD_ARP:
-         ARP_SetArpMode(ARP_MODE_CHORD_PAD);
-         break;
-      case ARP_MODE_CHORD_PAD:
-         ARP_SetArpMode(ARP_MODE_CHORD_ARP);
-         targetState = IND_FLASH_SLOW;
-         break;
-         // TODO - Add in arp mode keys someday
-      }
-      // Flash the indicator for confirmation.  
-      IND_SetTempIndicatorState(toeNum, IND_FLASH_FAST, IND_TEMP_FLASH_STATE_DEFAULT_DURATION, targetState, 100);
-      // Also update the stomp indicator
-      ARP_HMI_UpdateArpStompIndicator();
+   default:
+      // Ignore unused to switches
+      return;
+      
+   }
+   // Update the current display to reflect any content change
+   pCurrentPage->pUpdateDisplayCallback();
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// Helper to handle Chord toe toggle. 
+/////////////////////////////////////////////////////////////////////////////
+void ARP_HMI_HandleChordToeToggle(u8 toeNum, u8 pressed) {
+   u16 bpm;
+   switch (toeNum) {
+   case CHORD_TOE_SELECT_KEY:
+      /// Go to the dialog page
+      snprintf(dialogPageTitle, DISPLAY_CHAR_WIDTH + 1, "%s", "Set CHD ROOT KEY");
+      snprintf(dialogPageMessage1, DISPLAY_CHAR_WIDTH + 1, "%s", "Press Pedal to");
+      snprintf(dialogPageMessage2, DISPLAY_CHAR_WIDTH + 1, "%s", "Select Key");
+      dialogPage.pBackPage = pCurrentPage;
+      pCurrentPage = &dialogPage;
+      pCurrentPage->pUpdateDisplayCallback();
+
+      // Flash the indicators
+      IND_FlashAll(0);
+      // Set the pedal callback to get the selected root key
+      PEDALS_SetSelectPedalCallback(&ARP_HMI_SelectRootKeyCallback);
       break;
+   case CHORD_TOE_SELECT_MODE_SCALE:
+      // Go to the dialog page
+      snprintf(dialogPageTitle, DISPLAY_CHAR_WIDTH + 1, "%s", "SET CHD MODAL SCALE");
+      snprintf(dialogPageMessage1, DISPLAY_CHAR_WIDTH + 1, "%s", "Press Brown Pedal to");
+      snprintf(dialogPageMessage2, DISPLAY_CHAR_WIDTH + 1, "%s", "Select Mode");
+      dialogPage.pBackPage = pCurrentPage;
+      pCurrentPage = &dialogPage;
+      pCurrentPage->pUpdateDisplayCallback();
+
+      IND_FlashAll(0);
+
+      // Set the pedal callback to get the selected root key
+      PEDALS_SetSelectPedalCallback(&ARP_HMI_SelectModeScaleCallback);
+      break;
+   case ARP_TOE_INCREMENT_TEMPO:
+      bpm = ARP_GetBPM();
+      bpm += TEMPO_CHANGE_STEP;
+      ARP_SetBPM(bpm);
+      // Flash the indicator for confirmation
+      IND_SetTempIndicatorState(toeNum, IND_FLASH_FAST, IND_TEMP_FLASH_STATE_DEFAULT_DURATION, IND_OFF, 100);
+      break;
+   case ARP_TOE_DECREMENT_TEMPO:
+      bpm = ARP_GetBPM();
+      bpm -= TEMPO_CHANGE_STEP;
+      ARP_SetBPM(bpm);
+      // Flash the indicator for confirmation
+      IND_SetTempIndicatorState(toeNum, IND_FLASH_FAST, IND_TEMP_FLASH_STATE_DEFAULT_DURATION, IND_OFF, 100);
+      break;
+   default:
+      // Ignore unused to switches
+      return;
    }
    // Update the current display to reflect any content change
    pCurrentPage->pUpdateDisplayCallback();

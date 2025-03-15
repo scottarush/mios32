@@ -396,6 +396,32 @@ void PEDALS_SetVolume(u8 volumeLevel) {
 }
 
 /////////////////////////////////////////////////////////////////////////////
+// API to get the current midi channel
+// channel from 1 to 16
+/////////////////////////////////////////////////////////////////////////////
+u8 PEDALS_GetMIDIChannel() {
+   return pedal_config.midi_chn;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// API to set the current midi channel
+// The E2 block will be updated automatically on change.
+// channel from 1 to 16
+/////////////////////////////////////////////////////////////////////////////
+void PEDALS_SetMIDIChannel(s8 channel) {
+   if (pedal_config.midi_chn != channel) {
+      if (channel < 1){
+         channel = 1;
+      }
+      else if (channel > 16){
+         channel = 16;
+      }
+      pedal_config.midi_chn = channel;
+      PEDALS_PersistData();
+   }
+}
+
+/////////////////////////////////////////////////////////////////////////////
 // API to get the current volume level
 // volume:  volume scaling level from 1 to PEDALS_MAX_VOLUME
 /////////////////////////////////////////////////////////////////////////////

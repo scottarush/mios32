@@ -28,12 +28,9 @@
 
 typedef enum pageID_e {
    PAGE_HOME = 0,
-   PAGE_EDIT_VOICE_PRESET = 1,
-   PAGE_EDIT_PATTERN_PRESET = 2,
-   PAGE_MIDI_PROGRAM_SELECT = 3,
-   PAGE_ARP_SETTINGS = 4,
-   PAGE_ARP_PATTERN_SELECT = 5,
-   PAGE_DIALOG = 6,
+   PAGE_ARP_SETTINGS = 1,
+   PAGE_ARP_PATTERN_SELECT = 2,
+   PAGE_DIALOG = 3,
 } pageID_t;
 
 struct page_s {
@@ -48,21 +45,22 @@ struct page_s {
 };
 
 
-// Following type is used as an array index so must be 0 based and consecutive
+// Following type defines stomp switch functions from left=0 to right=4.
+// These are also indexes and must be consecutive.
 typedef enum {
-   STOMP_SWITCH_OCTAVE_VOLUME = 0,
-   STOMP_SWITCH_ARPEGGIATOR = 1,
-   STOMP_SWITCH_VOICE_PRESETS = 2,
-   STOMP_SWITCH_PATTERN_PRESETS = 3,
-   STOMP_SWITCH_UNUSED = 4
+   STOMP_SWITCH_VOLUME = 0,
+   STOMP_SWITCH_CHORD = 1,
+   STOMP_SWITCH_MIDI_CHANNEL = 2,
+   STOMP_SWITCH_ARPEGGIATOR = 3,
+   STOMP_SWITCH_OCTAVE = 4,
 } stomp_switch_setting_t;
 
 typedef enum toeSwitchMode_e {
    TOE_SWITCH_OCTAVE = 0,
    TOE_SWITCH_VOLUME = 1,
-   TOE_SWITCH_VOICE_PRESETS = 2,
-   TOE_SWITCH_PATTERN_PRESETS = 3,
-   TOE_SWITCH_ARP = 4,
+   TOE_SWITCH_CHORD = 2,
+   TOE_SWITCH_ARP = 3,
+   TOE_SWITCH_MIDI_CHANNEL = 4
 } toeSwitchMode_t;
 #define NUM_TOE_SWITCH_MODES 5
 
@@ -77,7 +75,6 @@ typedef enum renderline_justify_e {
 //----------------------------------------------------------------------------
 // Export Global Display page variables
 //----------------------------------------------------------------------------
-extern struct page_s midiProgramSelectPage;
 extern struct page_s homePage;
 extern struct page_s dialogPage;
 extern struct page_s* pCurrentPage;
@@ -103,23 +100,6 @@ typedef struct {
    // The current mode of the toe switches
    toeSwitchMode_t toeSwitchMode;
 
-   u8 numToeSwitchGenMIDIPresetBanks;
-
-   // Banks start at 1.
-   u8 currentToeSwitchGenMIDIPresetBank;
-   
-   // presetNumbers for toe switch gen MIDI presets. 0 is unset
-   u8 toeSwitchVoicePresetNumbers[NUM_TOE_GEN_MIDI_PRESET_BANKS][NUM_TOE_PRESETS_PER_BANK];
-
-   // Last selected MIDI preset program number in the assignment dialog
-   u8 lastSelectedMIDIProgNumber;
-
-   // Midi output to be used for preset editing
-   u8 lastSelectedMidiOutput;
-
-   // Midi channel to be used for preset editing
-   u8 lastSelectedMidiChannel;
-
    // stomp switch settings
    stomp_switch_setting_t stompSwitchSetting[NUM_STOMP_SWITCHES];
 
@@ -141,6 +121,7 @@ extern void HMI_DialogPage_UpdateDisplay();
 extern void HMI_UpdateIndicators();
 extern void HMI_RenderLine(u8, const char*, renderline_justify_t);
 extern void HMI_ClearLine(u8 lineNum);
+
 
 /////////////////////////////////////////////////////////////////////////////
 // Export global variables

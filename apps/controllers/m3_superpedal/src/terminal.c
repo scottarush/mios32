@@ -29,7 +29,6 @@
 #include "terminal.h"
 #include "pedals.h"
 #include "hmi.h"
-#include "midi_presets.h"
 #include "arp.h"
 #include "arp_hmi.h"
 
@@ -83,7 +82,7 @@ s32 TERMINAL_Init(u32 mode)
    return 0; // no error
 }
 
-
+/**
 /////////////////////////////////////////////////////////////////////////////
 // help function which parses a decimal or hex value
 // returns >= 0 if value is valid
@@ -102,7 +101,7 @@ static s32 get_dec(char* word)
 
    return l; // value is valid
 }
-
+**/
 
 /////////////////////////////////////////////////////////////////////////////
 // help function which parses for on or off
@@ -290,7 +289,6 @@ s32 TERMINAL_ParseLine(char* input, void* _output_function)
       }
       else if (strcmp(parameter, "reinit") == 0) {
          out("Re-Initing MIDI_PRESETS, HMI, PEDALS, & ARP");
-         MIDI_PRESETS_Init(0);
          HMI_Init(0);
          PEDALS_Init(0);
          ARP_Init(0);

@@ -39,7 +39,6 @@
 #include "hmi.h"
 #include "pedals.h"
 #include "indicators.h"
-#include "midi_presets.h"
 #include "persist.h"
 
 #include "seq.h"
@@ -179,9 +178,6 @@ void APP_Init(void) {
 
    // init the indicators
    IND_Init();
-
-   // Init the MIDI Presets.  Read settings from E2
-   MIDI_PRESETS_Init(0);
 
    // init the HMI last as it depends on above.
    HMI_Init(0);

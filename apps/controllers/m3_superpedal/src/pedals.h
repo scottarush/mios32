@@ -72,6 +72,8 @@ extern void PEDALS_SetOctave(s8 octave);
 extern s8 PEDALS_GetOctave();
 extern u8 PEDALS_GetVolume();
 extern void PEDALS_SetVolume(u8 volumeLevel);
+extern u8 PEDALS_GetMIDIChannel();
+extern void PEDALS_SetMIDIChannel(s8 channel);
 
 extern u8 PEDALS_ScaleVelocity(u8 velocity,u8 volumeLevel);
 
