@@ -23,6 +23,8 @@
 /////////////////////////////////////////////////////////////////////////////
 // Global Types
 typedef enum arp_mode_e {
+   // Arp mode off.  Notes will be played
+   ARP_MODE_OFF = 0,
    // Arppegiates from multiple press keys.  Not very usable with pedal board
    ARP_MODE_KEYS = 1,
    // arpeggiates a chord from single root note key/pedal press
@@ -44,17 +46,12 @@ typedef struct persisted_arp_data_s {
    u32 serializationID;
    arp_mode_t arpMode;
    u8 arpPatternIndex;
-   u16 midi_ports;
-   u8 midiChannel;
    arp_clock_mode_t clockMode;
    key_t rootKey;
    scale_t modeScale;
    chord_extension_t chordExtension;
    int ppqn;
    double bpm;
-   // Synch delay in 1/4 note beats.  Used to delay a pattern buffer update to allow
-   // for enough time to transition keys/pedals seamlessly 
-   u8 synchDelay;
 } persisted_arp_data_t;
 
 
@@ -72,6 +69,8 @@ extern s32 ARP_NotifyNewNote(notestack_t *n);
 
 extern s32 ARP_NotifyNoteOn(u8 note, u8 velocity);
 extern s32 ARP_NotifyNoteOff(u8 note,u8 velocity);
+
+extern s32 ARP_PlayOffEvents(void);
 
 extern void ARP_SetArpMode(arp_mode_t mode);
 extern const arp_mode_t ARP_GetArpMode();
@@ -93,10 +92,6 @@ extern scale_t ARP_GetModeScale();
 
 extern arp_clock_mode_t ARP_GetClockMode();
 extern void ARP_SetClockMode(arp_clock_mode_t mode);
-
-extern void ARP_SetMIDIChannel(u8 channel);
-extern u8 ARP_GetMIDIChannel();
-
 extern s32 ARP_PersistData();
 /////////////////////////////////////////////////////////////////////////////
 // Export global variables

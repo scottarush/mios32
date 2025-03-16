@@ -18,6 +18,7 @@
 #include <mios32.h>
 #include <string.h>
 
+#include "pedals.h"
 #include "arp_pattern.h"
 #include "arp_pattern_data.h"
 #include "seq_chord.h"
@@ -54,8 +55,6 @@ static step_note_t patternBuffer[MAX_NUM_STEPS][MAX_NUM_NOTES_PER_STEP];
 static u8 stepCounter;
 static u8 localPatternIndex;
 
-static u8 updatePatternBufferCount;
-
 /////////////////////////////////////////////////////////////////////////////
 // Local prototypes
 /////////////////////////////////////////////////////////////////////////////
@@ -74,7 +73,6 @@ s32 ARP_PAT_Init()
 
    localPatternIndex = ARP_GetARPSettings()->arpPatternIndex;
 
-   updatePatternBufferCount = 0;
    return 0; // no error
 }
 
@@ -90,7 +88,7 @@ s32 ARP_PAT_SetCurrentPattern(u8 _patternIndex) {
    // Persist the pattern change
    ARP_GetARPSettings()->arpPatternIndex = localPatternIndex;
    ARP_PersistData();
-   DEBUG_MSG("ARP_PAT_SetCurrentPattern:  Set pattern:%d read pattern: %d",localPatternIndex,ARP_GetARPSettings()->arpPatternIndex);
+   DEBUG_MSG("ARP_PAT_SetCurrentPattern:  Set pattern:%d read pattern: %d", localPatternIndex, ARP_GetARPSettings()->arpPatternIndex);
    return 0;
 }
 ////////////////////////////////////////////////////////////////////////////
@@ -137,92 +135,112 @@ void ARP_PAT_ClearPatternBuffer() {
 
 /////////////////////////////////////////////////////////////////////////////
 // Called on a key press.  Up to MAX_NUM_KEYS may be added.
-// Returns 0 for not consumed or too many keys, 1 for consumed
+// returns 1 if note consumed, 0 if not.
 /////////////////////////////////////////////////////////////////////////////
-s32 ARP_PAT_KeyPressed(u8 note, u8 velocity) {
-   //-- If we are in chord mode then clear the notestack and push a new chord into
-   // the stack
-   if (ARP_GetARPSettings()->arpMode == ARP_MODE_CHORD_ARP) {
-      // Clear notestack
-      NOTESTACK_Clear(&notestack);
-      // set the update flag so that it gets updated after the next synch point
-      updatePatternBufferCount = ARP_GetARPSettings()->synchDelay;
-
-      // Fill the note stack with the the keys of the chord as k1...k#notes to the stack.  
-      //  This is the same as pressing all the keys.  The stack will be processed at the next
-      // synch point.
-      persisted_arp_data_t* pArpSettings = ARP_GetARPSettings();
-      const chord_type_t chord = ARP_MODES_GetModeChord(pArpSettings->modeScale,
-         pArpSettings->chordExtension, pArpSettings->rootKey, note);
-      // Compute octave by subtracting C-2 (note 24)
-      s8 octave = ((note - 24) / 12) - 2;
-
-      // Now put the notes of the chord into the pattern buffer at the chordNoteVelocity
-      u8 numChordNotes = SEQ_CHORD_GetNumNotesByEnum(chord);
-
-      for (u8 keyNum = 0;keyNum < numChordNotes;keyNum++) {
-         s32 chordNote = SEQ_CHORD_NoteGetByEnum(keyNum, chord, octave);
-         // Add offset from the root note
-         chordNote += (note % 12);
-
-         NOTESTACK_Push(&notestack, chordNote, velocity);
+s32 ARP_PAT_KeyPressed(u8 rootNote, u8 velocity) {
+   s32 handled = 1;
+   if (notestack.len > 0) {
+      if (rootNote != notestack.note_items[0].note) {
+         // Change of note, so turn off any keys that were on
+         ARP_PlayOffEvents();
       }
    }
-   else {
-      // Not in chord mode so just push the note
-      NOTESTACK_Push(&notestack, note, velocity);
 
-      // if the push was a different note that exceeded the max number of keys, then pop it and return error
-      if (NOTESTACK_CountActiveNotes(&notestack) > MAX_NUM_KEYS) {
-         NOTESTACK_Pop(&notestack, note);
-         return 0;
-      }
-      // And update the pattern buffer immediately
+   if (ARP_GetArpMode() == ARP_MODE_CHORD_ARP) {
+      // Reset the arp so we move smoothly from key to key.  This will also clear the notestack
+      ARP_Reset();
+
+      // Re-fill it with the notes for the new root.  If not in the chord then handled will change
+      // to zero
+      handled = ARP_PAT_FillChordNotestack(&notestack, rootNote, velocity);
+
+      // update the pattern buffer 
       ARP_PAT_UpdatePatternBuffer();
-   }
-   return 1; // note consumed
 
+   }
+   return handled;
 }
 /////////////////////////////////////////////////////////////////////////////
-// Called on a key release. 
-// returns 0 not consumed, 1 consumed
+// Helper function looks up the chord and fills the supplied notetstack
+// Defined as a global helper also used to fill manually played cords when the
+// ARP is not running.
+// returns 1 if valid chord play, 0 if not a valid root for current mode/scale
 /////////////////////////////////////////////////////////////////////////////
-s32 ARP_PAT_KeyReleased(u8 note, u8 velocity) {
+s32 ARP_PAT_FillChordNotestack(notestack_t* pNotestack, u8 rootNote, u8 velocity) {
+   // Fill the note stack with the the keys of the chord as k1...k#notes to the stack.  
+     //  This is the same as pressing all the keys.  The stack will be processed at the next
+     // synch point.
+   persisted_arp_data_t* pArpSettings = ARP_GetARPSettings();
+   const chord_type_t chord = ARP_MODES_GetModeChord(pArpSettings->modeScale,
+      pArpSettings->chordExtension, pArpSettings->rootKey, rootNote);
+   // Compute octave by subtracting C-2 (note 24)
+   s8 octave = ((rootNote - 24) / 12) - 2;
 
-   u8 cleared = 0;
-   if (ARP_GetARPSettings()->arpMode == ARP_MODE_CHORD_ARP) {
-      // Check if the release key is the root in the notestack
-      if (notestack_items[0].note == note) {
-         // Same note so clear notestack and fall through to update pattern buffer (which
-         // will just clear it out and reset step counter.
-         NOTESTACK_Clear(&notestack);
-         cleared = 1;
-         // set the update buffer pending flag so that it gets updated after the next
-         // synch point in ARP_PAT_Tick
-         updatePatternBufferCount = ARP_GetARPSettings()->synchDelay;
-      }
+   // Now put the notes of the chord into the pattern buffer at the chordNoteVelocity
+   u8 numChordNotes = SEQ_CHORD_GetNumNotesByEnum(chord);
+#ifdef DEBUG
+   // DEBUG_MSG("ARP_FillChordPadNoteStack: Pushing chord: %s, chordPlayedNote=%d octave=%d numChordNotes=%d",
+     //  SEQ_CHORD_NameGetByEnum(chord), rootNote, octave, numChordNotes);
+#endif   
+   for (u8 keyNum = 0;keyNum < numChordNotes;keyNum++) {
+      s32 chordNote = SEQ_CHORD_NoteGetByEnum(keyNum, chord, octave);
+      // Add offset from the root note
+      chordNote += (rootNote % 12);
+
+      NOTESTACK_Push(pNotestack, chordNote, velocity);
    }
-   if (!cleared) {
-      // Not the root or we are in key mode so remove the note
+
+   // if the push was a different note that exceeded the max number of keys, then pop it and return 
+   // it was pulled from notestack in error
+   if (NOTESTACK_CountActiveNotes(&notestack) > MAX_NUM_KEYS) {
+      NOTESTACK_Pop(pNotestack, rootNote);
+   }
+#ifdef DEBUG
+   DEBUG_MSG("ARP_PAT_FillChordNotestack");
+   NOTESTACK_SendDebugMessage(pNotestack);
+#endif
+   return (pNotestack->len > 0);
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+// Called on a key release. 
+// Always consumes the note
+/////////////////////////////////////////////////////////////////////////////
+void ARP_PAT_KeyReleased(u8 note, u8 velocity) {
+
+   switch (ARP_GetArpMode()) {
+   case ARP_MODE_CHORD_ARP:
+      // Clear the Notestack and the pattern buffer
+      NOTESTACK_Clear(&notestack);
+      ARP_PAT_ClearPatternBuffer();
+      // And send all notes off
+      ARP_PlayOffEvents();
+      break;
+   case ARP_MODE_KEYS:
+      // Not the root or we are in key mode so just remove the note
       NOTESTACK_Pop(&notestack, note);
-      // Update the pattern buffer immediately if we didn't clear
+      // And update the pattern buffer.
       ARP_PAT_UpdatePatternBuffer();
+      break;
+   default:
+      // Fall through to send off on this note
    }
 
-   // Send the note off just in case to avoid a stuck on note.  During edge-case transitions between 
+   // Send the note off in case it wasn't actually in the notestack or during edge-case transitions between 
    // notes and into/out of ARP mode, an On can be sent, so we need to send an off
    int i;
    u16 mask = 1;
-   u8 midiChannel = ARP_GetARPSettings()->midiChannel;
+   u8 midiChannel = PEDALS_GetMIDIChannel() - 1;
+   mios32_midi_port_t ports = PEDALS_GetMIDIPorts();
+
    for (i = 0; i < 16; ++i, mask <<= 1) {
-      if (ARP_GetARPSettings()->midi_ports & mask) {
+      if (ports & mask) {
          // USB0/1/2/3, UART0/1/2/3, IIC0/1/2/3, OSC0/1/2/3
          mios32_midi_port_t port = 0x10 + ((i & 0xc) << 2) + (i & 3);
          MIOS32_MIDI_SendNoteOff(port, midiChannel, note, velocity);
       }
    }
-
-   return 1;   // note consumed
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -259,13 +277,14 @@ void ARP_PAT_Reset() {
    stepCounter = 0;
    ARP_PAT_ClearPatternBuffer();
    SEQ_MIDI_OUT_FlushQueue();
+   // And reset the tick so that we can quickly get to the next note
+   SEQ_BPM_TickSet(0);
 }
 /////////////////////////////////////////////////////////////////////////////
 // Forward from ARP_Tick when in pattern mode for each tick.  This function will output
 // notes from the pattern buffer to the sequenceer
 /////////////////////////////////////////////////////////////////////////////
-s32 ARP_PAT_Tick(u32 bpm_tick)
-{
+s32 ARP_PAT_Tick(u32 bpm_tick) {
    // whenever we reach a new 16th note (96 ticks @384 ppqn):
    if ((bpm_tick % (SEQ_BPM_PPQN_Get() / 4)) == 0) {
       // ensure that arp is reset on first bpm_tick
@@ -281,18 +300,6 @@ s32 ARP_PAT_Tick(u32 bpm_tick)
             // Reset the step counter
             stepCounter = 0;
 
-         }
-      }
-      // Check if there is an update pattern buffer pending (count > 0) and count down
-      // 1/4-note beat synch points until it expires then update the buffer
-      if (updatePatternBufferCount > 0) {
-         // Check if we are at the 1/4 beat synch point
-         if ((bpm_tick % (SEQ_BPM_PPQN_Get() / 16)) == 0) {
-            // If so, then decrement the count
-            updatePatternBufferCount--;
-            if (updatePatternBufferCount == 0){
-              ARP_PAT_UpdatePatternBuffer();
-            }
          }
       }
 
@@ -311,15 +318,17 @@ s32 ARP_PAT_Tick(u32 bpm_tick)
                midi_package.event = NoteOn;
                // For some reason SEQ_MIDI_OUT is 0 based midiChannel but ARPSettings is 1...16 
                // so subtract 1.
-               midi_package.chn = ARP_GetARPSettings()->midiChannel - 1;
+               midi_package.chn = PEDALS_GetMIDIChannel() - 1;
                midi_package.note = note;
                midi_package.velocity = velocity;
+
+               mios32_midi_port_t ports = PEDALS_GetMIDIPorts();
 
                // Play on the enabled ports.
                int i;
                u16 mask = 1;
                for (i = 0; i < 16; ++i, mask <<= 1) {
-                  if (ARP_GetARPSettings()->midi_ports & mask) {
+                  if (ports & mask) {
                      // USB0/1/2/3, UART0/1/2/3, IIC0/1/2/3, OSC0/1/2/3
                      mios32_midi_port_t port = 0x10 + ((i & 0xc) << 2) + (i & 3);
 
@@ -354,7 +363,7 @@ void ARP_PAT_UpdatePatternBuffer() {
    // has coherent data.
    MUTEX_PATTERN_BUFFER_TAKE
 
-      // At least one note in the notestack so refill it
+      // At least one note in the notestack so refill the buffer
       const arp_pattern_t* pPattern = &patterns[localPatternIndex];
    u32 stepPPQN = SEQ_BPM_PPQN_Get() / 4;
 
@@ -365,40 +374,18 @@ void ARP_PAT_UpdatePatternBuffer() {
          // TODO
          break;
       case CHORD:
-         // Get the key for the root of the chord.  Make sure that the 
-         // key number in the pattern doesn't exceed the notestack len
-         if (notestack.len >= pEvent->keySelect) {
-            u8 chordNote = notestack.note_items[pEvent->keySelect - 1].note;
-            u8 chordNoteVelocity = notestack.note_items[pEvent->keySelect - 1].tag;
-
-            // Lookup the chord notes from the root in k1 and the current modeScale setting
-            // and load them into the pattern buffer.           
-            persisted_arp_data_t* pArpSettings = ARP_GetARPSettings();
-            const chord_type_t chord = ARP_MODES_GetModeChord(pArpSettings->modeScale,
-               pArpSettings->chordExtension, pArpSettings->rootKey, chordNote);
-            // Compute octave by subtracting C-2 (note 24)
-            s8 octave = ((chordNote - 24) / 12) - 2;
-            // adjust octave by the delta in the event
-            octave += pEvent->octave;
-            // Add offset from the root note
-            chordNote += (chordNote % 12);
-            // Now put the notes of the chord into the pattern buffer at the chordNoteVelocity
-            u8 numChordNotes = SEQ_CHORD_GetNumNotesByEnum(chord);
-#ifdef DEBUG
-            //            DEBUG_MSG("ARP_PAT_UpdatePatternBuffer.CHORD: Adding notes @ step:%d k#:%d chord:%s, root=%d oct=%d #notes=%d",
-              //             step, pEvent->keySelect, SEQ_CHORD_NameGetByEnum(chord), chordNote, octave, numChordNotes);
-#endif                  
-            for (u8 keyNum = 0;keyNum < numChordNotes;keyNum++) {
-               s32 note = SEQ_CHORD_NoteGetByEnum(keyNum, chord, octave);
-               step_note_t* pNote = &patternBuffer[step][keyNum];
-               pNote->note = note;
-               pNote->length = stepPPQN;
-               pNote->velocity = chordNoteVelocity;
+         // Copy all the notes in the notestack at the current step
+         for (u8 noteIndex = 0;noteIndex < notestack.len;noteIndex++) {
+            if (noteIndex >= MAX_NUM_NOTES_PER_STEP) {
+               // Shouldn't happen but to keep from overvlowing the array below
+               break;
             }
-         }
-         else {
-            DEBUG_MSG("ARP_PAT_UpdatePatternBuffer: Error: k#: %d for pattern:%s step:%d exceeds notestack size",
-               pEvent->keySelect, patternNames[localPatternIndex], step);
+            u8 note = notestack.note_items[noteIndex].note;
+            step_note_t* pNote = &patternBuffer[step][noteIndex];
+            pNote->note = note;
+            pNote->length = stepPPQN;
+            // Velocity is in the 'tag' item
+            pNote->velocity = notestack.note_items[noteIndex].tag;
          }
          break;
       case NORM:

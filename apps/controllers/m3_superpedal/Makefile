@@ -16,6 +16,7 @@ LCD       =     $(MIOS32_LCD)
 
 THUMB_SOURCE    = src/app.c \
  		  src/pedals.c \
+		  src/velocity.c\
 		  src/indicators.c \
 		  src/hmi.c \
 		  src/arp_hmi.c\

@@ -21,7 +21,7 @@
 /////////////////////////////////////////////////////////////////////////////
 #define MAX_NUM_STEPS 16
 #define MAX_NUM_NOTES_PER_STEP 4
-#define NUM_PATTERNS 4
+#define NUM_PATTERNS 5
 
 /////////////////////////////////////////////////////////////////////////////
 // Global Types
@@ -66,10 +66,13 @@ typedef struct step_note_s {
 extern s32 ARP_PAT_Init();
 
 extern s32 ARP_PAT_KeyPressed(u8 note, u8 velocity);
-extern s32 ARP_PAT_KeyReleased(u8 note, u8 velocity);
+extern void ARP_PAT_KeyReleased(u8 note, u8 velocity);
 
 extern s32 ARP_PAT_SetCurrentPattern(u8 _patternIndex);
 extern s32 ARP_PAT_ActivatePattern(u8 _patternIndex);
+
+extern s32 ARP_PAT_FillChordNotestack(notestack_t* pNotestack, u8 rootNote, u8 velocity);
+
 
 extern const char * ARP_PAT_GetCurrentPatternShortName();
 u8 ARP_PAT_GetCurrentPatternIndex();

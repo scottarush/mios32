@@ -17,7 +17,7 @@
 #include <seq_bpm.h>
 #include <seq_midi_out.h>
 #include <notestack.h>
-
+#include "pedals.h"
 #include "arp.h"
 #include "arp_modes.h"
 #include "arp_pattern.h"
@@ -37,9 +37,6 @@
 // Local prototypes
 /////////////////////////////////////////////////////////////////////////////
 
-static s32 ARP_PlayOffEvents(void);
-
-static s32 ARP_FillChordPadNoteStack(u8 rootNote, u8 velocity);
 static void ARP_SendChordNoteOnOffs(u8 sendOn);
 
 /////////////////////////////////////////////////////////////////////////////
@@ -83,9 +80,6 @@ s32 ARP_Init(u8 resetDefaults)
       arpSettings.chordExtension = CHORD_EXT_SEVENTH;
       arpSettings.ppqn = 384;
       arpSettings.bpm = 120.0;
-      arpSettings.midi_ports = 0x0031;     // OUT1, OUT2, and USB
-      arpSettings.midiChannel = 1;
-      arpSettings.synchDelay = 2;
       ARP_PersistData();
 
    }
@@ -176,7 +170,7 @@ s32 ARP_Handler(void)
 // This function plays all "off" events
 // Should be called on sequencer reset/restart/pause to avoid hanging notes
 /////////////////////////////////////////////////////////////////////////////
-static s32 ARP_PlayOffEvents(void)
+s32 ARP_PlayOffEvents(void)
 {
    // Otherwise, it is a sequence mode, so flush the queue to play the "off events
    SEQ_MIDI_OUT_FlushQueue();
@@ -185,12 +179,14 @@ static s32 ARP_PlayOffEvents(void)
    // in stuck on keys.
    int i;
    u16 mask = 1;
-   u8 midiChannel = ARP_GetARPSettings()->midiChannel;
+   // Get the channel and ports from the Pedal object
+   mios32_midi_port_t ports = PEDALS_GetMIDIPorts();
+   u8 channel = PEDALS_GetMIDIChannel();
    for (i = 0; i < 16; ++i, mask <<= 1) {
-      if (ARP_GetARPSettings()->midi_ports & mask) {
+      if (ports & mask) {
          // USB0/1/2/3, UART0/1/2/3, IIC0/1/2/3, OSC0/1/2/3
          mios32_midi_port_t port = 0x10 + ((i & 0xc) << 2) + (i & 3);
-         MIOS32_MIDI_SendCC(port, midiChannel, 123, 0);
+         MIOS32_MIDI_SendCC(port, channel - 1, 123, 0);
       }
    }
 
@@ -217,52 +213,7 @@ s32 ARP_Reset(void)
 }
 
 
-/////////////////////////////////////////////////////////////////////////////
-// Called to fill the note stack for PAD mode
-/////////////////////////////////////////////////////////////////////////////
-s32 ARP_FillChordPadNoteStack(u8 rootNote, u8 velocity) {
-   if (chordPadNotestack.len > 0) {
-      if (rootNote != chordPadNotestack.note_items[0].note) {
-         // Change of note, so turn off any keys that were on
-         ARP_PlayOffEvents();
-      }
-   }
-   // Clear the notestack before filling
-   NOTESTACK_Clear(&chordPadNotestack);
 
-   // Get the keys of the chord
-   const chord_type_t chord = ARP_MODES_GetModeChord(arpSettings.modeScale,
-      arpSettings.chordExtension, arpSettings.rootKey, rootNote);
-   if ((chord == CHORD_INVALID) || (chord == CHORD_ERROR)) {
-      // This key is not a valid key in this cord.  Just fill the note stack with 
-      // this single note instead
-      NOTESTACK_Clear(&chordPadNotestack);
-      NOTESTACK_Push(&chordPadNotestack, rootNote, velocity);
-      return 1;
-   }
-
-   // Compute octave by subtracting C-2 (note 24)
-   s8 octave = ((rootNote - 24) / 12) - 2;
-
-   // Push the keys one by one onto the note stack from the root
-   u8 numChordNotes = SEQ_CHORD_GetNumNotesByEnum(chord);
-#ifdef DEBUG
-   // DEBUG_MSG("ARP_FillChordPadNoteStack: Pushing chord: %s, chordPlayedNote=%d octave=%d numChordNotes=%d",
-     //  SEQ_CHORD_NameGetByEnum(chord), rootNote, octave, numChordNotes);
-#endif   
-   for (u8 keyNum = 0;keyNum < numChordNotes;keyNum++) {
-      s32 note = SEQ_CHORD_NoteGetByEnum(keyNum, chord, octave);
-      if (note >= 0) {
-         // add offset for the chordPlayedNote
-         note += (rootNote % 12);
-         NOTESTACK_Push(&chordPadNotestack, note, velocity);
-      }
-   }
-#ifdef DEBUG
-   NOTESTACK_SendDebugMessage(&chordPadNotestack);
-#endif
-   return 0;
-}
 
 /////////////////////////////////////////////////////////////////////////////
 // Called when Note event has been received 
@@ -273,23 +224,29 @@ s32 ARP_FillChordPadNoteStack(u8 rootNote, u8 velocity) {
 /////////////////////////////////////////////////////////////////////////////
 s32 ARP_NotifyNoteOn(u8 note, u8 velocity)
 {
-   if (!arpEnabled) {
-      return 0;   // Note not consumed
-   }
-
-   switch (arpSettings.arpMode) {
+   switch (ARP_GetArpMode()) {
    case ARP_MODE_CHORD_ARP:
    case ARP_MODE_KEYS:
-      // Delegate to the ARP Pattern handler
-      return ARP_PAT_KeyPressed(note, velocity);
-
-   case ARP_MODE_CHORD_PAD:
-      // Delegate to local fill function
-      ARP_FillChordPadNoteStack(note, velocity);
-      ARP_SendChordNoteOnOffs(1);
+      if (ARP_GetEnabled()) {
+         // Delegate to the ARP Pattern handler
+         return ARP_PAT_KeyPressed(note, velocity);
+      }
       break;
+   case ARP_MODE_CHORD_PAD:
+      // play a chord
+      NOTESTACK_Clear(&chordPadNotestack);
+      s32 filled = ARP_PAT_FillChordNotestack(&chordPadNotestack, note, velocity);
+      if (filled == 0) {
+         // Invalid root so return 0
+         return 0;
+      }
+      // Otherwise, filled so send the notes on
+      ARP_SendChordNoteOnOffs(1);
+      return 1;
+   case ARP_MODE_OFF:
+      return 0;  // Not consumed
    }
-   return 1; //  Event was consumed by arpeggiator
+   return 0;   // Not consumed
 }
 
 
@@ -298,21 +255,37 @@ s32 ARP_NotifyNoteOn(u8 note, u8 velocity)
 // already been scaled
 /////////////////////////////////////////////////////////////////////////////
 s32 ARP_NotifyNoteOff(u8 note, u8 velocity) {
-   if (!arpEnabled) {
-      return 0;  // note not consumed
-   }
 
-   // Otherwise arp or pad mode active
-   if (arpSettings.arpMode == ARP_MODE_CHORD_PAD) {
-      // Call function to release the chord
+   // Otherwise handle according to mode
+   switch (ARP_GetArpMode()) {
+   case ARP_MODE_CHORD_ARP:
+   case ARP_MODE_KEYS:
+      if (ARP_GetEnabled()) {
+         // Delegate to the ARP Pattern handler
+         ARP_PAT_KeyReleased(note, velocity);
+         return 1;  // consumed by ARP
+      }
+      break;
+   case ARP_MODE_CHORD_PAD:
+      // Check if this note is the root of the chord stack
+      int found = 0;
+      if (chordPadNotestack.len > 0) {
+         if (chordPadNotestack.note_items[0].note == note) {
+            found = 1;
+         }
+      }
+      if (!found) {
+         // This isn't the root or the chord stack is empty so return to allow caller to send the off
+         return 0;
+      }
+      // This is the root of the current stack so send all the offs
       ARP_SendChordNoteOnOffs(0);
 
+      return 1;
+   case ARP_MODE_OFF:
+      return 0;  // Not consumed
    }
-   else {
-      // delegate to arp pattern handler
-      return ARP_PAT_KeyReleased(note, velocity);
-   }
-   return 1;  // note consumed
+   return 0;   // Not consumed
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -321,6 +294,9 @@ s32 ARP_NotifyNoteOff(u8 note, u8 velocity) {
 /////////////////////////////////////////////////////////////////////////////
 void ARP_SendChordNoteOnOffs(u8 sendOn) {
    //  DEBUG_MSG("ARP_SendChordNoteOnOffs: sendOn=%d notestack.len=%d",sendOn,notestack.len);
+   // Get the channel and ports from the Pedal object
+   mios32_midi_port_t ports = PEDALS_GetMIDIPorts();
+   u8 channel = PEDALS_GetMIDIChannel();
    for (u8 count = 0;count < chordPadNotestack.len;count++) {
       // get note/velocity/length from notestack
       u8 note = chordPadNotestackItems[count].note;
@@ -331,14 +307,14 @@ void ARP_SendChordNoteOnOffs(u8 sendOn) {
          int i;
          u16 mask = 1;
          for (i = 0; i < 16; ++i, mask <<= 1) {
-            if (arpSettings.midi_ports & mask) {
+            if (ports & mask) {
                // USB0/1/2/3, UART0/1/2/3, IIC0/1/2/3, OSC0/1/2/3
                mios32_midi_port_t port = 0x10 + ((i & 0xc) << 2) + (i & 3);
                if (sendOn) {
-                  MIOS32_MIDI_SendNoteOn(port, arpSettings.midiChannel - 1, note, velocity);
+                  MIOS32_MIDI_SendNoteOn(port, channel - 1, note, velocity);
                }
                else {
-                  MIOS32_MIDI_SendNoteOff(port, arpSettings.midiChannel - 1, note, velocity);
+                  MIOS32_MIDI_SendNoteOff(port, channel - 1, note, velocity);
                }
             }
          }
@@ -354,20 +330,10 @@ void ARP_SetArpMode(arp_mode_t mode) {
    if (mode == arpSettings.arpMode) {
       return;
    }
-   // Otherwise a mode change.  
+   // Otherwise a mode change save it and reset the arp
    arpSettings.arpMode = mode;
-   switch (arpSettings.arpMode) {
-   case ARP_MODE_KEYS:
-   case ARP_MODE_CHORD_ARP:
-      // reset the ARP
-      ARP_Reset();
-      break;
-   case ARP_MODE_CHORD_PAD:
-      // Play off events and stop the sequencer
-      ARP_PlayOffEvents();
-      SEQ_BPM_Stop();
-      break;
-   }
+   ARP_Reset();
+
    // Save the mode change to EE
    ARP_PersistData();
 }
@@ -413,7 +379,7 @@ const char* ARP_GetArpStateText() {
    }
    switch (arpSettings.arpMode) {
    case ARP_MODE_CHORD_ARP:
-      return "CHRD";
+      return "ARP";
    case ARP_MODE_CHORD_PAD:
       return "PAD";
    case ARP_MODE_KEYS:
@@ -459,25 +425,6 @@ void ARP_SetClockMode(arp_clock_mode_t mode) {
    // persist the change
    ARP_PersistData();
 }
-/////////////////////////////////////////////////////////////////////////////
-// gets the midi channel
-/////////////////////////////////////////////////////////////////////////////
-u8 ARP_GetMIDIChannel() {
-   return arpSettings.midiChannel;
-}
-/////////////////////////////////////////////////////////////////////////////
-// Sets the midi channel
-/////////////////////////////////////////////////////////////////////////////
-void ARP_SetMIDIChannel(u8 channel) {
-   if (arpSettings.midiChannel == channel) {
-      return;
-   }
-   arpSettings.midiChannel = channel;
-
-   // persist the change
-   ARP_PersistData();
-}
-
 /////////////////////////////////////////////////////////////////////////////
 // Returns arp settings 
 /////////////////////////////////////////////////////////////////////////////

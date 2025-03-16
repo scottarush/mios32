@@ -138,12 +138,7 @@ void HMI_Init(u8 resetDefaults) {
    if (valid < 0) {
       DEBUG_MSG("HMI_Init:  PERSIST_ReadBlock return invalid. Re-initing persisted settings to defaults");
 
-      // stomp switch settings
-      hmiSettings.stompSwitchSetting[3] = STOMP_SWITCH_VOLUME;
-      hmiSettings.stompSwitchSetting[2] = STOMP_SWITCH_MIDI_CHANNEL;
-      hmiSettings.stompSwitchSetting[1] = STOMP_SWITCH_CHORD;
-      hmiSettings.stompSwitchSetting[0] = STOMP_SWITCH_ARPEGGIATOR;
-      hmiSettings.stompSwitchSetting[4] = STOMP_SWITCH_OCTAVE;
+      // stomp switch settings 
 
       // Set deefault TOE mode
       hmiSettings.toeSwitchMode = TOE_SWITCH_OCTAVE;
@@ -298,7 +293,7 @@ void HMI_NotifyToeToggle(u8 toeNum, u8 pressed, s32 timestamp) {
       IND_SetTempIndicatorState(toeNum, IND_FLASH_FAST, IND_TEMP_FLASH_STATE_DEFAULT_DURATION, IND_ON, 100);
       break;
    case TOE_SWITCH_CHORD:
-      ARP_HMI_HandleChordToeToggle(toeNum,HMI_GetStompIndicatorID(STOMP_SWITCH_CHORD));
+      ARP_HMI_HandleChordToeToggle(toeNum, HMI_GetStompIndicatorID(STOMP_SWITCH_CHORD));
       break;
    case TOE_SWITCH_ARP:
       switch (toeNum) {
@@ -337,7 +332,7 @@ void HMI_NotifyStompToggle(u8 stompNum, u8 pressed, s32 timestamp) {
    }
 
    // Process the change according to the current switch setting
-   switch (hmiSettings.stompSwitchSetting[stompNum - 1]) {
+   switch (stompNum) {
    case STOMP_SWITCH_OCTAVE:
       hmiSettings.toeSwitchMode = TOE_SWITCH_OCTAVE;
       break;
@@ -345,35 +340,54 @@ void HMI_NotifyStompToggle(u8 stompNum, u8 pressed, s32 timestamp) {
       hmiSettings.toeSwitchMode = TOE_SWITCH_VOLUME;
       break;
    case STOMP_SWITCH_CHORD:
-      hmiSettings.toeSwitchMode = TOE_SWITCH_CHORD;
-      // And set arp to chord mode
-      ARP_SetArpMode(ARP_MODE_CHORD_PAD);
-
-      // change to CHORD mode toe switches
-      hmiSettings.toeSwitchMode = TOE_SWITCH_CHORD;
-      // Set (back) to home page
+      if (hmiSettings.toeSwitchMode == TOE_SWITCH_CHORD) {
+         // This is a second stomp so toggle Chord mode on/off
+         if (ARP_GetArpMode() == ARP_MODE_OFF){
+            ARP_SetArpMode(ARP_MODE_CHORD_PAD);
+         }
+         else{
+            ARP_SetArpMode(ARP_MODE_OFF);
+         }
+      }
+      else {
+         // Initial press
+         hmiSettings.toeSwitchMode = TOE_SWITCH_CHORD;
+         // Set arp to chord mode
+         ARP_SetArpMode(ARP_MODE_CHORD_PAD);
+         // Set arp disabled so we play chords
+         ARP_SetEnabled(0);
+      }
+      // Set (back) to home page in case it changed
       pCurrentPage = &homePage;
       break;
    case STOMP_SWITCH_ARPEGGIATOR:
-      hmiSettings.toeSwitchMode = TOE_SWITCH_ARP;
-      ARP_SetArpMode(ARP_MODE_CHORD_ARP);
+      if (hmiSettings.toeSwitchMode == TOE_SWITCH_ARP) {
+         // This is a second stomp so toggle the arp on/off
+         ARP_SetEnabled(!ARP_GetEnabled());
+      }
+      else {
+         // Initial press
+         hmiSettings.toeSwitchMode = TOE_SWITCH_ARP;
+         // Set arp to arp mode
+         ARP_SetArpMode(ARP_MODE_CHORD_ARP);
+         // TODO - Need a separate setting for Key vs Chord mode and use that setting here
 
-      // change to ARP mode toe switches
+         // Set enabled so arpeggiator running
+         ARP_SetEnabled(1);
+      }
+      // Set (back) to home page in case it changed
       hmiSettings.toeSwitchMode = TOE_SWITCH_ARP;
       // Set (back) to home page
       pCurrentPage = &homePage;
       break;
    case STOMP_SWITCH_MIDI_CHANNEL:
       hmiSettings.toeSwitchMode = TOE_SWITCH_MIDI_CHANNEL;
-
-      // change to ARP mode toe switches
-      hmiSettings.toeSwitchMode = TOE_SWITCH_MIDI_CHANNEL;
       // Set (back) to home page
       pCurrentPage = &homePage;
       break;
    default:
       // Invalid.  Just return;
-      DEBUG_MSG("HMI_NotifyStompToggle:  Invalid setting %d for stompNum %d", hmiSettings.stompSwitchSetting[stompNum - 1], stompNum);
+      DEBUG_MSG("HMI_NotifyStompToggle:  Invalid stompNum %d", stompNum);
       return;
    }
    // Update the indicators and the display in case the mode changed.
@@ -416,9 +430,9 @@ void HMI_UpdateIndicators() {
    switch (hmiSettings.toeSwitchMode) {
    case TOE_SWITCH_VOLUME:
       IND_SetIndicatorState(HMI_GetToeVolumeIndex(), IND_ON, 100, IND_RAMP_NONE);
-      // Now set the stomp indicator to Green
-      IND_SetIndicatorColor(IND_STOMP_5, IND_COLOR_GREEN);
-      IND_SetIndicatorState(IND_STOMP_5, IND_ON, 100, IND_RAMP_NONE);
+      // Set Volume indicator to red
+      IND_SetIndicatorColor(HMI_GetStompIndicatorID(STOMP_SWITCH_VOLUME), IND_COLOR_RED);
+      IND_SetIndicatorState(HMI_GetStompIndicatorID(STOMP_SWITCH_VOLUME), IND_ON, 100, IND_RAMP_NONE);
       break;
    case TOE_SWITCH_OCTAVE:
       // Octaves are mapped from -2 to 8 with flashing 1 and 6 indicators for the < 0 and > 6
@@ -442,13 +456,13 @@ void HMI_UpdateIndicators() {
          IND_SetBlipIndicator(6, 0, 1.0, 100);
          break;
       case 7:
-         IND_SetBlipIndicator(6, 0, 2.0, 100);
+         IND_SetBlipIndicator(7, 0, 2.0, 100);
          break;
       case 8:
-         IND_SetBlipIndicator(6, 0, 4.0, 100);
+         IND_SetBlipIndicator(8, 0, 4.0, 100);
          break;
       }
-      // Set the stomp indicator to RED in case it wasn't already set to Octave mode.
+      // Set Octave indicator to Red
 
       IND_SetIndicatorColor(HMI_GetStompIndicatorID(STOMP_SWITCH_OCTAVE), IND_COLOR_RED);
       IND_SetIndicatorState(HMI_GetStompIndicatorID(STOMP_SWITCH_OCTAVE), IND_ON, 100, IND_RAMP_NONE);
@@ -478,8 +492,8 @@ void HMI_UpdateIndicators() {
       }
       break;
    case TOE_SWITCH_MIDI_CHANNEL:
-      // TODO
-      break;
+      IND_SetIndicatorColor(HMI_GetStompIndicatorID(STOMP_SWITCH_MIDI_CHANNEL), IND_COLOR_RED);
+      IND_SetIndicatorState(HMI_GetStompIndicatorID(STOMP_SWITCH_MIDI_CHANNEL), IND_ON, 100, IND_RAMP_NONE);      break;
    }
 
 }
@@ -675,28 +689,36 @@ void HMI_HomePage_UpdateDisplay() {
    case TOE_SWITCH_MIDI_CHANNEL:
       HMI_ClearLine(2);
       break;
+   case TOE_SWITCH_CHORD:
    case TOE_SWITCH_ARP:
-      // Line 1 is root key and mode
+      // Line 1 is root key and mode for both
       snprintf(lineBuffer, DISPLAY_CHAR_WIDTH + 1, "%s %s",
          ARP_MODES_GetNoteName(ARP_GetRootKey()), SEQ_SCALE_NameGet(ARP_GetModeScale()));
-      HMI_RenderLine(1, lineBuffer, RENDER_LINE_RIGHT);
+      HMI_RenderLine(1, lineBuffer, RENDER_LINE_CENTER);
 
-      // Line 2 is pattern name and bpm
-      u16 bpm = ARP_GetBPM();
-      // Truncate scale/mode name.  Had problems with snprintf for some reason so
-      // went to memcpy instead.  
-      // TODO: Figure out why snprintf didn't work.
-      // const char* scaleName = SEQ_SCALE_NameGet(ARP_GetModeScale());
-      // u8 truncLength = 9;
-      // u8 nameLength = strlen(scaleName);
-      // if (nameLength < truncLength) {
-      //    truncLength = nameLength;
-      // }
-      memcpy(scratchBuffer, ARP_PAT_GetPatternName(ARP_PAT_GetCurrentPatternIndex()), 16);
-      scratchBuffer[16] = '\0';
+      // Do line 2 specific to Chord for Arp
+      if (hmiSettings.toeSwitchMode == TOE_SWITCH_ARP) {
+         // Line 2 is pattern name and bpm for ARP mode
+         u16 bpm = ARP_GetBPM();
+         // Truncate scale/mode name.  Had problems with snprintf for some reason so
+         // went to memcpy instead.  
+         // TODO: Figure out why snprintf didn't work.
+         // const char* scaleName = SEQ_SCALE_NameGet(ARP_GetModeScale());
+         // u8 truncLength = 9;
+         // u8 nameLength = strlen(scaleName);
+         // if (nameLength < truncLength) {
+         //    truncLength = nameLength;
+         // }
+         memcpy(scratchBuffer, ARP_PAT_GetPatternName(ARP_PAT_GetCurrentPatternIndex()), 16);
+         scratchBuffer[16] = '\0';
 
-      snprintf(lineBuffer, DISPLAY_CHAR_WIDTH + 1, "%s %d", scratchBuffer, bpm);
-      HMI_RenderLine(2, lineBuffer, RENDER_LINE_RIGHT);
+         snprintf(lineBuffer, DISPLAY_CHAR_WIDTH + 1, "%s %d", scratchBuffer, bpm);
+         HMI_RenderLine(2, lineBuffer, RENDER_LINE_CENTER);
+      }
+      else{
+         // Just clear line 2 for chord mode 
+         HMI_ClearLine(2);
+      }
       break;
    default:
 #ifdef DEBUG
@@ -712,7 +734,7 @@ void HMI_HomePage_UpdateDisplay() {
 void HMI_HomePage_RotaryEncoderChanged(s8 increment) {
    switch (hmiSettings.toeSwitchMode) {
    case TOE_SWITCH_MIDI_CHANNEL:
-      PEDALS_SetMIDIChannel(PEDALS_GetMIDIChannel()+increment);
+      PEDALS_SetMIDIChannel(PEDALS_GetMIDIChannel() + increment);
       break;
    case TOE_SWITCH_ARP:
       // Go directly to the arp pattern select page

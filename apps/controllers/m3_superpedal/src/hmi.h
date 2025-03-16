@@ -45,14 +45,14 @@ struct page_s {
 };
 
 
-// Following type defines stomp switch functions from left=0 to right=4.
+// Following type defines stomp switch functions from left=1 to right=5.
 // These are also indexes and must be consecutive.
 typedef enum {
-   STOMP_SWITCH_VOLUME = 0,
-   STOMP_SWITCH_CHORD = 1,
-   STOMP_SWITCH_MIDI_CHANNEL = 2,
-   STOMP_SWITCH_ARPEGGIATOR = 3,
-   STOMP_SWITCH_OCTAVE = 4,
+   STOMP_SWITCH_VOLUME = 5,
+   STOMP_SWITCH_CHORD = 2,
+   STOMP_SWITCH_MIDI_CHANNEL = 3,
+   STOMP_SWITCH_ARPEGGIATOR = 4,
+   STOMP_SWITCH_OCTAVE = 1,
 } stomp_switch_setting_t;
 
 typedef enum toeSwitchMode_e {
@@ -99,9 +99,6 @@ typedef struct {
 
    // The current mode of the toe switches
    toeSwitchMode_t toeSwitchMode;
-
-   // stomp switch settings
-   stomp_switch_setting_t stompSwitchSetting[NUM_STOMP_SWITCHES];
 
 } persisted_hmi_settings_t;
 

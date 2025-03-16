@@ -53,8 +53,7 @@ typedef enum arp_settings_toe_functions_e {
 
 
 typedef enum arp_settings_entries_e {
-   ARP_SETTINGS_MIDI_CHANNEL = 0,
-   ARP_SETTINGS_CLOCK_MODE = 1
+   ARP_SETTINGS_CLOCK_MODE = 0
 } arp_settings_entries_t;
 
 
@@ -68,8 +67,8 @@ typedef enum chord_settings_toe_functions_e {
 } chord_settings_toe_functions_t;
 
 
-const char* arpSettingsPageEntryTitles[] = { "Set Midi Out Channel","Set Clock Mode" };
-#define ARP_SETTINGS_PAGE_NUM_ENTRIES 2
+const char* arpSettingsPageEntryTitles[] = { "Set Clock Mode" };
+#define ARP_SETTINGS_PAGE_NUM_ENTRIES 1
 
 //----------------------------------------------------------------------------
 // Local prototypes
@@ -236,15 +235,6 @@ void ARP_HMI_ARPSettingsPage_RotaryEncoderChanged(s8 increment) {
 /////////////////////////////////////////////////////////////////////////////
 void ARP_HMI_ARPSettingsPage_RotaryEncoderSelected() {
    switch (arpHMISettings.lastArpSettingsPageIndex) {
-   case ARP_SETTINGS_MIDI_CHANNEL:
-      snprintf(dialogPageTitle, DISPLAY_CHAR_WIDTH, "SELECT MIDI CHANNEL");
-
-      snprintf(dialogPageMessage1, DISPLAY_CHAR_WIDTH, "Channel: %d", ARP_GetMIDIChannel());
-      dialogPageMessage2[0] = '\0';
-      dialogPage.pBackPage = pCurrentPage;
-      dialogPage.pRotaryEncoderChangedCallback = ARP_HMI_ARPSettingsValues_RotaryEncoderChanged;
-      dialogPage.pBackButtonCallback = NULL;
-      break;
    case ARP_SETTINGS_CLOCK_MODE:
       snprintf(dialogPageTitle, DISPLAY_CHAR_WIDTH, "SELECT CLOCK MODE");
       snprintf(dialogPageMessage1, DISPLAY_CHAR_WIDTH, "Clock Mode: %s", ARP_HMI_GetClockModeText(ARP_GetClockMode()));
@@ -264,18 +254,6 @@ void ARP_HMI_ARPSettingsPage_RotaryEncoderSelected() {
 /////////////////////////////////////////////////////////////////////////////
 void ARP_HMI_ARPSettingsValues_RotaryEncoderChanged(s8 increment) {
    switch (arpHMISettings.lastArpSettingsPageIndex) {
-   case ARP_SETTINGS_MIDI_CHANNEL:
-      u8 channel = ARP_GetMIDIChannel();
-      channel += increment;
-      if (channel > 16) {
-         channel = 16;
-      }
-      else if (channel < 1) {
-         channel = 1;
-      }
-      ARP_SetMIDIChannel(channel);
-      snprintf(dialogPageMessage1, DISPLAY_CHAR_WIDTH, "Channel: %d", ARP_GetMIDIChannel());
-      break;
    case ARP_SETTINGS_CLOCK_MODE:
       arp_clock_mode_t mode = ARP_GetClockMode();
       mode += increment;
@@ -312,7 +290,7 @@ void ARP_HMI_UpdateArpStompIndicator(indicator_id_t indicator) {
    // Set indicator to Green if running, Red if stopped, Yellow if not in Arp mode (this is an error)
    switch (ARP_GetArpMode()) {
    case ARP_MODE_CHORD_ARP:
-      // In chord mode, 
+      // In chord arpeggiator mode, 
       if (ARP_GetEnabled()) {
          // Red for arpeggiator running
          // TODO - Flash it in synch with BPM.
@@ -323,14 +301,12 @@ void ARP_HMI_UpdateArpStompIndicator(indicator_id_t indicator) {
          color = IND_COLOR_GREEN;
       }
       break;
-   case ARP_MODE_CHORD_PAD:
-      // This is an error as chord pad has a different stomp
+   case ARP_MODE_KEYS:
       color = IND_COLOR_YELLOW;
       break;
-   case ARP_MODE_KEYS:
-      // TODO - Find another color for Keys
-    //  color = IND_COLOR_RED;
-      break;
+   default:
+      DEBUG_MSG("ARP_HMI_UpdateArpStompIndicator:  Invalid ARPMode=%s on Arp Stomp Indicator", ARP_GetArpStateText());
+
    }
 
    IND_SetIndicatorColor(indicator, color);
@@ -341,30 +317,19 @@ void ARP_HMI_UpdateArpStompIndicator(indicator_id_t indicator) {
 /////////////////////////////////////////////////////////////////////////////
 void ARP_HMI_UpdateChordStompIndicator(indicator_id_t indicator) {
    indicator_color_t color = IND_COLOR_RED;
-   // Set chord stomp indicator to Red if running, green if pad mode
-   // yellow if arp not in chord mode (this is an error as Chord mode should already have been enabled)
    switch (ARP_GetArpMode()) {
    case ARP_MODE_CHORD_PAD:
-      // In chord mode, 
-      if (ARP_GetEnabled()) {
-         // Red for arpeggiator running
-         // TODO - Flash it in synch with BPM.
-         color = IND_COLOR_RED;
-      }
-      else {
-         // Chord mode,  not running so show green
-         color = IND_COLOR_GREEN;
-      }
+      color = IND_COLOR_RED;
       break;
-   case ARP_MODE_CHORD_ARP:
-     // This is an error as are mode has a different stomp
-     color = IND_COLOR_YELLOW;
-     break;
-   case ARP_MODE_KEYS:
-      // TODO - Find another color for Keys
-    //  color = IND_COLOR_RED;
+   case ARP_MODE_OFF:
+      // Chords not enabled
+      color = IND_COLOR_GREEN;
       break;
+   default:
+      // Error.  Set it Yellow
+      DEBUG_MSG("ARP_HMI_UpdateChordStompIndicator:  Invalid ARPMode=%s on Chord Stomp Indicator", ARP_GetArpStateText());
    }
+
    IND_SetIndicatorColor(indicator, color);
    IND_SetIndicatorState(indicator, IND_ON, 100, IND_RAMP_NONE);
 }
@@ -420,7 +385,7 @@ void ARP_HMI_HandleArpToeToggle(u8 toeNum, u8 pressed) {
    default:
       // Ignore unused to switches
       return;
-      
+
    }
    // Update the current display to reflect any content change
    pCurrentPage->pUpdateDisplayCallback();

@@ -396,7 +396,7 @@ void IND_SetBlipIndicator(indicator_id_t indicatorNum, u8 inverse, float frequen
 // indicatorNum:  Number of led starting from left with indicator 1.
 //
 /////////////////////////////////////////////////////////////////////////////
-void IND_SetFlashIndicator(u8 indicatorNum, float frequency, u8 brightness) {
+void IND_SetFlashIndicator(indicator_id_t indicatorNum, float frequency, u8 brightness) {
    IND_SetFullIndicatorState(indicatorNum, 0, brightness, frequency, 50, IND_RAMP_NONE);
 }
 
@@ -406,7 +406,7 @@ void IND_SetFlashIndicator(u8 indicatorNum, float frequency, u8 brightness) {
 // state to set the indicator to.
 //
 /////////////////////////////////////////////////////////////////////////////
-void IND_SetIndicatorState(u8 indicatorNum, indicator_states_t state, u8 brightness, indicator_ramp_t rampMode) {
+void IND_SetIndicatorState(indicator_id_t indicatorNum, indicator_states_t state, u8 brightness, indicator_ramp_t rampMode) {
    // set the output pin and init the flash timer
    switch (state) {
    case IND_FLASH_FAST:
@@ -580,7 +580,7 @@ void IND_SetTempIndicatorState(indicator_id_t indicatorNum, indicator_states_t t
 // indicatorNum:  Number of led starting from left with indicator 1.
 // returns 0 for off, 1 for on
 /////////////////////////////////////////////////////////////////////////////
-indicator_states_t IND_GetIndicatorState(u8 indicatorNum) {
+indicator_states_t IND_GetIndicatorState(indicator_id_t indicatorNum) {
    if (indicatorNum > NUM_LED_INDICATORS) {
       DEBUG_MSG("Invalid indicator number: %d", indicatorNum);
       return 0;

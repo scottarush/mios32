@@ -12,6 +12,7 @@
 #ifndef _PEDALS_H
 #define _PEDALS_H
 
+#include "velocity.h"
 /////////////////////////////////////////////////////////////////////////////
 // Global define data.
 /////////////////////////////////////////////////////////////////////////////
@@ -56,7 +57,8 @@ typedef struct {
    // volume from 1 to PEDALS_MAX_VOLUME
    u8 volumeLevel;
 
-   // root key. 
+   // velocity curve
+   velocity_curve_t velocityCurve;
 } persisted_pedal_confg_t;
 
 // Callback function for receiving a selected pedal in pedalSelectMode
@@ -73,7 +75,9 @@ extern s8 PEDALS_GetOctave();
 extern u8 PEDALS_GetVolume();
 extern void PEDALS_SetVolume(u8 volumeLevel);
 extern u8 PEDALS_GetMIDIChannel();
-extern void PEDALS_SetMIDIChannel(s8 channel);
+extern void PEDALS_SetMIDIChannel(u8 channel);
+
+extern mios32_midi_port_t PEDALS_GetMIDIPorts();
 
 extern u8 PEDALS_ScaleVelocity(u8 velocity,u8 volumeLevel);
 

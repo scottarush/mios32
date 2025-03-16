@@ -11,8 +11,8 @@
 #define _MIOS32_CONFIG_H
 
 // Version string
-#define M3_SUPERPEDAL_VERSION "Version: 1.1"
-#define M3_SUPERPEDAL_VERSION_DATE "06OCT2024"
+#define M3_SUPERPEDAL_VERSION "Version: 2.0"
+#define M3_SUPERPEDAL_VERSION_DATE "14MAR2025"
 
 // This disables the boot message to the LCD display (still goes to the terminal)
 // Otherwise it overwrites the one in the call trace from APP_Init() since APP_Init is
@@ -21,7 +21,7 @@
 
 // The boot message which is print during startup and returned on a SysEx query
 #define MIOS32_LCD_BOOT_MSG_LINE1 "M3 Super Pedal"
-#define MIOS32_LCD_BOOT_MSG_LINE2 "(C) 2024 S. Rush"
+#define MIOS32_LCD_BOOT_MSG_LINE2 "(C) 2025 S. Rush"
 
 
 // Following settings allow to customize the USB device descriptor

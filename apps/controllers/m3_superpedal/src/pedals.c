@@ -121,6 +121,8 @@ void PEDALS_Init(u8 resetDefaults) {
       pc->volumeLevel = PEDALS_MAX_VOLUME;
       pc->left_pedal_note_number = 23;
 
+      pc->velocityCurve = VELOCITY_CURVE_CONVEX;
+
       // Persist defaults to EEPROM
       PEDALS_PersistData();
    }
@@ -270,8 +272,11 @@ s32 PEDALS_SendNote(u8 note_number, u8 velocity, u8 pressed) {
 
    u8 sent_note = note_number;
 
-   // Compute velocity and send to the Arpeggiator.  If consumed there then don't send to 
-   u8 scaledVelocity = PEDALS_ScaleVelocity(velocity, PEDALS_GetVolume());
+   // Compute curved velocity first, then scale it to volume
+   u8 scaledVelocity = VELOCITY_LookupVelocity(velocity,pc->velocityCurve);
+
+   // now scale for volume
+   scaledVelocity = PEDALS_ScaleVelocity(velocity, PEDALS_GetVolume());
 #ifdef DEBUG
    DEBUG_MSG("PEDALS_SendNote: velocity=%d scaledVelocity=%d", velocity, scaledVelocity);
 #endif   
@@ -283,9 +288,9 @@ s32 PEDALS_SendNote(u8 note_number, u8 velocity, u8 pressed) {
       arpConsumed = ARP_NotifyNoteOn(note_number, scaledVelocity);
    }
    if (arpConsumed) {
-      return 0;  // ARP ate it.  No error
+      return 0;  // ARP ate it.  Notes already played
    }
-   // Otherwise, send to MIDI ports
+   // Otherwise, send just this note to the MIDI ports
    int i;
    u16 mask = 1;
    for (i = 0; i < 16; ++i, mask <<= 1) {
@@ -394,7 +399,14 @@ void PEDALS_SetVolume(u8 volumeLevel) {
       PEDALS_PersistData();
    }
 }
-
+////////////////////////////////////////////////////////////////////////////
+// API to get the current midi ports
+// the enabled midi ports in the midibox format
+/////////////////////////////////////////////////////////////////////////////
+mios32_midi_port_t PEDALS_GetMIDIPorts(){
+   persisted_pedal_confg_t* pc = (persisted_pedal_confg_t*)&pedal_config;
+   return pc->midi_ports;
+}
 /////////////////////////////////////////////////////////////////////////////
 // API to get the current midi channel
 // channel from 1 to 16
@@ -408,9 +420,9 @@ u8 PEDALS_GetMIDIChannel() {
 // The E2 block will be updated automatically on change.
 // channel from 1 to 16
 /////////////////////////////////////////////////////////////////////////////
-void PEDALS_SetMIDIChannel(s8 channel) {
+void PEDALS_SetMIDIChannel(u8 channel) {
    if (pedal_config.midi_chn != channel) {
-      if (channel < 1){
+      if (channel == 0){
          channel = 1;
       }
       else if (channel > 16){
