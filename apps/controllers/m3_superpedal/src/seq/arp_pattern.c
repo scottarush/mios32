@@ -47,13 +47,31 @@
 static notestack_t notestack;
 static notestack_item_t notestack_items[MAX_NUM_KEYS];
 
-// Queue of notes.
-// Notes set to 0 length are null
+
+/**
+ * step_note_t are the individual notes within the runtime pattern_buffer.
+ * The pattern buffer can have up to MAX_NUM_NOTES_PER_STEP of these in order
+ * to allow chords to be played by the arpeggiator.
+ */
+typedef struct step_note_s {
+   u8 note;
+   u8 velocity;
+   // duration in bpmticks from starting tickoffset in the step
+   u8 length;
+   // offset += in bpmticks.  Default is 0 at start of step
+   s32 tickOffset;
+
+} step_note_t;
+
+// Runtime buffer filled from the note stack in UpdatePatternBuffer
 static step_note_t patternBuffer[MAX_NUM_STEPS][MAX_NUM_NOTES_PER_STEP];
 
 // pattern step counter
 static u8 stepCounter;
 static u8 localPatternIndex;
+
+// reset flag resets at the next ARP tick
+static u8 resynchArpeggiator;
 
 /////////////////////////////////////////////////////////////////////////////
 // Local prototypes
@@ -72,6 +90,8 @@ s32 ARP_PAT_Init()
    NOTESTACK_Init(&notestack, NOTESTACK_MODE_PUSH_BOTTOM, &notestack_items[0], MAX_NUM_KEYS);
 
    localPatternIndex = ARP_GetARPSettings()->arpPatternIndex;
+
+   resynchArpeggiator = 0;
 
    return 0; // no error
 }
@@ -138,25 +158,60 @@ void ARP_PAT_ClearPatternBuffer() {
 // returns 1 if note consumed, 0 if not.
 /////////////////////////////////////////////////////////////////////////////
 s32 ARP_PAT_KeyPressed(u8 rootNote, u8 velocity) {
-   s32 handled = 1;
-   if (notestack.len > 0) {
-      if (rootNote != notestack.note_items[0].note) {
-         // Change of note, so turn off any keys that were on
-         ARP_PlayOffEvents();
-      }
-   }
 
-   if (ARP_GetArpMode() == ARP_MODE_CHORD_ARP) {
-      // Reset the arp so we move smoothly from key to key.  This will also clear the notestack
-      ARP_Reset();
+   int handled = 0;
+   int resynch = 0;
+   // If notestack is zero, then we will need to immediately synch sequencer once
+   // updated notes are in the stack
+   if (notestack.len == 0) {
+      resynch = 1;
+   }
+   switch (ARP_GetArpMode()) {
+   case ARP_MODE_ONEKEY_CHORD_ARP:
+      if (!ARP_GetEnabled()) {
+         // Shouldn't have been called with ARP disabled.  return not handled
+         return 0;
+      }
+      // Otherwise ARP running 
+      if (notestack.len > 0){
+         if (rootNote != notestack.note_items[0].note) {
+            // Change of note, flush the queue to play the "off events
+            SEQ_MIDI_OUT_FlushQueue();
+            // force a sequence resynch
+            resynch = 1;
+         }
+      }
 
       // Re-fill it with the notes for the new root.  If not in the chord then handled will change
       // to zero
       handled = ARP_PAT_FillChordNotestack(&notestack, rootNote, velocity);
 
       // update the pattern buffer 
-      ARP_PAT_UpdatePatternBuffer();
-
+      if (handled) {
+         ARP_PAT_UpdatePatternBuffer();
+      }
+      // fall through to determine whether to resynhc or not
+      break;
+   case ARP_MODE_CHORD_PAD:
+      // Should have been handled in ARP_NotifyNoeOn. This is an invalid call, return not handled
+      return 0;
+   case ARP_MODE_MULTI_KEY:
+      if (!ARP_GetEnabled()) {
+         // Shouldn't have been called with ARP disabled.  return not handled
+         return 0;
+      }
+      // Otherwise add the key to the notestack unless already too many keys
+      if (notestack.len >= MAX_NUM_KEYS) {
+          return 0;         // Caller can decide what to do with it
+      }
+      else {
+         NOTESTACK_Push(&notestack, rootNote, velocity);
+      }
+      break;
+   }
+   if (handled && resynch){
+      // Was a handled event requiring a resynch so set resynch flag for next tick.
+      resynchArpeggiator = 1;
    }
    return handled;
 }
@@ -172,15 +227,15 @@ s32 ARP_PAT_FillChordNotestack(notestack_t* pNotestack, u8 rootNote, u8 velocity
      // synch point.
    persisted_arp_data_t* pArpSettings = ARP_GetARPSettings();
    const chord_type_t chord = ARP_MODES_GetModeChord(pArpSettings->modeScale,
-      pArpSettings->chordExtension, pArpSettings->rootKey, rootNote);
+      pArpSettings->modeGroup, pArpSettings->rootKey, rootNote);
    // Compute octave by subtracting C-2 (note 24)
    s8 octave = ((rootNote - 24) / 12) - 2;
 
    // Now put the notes of the chord into the pattern buffer at the chordNoteVelocity
    u8 numChordNotes = SEQ_CHORD_GetNumNotesByEnum(chord);
 #ifdef DEBUG
-   // DEBUG_MSG("ARP_FillChordPadNoteStack: Pushing chord: %s, chordPlayedNote=%d octave=%d numChordNotes=%d",
-     //  SEQ_CHORD_NameGetByEnum(chord), rootNote, octave, numChordNotes);
+   DEBUG_MSG("ARP_FillChordPadNoteStack: Pushing chord: %s, chordPlayedNote=%d octave=%d numChordNotes=%d",
+      SEQ_CHORD_NameGetByEnum(chord), rootNote, octave, numChordNotes);
 #endif   
    for (u8 keyNum = 0;keyNum < numChordNotes;keyNum++) {
       s32 chordNote = SEQ_CHORD_NoteGetByEnum(keyNum, chord, octave);
@@ -205,29 +260,57 @@ s32 ARP_PAT_FillChordNotestack(notestack_t* pNotestack, u8 rootNote, u8 velocity
 
 /////////////////////////////////////////////////////////////////////////////
 // Called on a key release. 
-// Always consumes the note
+// Returns +1 if not consumed, 0 if not consumed and caller should ahndle.
 /////////////////////////////////////////////////////////////////////////////
-void ARP_PAT_KeyReleased(u8 note, u8 velocity) {
+s32 ARP_PAT_KeyReleased(u8 note, u8 velocity) {
 
    switch (ARP_GetArpMode()) {
-   case ARP_MODE_CHORD_ARP:
+   case ARP_MODE_ONEKEY_CHORD_ARP:
+      if (!ARP_GetEnabled()) {
+         // Shouldn't have been called with ARP disabled.  return not handled
+         return 0;
+      }
+      // Check if the note is in the notestack
+      int handled = 1;
+      if (NOTESTACK_Pop(&notestack, note) < 0) {
+         // This note isn't in the stack so clear handled flag to allow caller to turn it off
+         // This happends on a release of an out-of-chord key.
+         handled = 0;
+      }
       // Clear the Notestack and the pattern buffer
       NOTESTACK_Clear(&notestack);
       ARP_PAT_ClearPatternBuffer();
-      // And send all notes off
-      ARP_PlayOffEvents();
-      break;
-   case ARP_MODE_KEYS:
-      // Not the root or we are in key mode so just remove the note
-      NOTESTACK_Pop(&notestack, note);
-      // And update the pattern buffer.
-      ARP_PAT_UpdatePatternBuffer();
-      break;
-   default:
-      // Fall through to send off on this note
+      // And flush the SEQ queue to play the off notes in queue
+      SEQ_MIDI_OUT_FlushQueue();
+      return handled;
+   case ARP_MODE_MULTI_KEY:
+      if (!ARP_GetEnabled()) {
+         // Shouldn't have been called with ARP disabled.  return not handled
+         return 0;
+      }
+      // Remove the note
+      int removed = NOTESTACK_Pop(&notestack, note);
+      if (removed >= 0) {
+         //  update the pattern buffer.
+         ARP_PAT_UpdatePatternBuffer();
+         return 1;
+      }
+      else {
+         return 0;  // Note was not in the notestack
+      }
+   case ARP_MODE_OFF:
+      // Arp off return 0.  This hsould not have been called
+      DEBUG_MSG("Error:  ARP_PAT_KeyReleased called in ARP_MODE_OFF: note=%d", note);
+      return 0;
+   case ARP_MODE_CHORD_PAD:
+      // Should not have been called in chord pad mode.  This is an error.  Return not handled
+      DEBUG_MSG("Error:  ARP_PAT_KeyReleased called in ARP_MODE_CHORD_PAD: note=%d", note);
    }
+   return 0;
 
-   // Send the note off in case it wasn't actually in the notestack or during edge-case transitions between 
+   // Delete the following once we fix all the stuck notes
+   /**
+   // Send the note off in case it wasn't actually in the notestack or during edge-case transitions between
    // notes and into/out of ARP mode, an On can be sent, so we need to send an off
    int i;
    u16 mask = 1;
@@ -241,6 +324,7 @@ void ARP_PAT_KeyReleased(u8 note, u8 velocity) {
          MIOS32_MIDI_SendNoteOff(port, midiChannel, note, velocity);
       }
    }
+      **/
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -281,14 +365,29 @@ void ARP_PAT_Reset() {
    SEQ_BPM_TickSet(0);
 }
 /////////////////////////////////////////////////////////////////////////////
-// Forward from ARP_Tick when in pattern mode for each tick.  This function will output
+// Forward from ARP_Handler when in pattern mode for each tick.  This function will output
 // notes from the pattern buffer to the sequenceer
 /////////////////////////////////////////////////////////////////////////////
 s32 ARP_PAT_Tick(u32 bpm_tick) {
+   u32 thisTick = bpm_tick;
+   // Check for resynch
+   if (resynchArpeggiator){
+      // Clear the resynch
+      resynchArpeggiator = 0;
+
+      // Flush queue for off notes just in case not previously called
+      SEQ_MIDI_OUT_FlushQueue();
+      // (re)set this tick to 0 so we execute the pattern reset right now. 
+      thisTick = 0;
+      // and resynch seq bpm generate
+      SEQ_BPM_TickSet(0);
+
+   }
+
    // whenever we reach a new 16th note (96 ticks @384 ppqn):
-   if ((bpm_tick % (SEQ_BPM_PPQN_Get() / 4)) == 0) {
+   if ((thisTick % (SEQ_BPM_PPQN_Get() / 4)) == 0) {
       // ensure that arp is reset on first bpm_tick
-      if (bpm_tick == 0) {
+      if (thisTick == 0) {
          stepCounter = 0;
       }
       else {
@@ -332,7 +431,7 @@ s32 ARP_PAT_Tick(u32 bpm_tick) {
                      // USB0/1/2/3, UART0/1/2/3, IIC0/1/2/3, OSC0/1/2/3
                      mios32_midi_port_t port = 0x10 + ((i & 0xc) << 2) + (i & 3);
 
-                     SEQ_MIDI_OUT_Send(port, midi_package, SEQ_MIDI_OUT_OnOffEvent, bpm_tick, length);
+                     SEQ_MIDI_OUT_Send(port, midi_package, SEQ_MIDI_OUT_OnOffEvent, thisTick, length);
                   }
                }
             }
@@ -365,55 +464,69 @@ void ARP_PAT_UpdatePatternBuffer() {
 
       // At least one note in the notestack so refill the buffer
       const arp_pattern_t* pPattern = &patterns[localPatternIndex];
+
+   // Step size in PPQN for computing note on lengths below.
    u32 stepPPQN = SEQ_BPM_PPQN_Get() / 4;
 
+   // Go through each step in the pattern buffer and create the notes according to the 
+   // arpeggiator rules (i.e. same as BlueARP)
    for (u8 step = 0;step < pPattern->numSteps;step++) {
       const step_event_t* pEvent = &pPattern->events[step];
       switch (pEvent->stepType) {
-      case RNDM:
+      case STEP_TYPE_RNDM:
          // TODO
          break;
-      case CHORD:
-         // Copy all the notes in the notestack at the current step
+      case STEP_TYPE_CHORD:
+         // Copy all the notes in the notestack at the current step.   
+         // Note that keySelect is not valid here as key order is not relevant.         
          for (u8 noteIndex = 0;noteIndex < notestack.len;noteIndex++) {
             if (noteIndex >= MAX_NUM_NOTES_PER_STEP) {
-               // Shouldn't happen but to keep from overvlowing the array below
+               // Shouldn't happen but to keep from overflowing the array below
                break;
             }
             u8 note = notestack.note_items[noteIndex].note;
-            step_note_t* pNote = &patternBuffer[step][noteIndex];
-            pNote->note = note;
-            pNote->length = stepPPQN;
+            step_note_t* pStepNote = &patternBuffer[step][noteIndex];
+            pStepNote->note = note;
+            pStepNote->length = stepPPQN;
             // Velocity is in the 'tag' item
-            pNote->velocity = notestack.note_items[noteIndex].tag;
+            pStepNote->velocity = notestack.note_items[noteIndex].tag;
          }
          break;
-      case NORM:
+      case STEP_TYPE_NORM:
+      case STEP_TYPE_TIE:
          // add the note at the keySelect with a single step length adjusting for the octave and scale step
          if (notestack.len >= pEvent->keySelect) {
-            step_note_t* pNote = &patternBuffer[step][pEvent->keySelect - 1];
-            pNote->note = notestack.note_items[pEvent->keySelect - 1].note + 12 * pEvent->octave + pEvent->scaleStep;
-            pNote->velocity = notestack.note_items[pEvent->keySelect - 1].tag;
-#ifdef DEBUG
-            //          DEBUG_MSG("ARP_PAT_UpdatePatternBuffer:NORM Adding note %02x @ step:%d k#:%d",
-              //           pNote->note, step, pEvent->keySelect);
-#endif                  
-            if (pEvent->stepType == NORM) {
-               pNote->length = stepPPQN;
-               pNote->tickOffset = 0;
+            step_note_t* pStepNote = &patternBuffer[step][pEvent->keySelect - 1];
+            // Compute the octave and scale adjusted note, then limit to valid midi notes
+            s32 note = notestack.note_items[pEvent->keySelect - 1].note + (12 * pEvent->octaveOffset) + pEvent->scaleStepOffset;
+            if (note < 0) {
+               note = 0;
+            }
+            else if (note > 127) {
+               note = 127;
+            }
+            pStepNote->note = note;
+
+            // set the velocity which is the 'tag' element.
+            pStepNote->velocity = notestack.note_items[pEvent->keySelect - 1].tag;
+
+            // Note set the length according to whether this is a NORM or a TIE
+            if (pEvent->stepType == STEP_TYPE_NORM) {
+               pStepNote->length = stepPPQN;
+               pStepNote->tickOffset = 0;
             }
             else {
                // this is a TIE so overlap the note on this step by + and - 1/4 of the stepPPQN
                s32 overlap = stepPPQN / 4;
-               pNote->length = stepPPQN + overlap;
-               pNote->tickOffset = -overlap;
+               pStepNote->length = stepPPQN + overlap;
+               pStepNote->tickOffset = -overlap;
             }
          }
          break;
-      case OFF:
-         // Don't add a note - do nothing here.
+      case STEP_TYPE_OFF:
+         // No notes for this step.
          break;
-      case REST:
+      case STEP_TYPE_REST:
          // Extend the length of the notes in the previous step, if any, by the length of this one.
          if (step > 0) {
             for (u8 keyNum = 0;keyNum < MAX_NUM_NOTES_PER_STEP;keyNum++) {

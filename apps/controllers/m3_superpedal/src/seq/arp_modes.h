@@ -31,18 +31,25 @@ typedef enum key_e {
    KEY_B = 11
 } key_t;
 
-typedef enum chord_extension_e {
-   CHORD_EXT_NONE = 0,
-   CHORD_EXT_SEVENTH = 1,
-   CHORD_EXT_NINTH = 2
-}  chord_extension_t;
+typedef enum mode_groups_e {
+   MODE_GROUP_BASE = 0,
+   MODE_GROUP_SEVENTH = 1,
+   MODE_GROUP_NINTH = 2,
+   MODE_GROUP_FIFTH = 3
+}  mode_groups_t;
+#define NUM_MODE_GROUPS 4
+
 
 /////////////////////////////////////////////////////////////////////////////
 // Prototypes
 /////////////////////////////////////////////////////////////////////////////
 
 extern const char * ARP_MODES_GetNoteName(u8 note);
-extern const chord_type_t ARP_MODES_GetModeChord(scale_t scale,chord_extension_t extension,u8 keySig,u8 note);
+extern const chord_type_t ARP_MODES_GetModeChord(scale_t scale,mode_groups_t modeGroup,u8 keySig,u8 note);
+extern const char * ARP_MODES_GetChordExtensionText(mode_groups_t extension);
+
+extern const char * ARP_MODES_GetModeGroupName(mode_groups_t group);
+
 
 /////////////////////////////////////////////////////////////////////////////
 // Export global variables

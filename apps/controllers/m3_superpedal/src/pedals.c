@@ -290,7 +290,7 @@ s32 PEDALS_SendNote(u8 note_number, u8 velocity, u8 pressed) {
    if (arpConsumed) {
       return 0;  // ARP ate it.  Notes already played
    }
-   // Otherwise, send just this note to the MIDI ports
+   // Otherwise, send this single note to the ports
    int i;
    u16 mask = 1;
    for (i = 0; i < 16; ++i, mask <<= 1) {

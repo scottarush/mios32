@@ -38,6 +38,7 @@
 /////////////////////////////////////////////////////////////////////////////
 
 static void ARP_SendChordNoteOnOffs(u8 sendOn);
+static s32 ARP_Reset(void);
 
 /////////////////////////////////////////////////////////////////////////////
 // Local variables
@@ -73,11 +74,11 @@ s32 ARP_Init(u8 resetDefaults)
    valid = PERSIST_ReadBlock(PERSIST_ARP_BLOCK, (unsigned char*)&arpSettings, sizeof(persisted_arp_data_t));
    if (valid < 0) {
       DEBUG_MSG("ARP_Init:  PERSIST_ReadBlock return invalid. Re-initing persisted settings to defaults");
-      arpSettings.arpMode = ARP_MODE_CHORD_ARP;
+      arpSettings.arpMode = ARP_MODE_ONEKEY_CHORD_ARP;
       arpSettings.arpPatternIndex = 0;
       arpSettings.rootKey = KEY_A;
       arpSettings.modeScale = SCALE_AEOLIAN;
-      arpSettings.chordExtension = CHORD_EXT_SEVENTH;
+      arpSettings.modeGroup = MODE_GROUP_SEVENTH;
       arpSettings.ppqn = 384;
       arpSettings.bpm = 120.0;
       ARP_PersistData();
@@ -169,6 +170,8 @@ s32 ARP_Handler(void)
 /////////////////////////////////////////////////////////////////////////////
 // This function plays all "off" events
 // Should be called on sequencer reset/restart/pause to avoid hanging notes
+//
+// TODO:  Delete this function once confirmed it is no longer needed.  It was a hack due to stuck notes.
 /////////////////////////////////////////////////////////////////////////////
 s32 ARP_PlayOffEvents(void)
 {
@@ -201,10 +204,7 @@ s32 ARP_Reset(void)
 {
    // timebase may have changed, ensure that Off-Events are played 
    // (otherwise they will be played much later...)
-   ARP_PlayOffEvents();
-
-   // reset BPM tick
-   SEQ_BPM_TickSet(0);
+   SEQ_MIDI_OUT_FlushQueue();
 
    // Also reset pattern
    ARP_PAT_Reset();
@@ -219,14 +219,14 @@ s32 ARP_Reset(void)
 // Called when Note event has been received 
 // If velocity is 0 then this is a note off event.
 // The velocity has already been scaled
-// Returns 1 if consumed by arpeggiator, 0 is arpeggiator inactive and event
-// not consumed.
+// Returns 1 if consumed by arpeggiator, 0 if not consumed and caller should
+// play single note on its own.
 /////////////////////////////////////////////////////////////////////////////
 s32 ARP_NotifyNoteOn(u8 note, u8 velocity)
 {
    switch (ARP_GetArpMode()) {
-   case ARP_MODE_CHORD_ARP:
-   case ARP_MODE_KEYS:
+   case ARP_MODE_ONEKEY_CHORD_ARP:
+   case ARP_MODE_MULTI_KEY:
       if (ARP_GetEnabled()) {
          // Delegate to the ARP Pattern handler
          return ARP_PAT_KeyPressed(note, velocity);
@@ -252,18 +252,18 @@ s32 ARP_NotifyNoteOn(u8 note, u8 velocity)
 
 /////////////////////////////////////////////////////////////////////////////
 // Called whenever a Note Off event has been received.  The velocity has
-// already been scaled
+// already been scaled.  
+// Returns +1 if consumed by ARP, 0 if not consumed and caller should handle
 /////////////////////////////////////////////////////////////////////////////
 s32 ARP_NotifyNoteOff(u8 note, u8 velocity) {
 
    // Otherwise handle according to mode
    switch (ARP_GetArpMode()) {
-   case ARP_MODE_CHORD_ARP:
-   case ARP_MODE_KEYS:
+   case ARP_MODE_ONEKEY_CHORD_ARP:
+   case ARP_MODE_MULTI_KEY:
       if (ARP_GetEnabled()) {
          // Delegate to the ARP Pattern handler
-         ARP_PAT_KeyReleased(note, velocity);
-         return 1;  // consumed by ARP
+         return ARP_PAT_KeyReleased(note, velocity);
       }
       break;
    case ARP_MODE_CHORD_PAD:
@@ -378,11 +378,11 @@ const char* ARP_GetArpStateText() {
       return "STOP";
    }
    switch (arpSettings.arpMode) {
-   case ARP_MODE_CHORD_ARP:
+   case ARP_MODE_ONEKEY_CHORD_ARP:
       return "ARP";
    case ARP_MODE_CHORD_PAD:
       return "PAD";
-   case ARP_MODE_KEYS:
+   case ARP_MODE_MULTI_KEY:
       return "KEYS";
    }
    return "ERR!";
@@ -426,6 +426,25 @@ void ARP_SetClockMode(arp_clock_mode_t mode) {
    ARP_PersistData();
 }
 /////////////////////////////////////////////////////////////////////////////
+// Gets the current mode group for chord formation
+/////////////////////////////////////////////////////////////////////////////
+const mode_groups_t ARP_GetModeGroup() {
+   return arpSettings.modeGroup;
+}
+/////////////////////////////////////////////////////////////////////////////
+// Sets the current mode group for chord formation
+/////////////////////////////////////////////////////////////////////////////
+void ARP_SetModeGroup(mode_groups_t group) {
+   if (arpSettings.modeGroup == group) {
+      return;
+   }
+   arpSettings.modeGroup = group;
+
+   ARP_Reset();
+   // persist the change
+   ARP_PersistData();
+}
+/////////////////////////////////////////////////////////////////////////////
 // Returns arp settings 
 /////////////////////////////////////////////////////////////////////////////
 persisted_arp_data_t* ARP_GetARPSettings() {
@@ -460,10 +479,3 @@ void ARP_SetModeScale(scale_t scale) {
    ARP_PersistData();
 }
 
-/////////////////////////////////////////////////////////////////////////////
-// Sets chord extension and persists to EEPROM
-/////////////////////////////////////////////////////////////////////////////
-void ARP_SetChordExtension(chord_extension_t extension) {
-   arpSettings.chordExtension = extension;
-   ARP_PersistData();
-}

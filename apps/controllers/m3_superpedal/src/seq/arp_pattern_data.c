@@ -20,28 +20,42 @@
 #include "arp_pattern_data.h"
 
 //------------------------------------------------------------------------
-// Pattern Definitions
+// Pattern Definitions.  Each step is a 16th note.
 const arp_pattern_t patterns[NUM_PATTERNS] = {
-   {4,{{NORM,1,0,0},{NORM,2,0,0},{NORM,3,0,0},{NORM,4,0,0}}},  
-   {4,{{NORM,4,0,0},{NORM,3,0,0},{NORM,2,0,0},{NORM,1,0,0}}},   
-   {8,{{NORM,1,0,0},{NORM,2,0,0},{NORM,3,0,0},{NORM,4,0,0},{NORM,1,1,0},{NORM,3,0,0},{NORM,2,0,0},{NORM,1,0,0}}},   
-   {4,{{CHORD,1,0,0},{REST,2,0,0},{REST,3,0,0},{REST,4,0,0}}},
-   {4,{{CHORD,1,0,0},{REST,2,0,0},{CHORD,3,0,0},{REST,4,0,0}}}
+   //Ascending
+   {4,{{STEP_TYPE_NORM,1,0,0},{STEP_TYPE_NORM,2,0,0},{STEP_TYPE_NORM,3,0,0},{STEP_TYPE_NORM,4,0,0}}},  
+
+   // Descending
+   {4,{{STEP_TYPE_NORM,4,0,0},{STEP_TYPE_NORM,3,0,0},{STEP_TYPE_NORM,2,0,0},{STEP_TYPE_NORM,1,0,0}}},   
+
+   // Ascend & Descend
+   {8,{{STEP_TYPE_NORM,1,0,0},{STEP_TYPE_NORM,2,0,0},{STEP_TYPE_NORM,3,0,0},{STEP_TYPE_NORM,4,0,0},
+      {STEP_TYPE_NORM,1,1,0},{STEP_TYPE_NORM,3,0,0},{STEP_TYPE_NORM,2,0,0},{STEP_TYPE_NORM,1,0,0}}},   
+
+   // Chord 1/4 Notes
+   {4,{{STEP_TYPE_CHORD,0,0,0},{STEP_TYPE_REST,0,0,0},{STEP_TYPE_OFF,0,0,0},{STEP_TYPE_OFF,0,0,0}}},
+   
+   // Chord 1/8 Notes
+   {4,{{STEP_TYPE_CHORD,0,0,0},{STEP_TYPE_OFF,0,0,0},{STEP_TYPE_CHORD,0,0,0},{STEP_TYPE_OFF,0,0,0}}},
+
+   // Chord 1/16 Notes
+   {4,{{STEP_TYPE_CHORD,0,0,0},{STEP_TYPE_CHORD,0,0,0},{STEP_TYPE_CHORD,0,0,0},{STEP_TYPE_CHORD,0,0,0}}},
+
 };
 
 const char * patternNames[] = {
-   // 0..10
-   "Ascending",
-   "Descending",
-   "Ascend & Descend",
-   "Chord 1/4 Notes",
-   "Chord 1/8 Notes"
+   "Ascending Octaves",
+   "Descending Octaves",
+   "Asc & Desc Octaves",
+   "Chorded 1/4 Notes",
+   "Chorded 1/8 Notes",
+   "Chorded 1/16 Notes",
 };
 const char * patternShortNames[] = {
-   // 0..10
    "Asc ",
    "Desc",
    "AscDesc",
-   "Chord 4",
-   "Chord 8"
+   "Chrd 4",
+   "Chrd 8",
+   "Chrd 16",
 };

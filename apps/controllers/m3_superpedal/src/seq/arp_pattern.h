@@ -21,42 +21,62 @@
 /////////////////////////////////////////////////////////////////////////////
 #define MAX_NUM_STEPS 16
 #define MAX_NUM_NOTES_PER_STEP 4
-#define NUM_PATTERNS 5
+
+#define NUM_PATTERNS 6
 
 /////////////////////////////////////////////////////////////////////////////
 // Global Types
 /////////////////////////////////////////////////////////////////////////////
 
+// The step type for each step event within the pattern buffer.  With the exception of
+/// RNDM, these are the same as those in the BlueARP.
 typedef enum step_type_e {
-   RNDM = 0,
-   CHORD = 1,
-   TIE = 2,
-   NORM = 3,
-   REST = 4,
-   OFF = 5
+   // Random notes pinned off the root key
+   STEP_TYPE_RNDM = 0,
+   
+   // Chord formed from the root key using the current chord setting
+   STEP_TYPE_CHORD = 1,
+   
+   // Extends the notes in the previous step with this one.
+   // TODO:  Update the doc here with better description from BlueArp docs
+   STEP_TYPE_TIE = 2,
+   
+   // Normal mode means whatever notes have been added to the note stack
+   // will be added as 16th notes sequentially to the pattern buffer in 
+   // their order within the notestack.
+   STEP_TYPE_NORM = 3,
+
+   // Extend the note playing from the previous step. Used to make longer notes
+   STEP_TYPE_REST = 4,
+
+   // An Off step event doesn't play a note.
+   STEP_TYPE_OFF = 5
 } step_type_t;
 
+/**
+ * There is one event per step
+ */
 typedef struct step_event_s {
    step_type_t stepType;
-   // from 1..MAX_NUM_NOTES_PER_STEP
+   // The order of the active key from 1(first) up to MAX_NUM_KEYS_PER_STEP total keys pressed  
+   // Not valid, and set to 0 in the patterns, for STEP_TYPE_CHORD where all keys are to be
+   // played.
    u8 keySelect;
-   s8 octave;
-   s8 scaleStep;
+   // The octave offset up or down
+   s8 octaveOffset;
+   // The scale offset up or down in steps
+   s8 scaleStepOffset;
 } step_event_t;
 
+/**
+ * Type for patterns defined in arp_pattern_data.  
+ */
 typedef struct arp_pattern_s {
    u8 numSteps;
    step_event_t events[MAX_NUM_STEPS];
 } arp_pattern_t;
 
-typedef struct step_note_s {
-   u8 note;
-   u8 velocity;
-   // duration in bpmticks from starting tickoffset in the step
-   u8 length;
-   // offset += in bpmticks.  Default is 0 at start of step
-   s32 tickOffset;
-} step_note_t;
+
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -66,7 +86,7 @@ typedef struct step_note_s {
 extern s32 ARP_PAT_Init();
 
 extern s32 ARP_PAT_KeyPressed(u8 note, u8 velocity);
-extern void ARP_PAT_KeyReleased(u8 note, u8 velocity);
+extern s32 ARP_PAT_KeyReleased(u8 note, u8 velocity);
 
 extern s32 ARP_PAT_SetCurrentPattern(u8 _patternIndex);
 extern s32 ARP_PAT_ActivatePattern(u8 _patternIndex);

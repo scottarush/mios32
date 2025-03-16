@@ -12,7 +12,7 @@
 
 
 #include "indicators.h"
-
+#include "arp_modes.h"
 /////////////////////////////////////////////////////////////////////////////
 // Global definitions
 /////////////////////////////////////////////////////////////////////////////
@@ -33,6 +33,8 @@ typedef struct persisted_arp_hmi_data_s {
 
    u8 lastArpSettingsPageIndex;
 
+   mode_groups_t currentModeGroup;
+
 } persisted_arp_hmi_data_t;
 
 
@@ -45,17 +47,18 @@ extern s32 ARP_HMI_Init(u8);
 extern void ARP_HMI_UpdateArpStompIndicator(indicator_id_t indicator);
 extern void ARP_HMI_UpdateChordStompIndicator(indicator_id_t);
 
-extern void ARP_HMI_ARPSettings_UpdateDisplay();
+extern void ARP_HMI_ARPSettingsPage_UpdateDisplay();
 extern void ARP_HMI_HandleArpToeToggle(u8, u8);
 extern void ARP_HMI_HandleChordToeToggle(u8 toeNum, u8 pressed);
 extern s32 ARP_HMI_PersistData();
 extern void ARP_HMI_ARPSettingsPage_RotaryEncoderChanged(s8 increment);
 extern void ARP_HMI_ARPSettingsPage_RotaryEncoderSelected();
 extern void ARP_HMI_ARPPatternPage_RotaryEncoderChanged(s8 increment);
-extern void ARP_HMI_ARPPatternPage_RotaryEncoderSelected();
-extern void ARP_HMI_ARPPatternPage_BackButtonCallback();
 
 extern void ARP_HMI_ARPPatternPage_UpdateDisplay();
+
+extern void ARP_HMI_ModeGroupPage_UpdateDisplay();
+extern void ARP_HMI_ModeGroupPage_RotaryEncoderChanged(s8 increment);
 
 ///////////////////////////////////////////////////
 // Export global variables

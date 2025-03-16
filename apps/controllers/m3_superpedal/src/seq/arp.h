@@ -26,9 +26,9 @@ typedef enum arp_mode_e {
    // Arp mode off.  Notes will be played
    ARP_MODE_OFF = 0,
    // Arppegiates from multiple press keys.  Not very usable with pedal board
-   ARP_MODE_KEYS = 1,
+   ARP_MODE_MULTI_KEY = 1,
    // arpeggiates a chord from single root note key/pedal press
-   ARP_MODE_CHORD_ARP = 2,
+   ARP_MODE_ONEKEY_CHORD_ARP = 2,
    // plays modal chord from single root note key/pedal press
    ARP_MODE_CHORD_PAD = 3 
 } arp_mode_t;
@@ -49,7 +49,7 @@ typedef struct persisted_arp_data_s {
    arp_clock_mode_t clockMode;
    key_t rootKey;
    scale_t modeScale;
-   chord_extension_t chordExtension;
+   mode_groups_t modeGroup;
    int ppqn;
    double bpm;
 } persisted_arp_data_t;
@@ -61,7 +61,6 @@ typedef struct persisted_arp_data_s {
 
 extern s32 ARP_Init(u8);
 
-extern s32 ARP_Reset(void);
 
 extern s32 ARP_Handler(void);
 
@@ -92,6 +91,11 @@ extern scale_t ARP_GetModeScale();
 
 extern arp_clock_mode_t ARP_GetClockMode();
 extern void ARP_SetClockMode(arp_clock_mode_t mode);
+
+extern const mode_groups_t ARP_GetChordExtension();
+extern void ARP_SetChordExtension(mode_groups_t extension);
+
+
 extern s32 ARP_PersistData();
 /////////////////////////////////////////////////////////////////////////////
 // Export global variables

@@ -52,9 +52,13 @@ typedef enum arp_settings_toe_functions_e {
 } arp_settings_toe_functions_t;
 
 
+// Arp settings page.  These are indexes into the page titles as well.
 typedef enum arp_settings_entries_e {
    ARP_SETTINGS_CLOCK_MODE = 0
 } arp_settings_entries_t;
+const char* arpSettingsPageEntryTitles[] = { "Set Clock Mode" };
+#define NUM_ARP_SETTINGS 1
+
 
 
 // Toe functions in Chord mode.  Note that toe switches 7 and 8 are
@@ -67,8 +71,7 @@ typedef enum chord_settings_toe_functions_e {
 } chord_settings_toe_functions_t;
 
 
-const char* arpSettingsPageEntryTitles[] = { "Set Clock Mode" };
-#define ARP_SETTINGS_PAGE_NUM_ENTRIES 1
+
 
 //----------------------------------------------------------------------------
 // Local prototypes
@@ -77,6 +80,7 @@ const char* arpSettingsPageEntryTitles[] = { "Set Clock Mode" };
 void ARP_HMI_SelectRootKeyCallback(u8 pedalNum);
 void ARP_HMI_SelectModeScaleCallback(u8 pedalNum);
 const char* ARP_HMI_GetClockModeText(arp_clock_mode_t mode);
+const char* ARP_HMI_GetChordExtensionText(mode_groups_t extension);
 void ARP_HMI_ARPSettingsValues_RotaryEncoderChanged(s8 increment);
 
 
@@ -125,16 +129,61 @@ s32 ARP_HMI_PersistData() {
    }
    return valid;
 }
+
+////////////////////////////////////////////////////////////////////////////
+// Callback to update the arp settings display
+////////////////////////////////////////////////////////////////////////////
+void ARP_HMI_ModeGroupPage_UpdateDisplay() {
+   HMI_RenderLine(0, modeGroupPage.pPageTitle, RENDER_LINE_CENTER);
+   // Print up to 3 entries with current selection on line 2
+
+   // Previous item on line 1
+   if (arpHMISettings.currentModeGroup > 0) {
+      HMI_RenderLine(2, ARP_MODES_GetModeGroupName(arpHMISettings.currentModeGroup-1), RENDER_LINE_SELECT);
+   }
+   // Selected entry on line 2
+   HMI_RenderLine(2, ARP_MODES_GetModeGroupName(arpHMISettings.currentModeGroup), RENDER_LINE_SELECT);
+   if (arpHMISettings.currentModeGroup== NUM_MODE_GROUPS - 1) {
+      // At the end, clear line 3
+      HMI_ClearLine(3);
+   }
+   else {
+      // Print next item on line 3
+      HMI_RenderLine(3, ARP_MODES_GetModeGroupName(arpHMISettings.currentModeGroup+1), RENDER_LINE_CENTER);
+   }
+}
+/////////////////////////////////////////////////////////////////////////////
+// Callback for rotary encoder changes on mode group page
+/////////////////////////////////////////////////////////////////////////////
+void ARP_HMI_ModeGroupPage_RotaryEncoderChanged(s8 increment) {
+   int group = arpHMISettings.currentModeGroup + increment;
+   if (group < 0){
+      group = 0;
+   }
+   else if (group >= NUM_MODE_GROUPS){
+      group = NUM_MODE_GROUPS - 1;
+   }
+   if (group != arpHMISettings.currentModeGroup){
+      arpHMISettings.currentModeGroup = group;
+      ARP_HMI_PersistData();
+   }
+   pCurrentPage->pUpdateDisplayCallback();
+}
+
 ////////////////////////////////////////////////////////////////////////////
 // Callback to update the arp pattern select display
 ////////////////////////////////////////////////////////////////////////////
 void ARP_HMI_ARPPatternPage_UpdateDisplay() {
    HMI_RenderLine(0, arpPatternPage.pPageTitle, RENDER_LINE_CENTER);
-   // Spacer on line 1
-   HMI_RenderLine(1, "--------------------", RENDER_LINE_LEFT);
 
-   // Print up to 2 entries with current selection on line 2
-
+   // Print up to 3 entries with current selection on line 2
+  // Previous item on line 1
+   if (lastARPPatternIndex > 0) {
+      HMI_RenderLine(1, ARP_PAT_GetPatternName(lastARPPatternIndex - 1), RENDER_LINE_SELECT);
+   }
+   else {
+      HMI_ClearLine(1);
+   }
    // Selected entry on line 2
    HMI_RenderLine(2, ARP_PAT_GetPatternName(lastARPPatternIndex), RENDER_LINE_SELECT);
    if (lastARPPatternIndex >= NUM_PATTERNS - 1) {
@@ -150,16 +199,20 @@ void ARP_HMI_ARPPatternPage_UpdateDisplay() {
 ////////////////////////////////////////////////////////////////////////////
 // Callback to update the arp settings display
 ////////////////////////////////////////////////////////////////////////////
-void ARP_HMI_ARPSettings_UpdateDisplay() {
+void ARP_HMI_ARPSettingsPage_UpdateDisplay() {
    HMI_RenderLine(0, arpSettingsPage.pPageTitle, RENDER_LINE_CENTER);
-   // Spacer on line 1
-   HMI_RenderLine(1, "--------------------", RENDER_LINE_LEFT);
+   // Print up to 3 entries with current selection on line 2
 
-   // Print up to 2 entries with current selection on line 2
-
+   // Previous item on line 1
+   if (arpHMISettings.lastArpSettingsPageIndex > 0) {
+      HMI_RenderLine(1, arpSettingsPageEntryTitles[arpHMISettings.lastArpSettingsPageIndex - 1], RENDER_LINE_SELECT);
+   }
+   else {
+      HMI_ClearLine(1);
+   }
    // Selected entry on line 2
    HMI_RenderLine(2, arpSettingsPageEntryTitles[arpHMISettings.lastArpSettingsPageIndex], RENDER_LINE_SELECT);
-   if (arpHMISettings.lastArpSettingsPageIndex == ARP_SETTINGS_PAGE_NUM_ENTRIES - 1) {
+   if (arpHMISettings.lastArpSettingsPageIndex == NUM_ARP_SETTINGS - 1) {
       // At the end, clear line 3
       HMI_ClearLine(3);
    }
@@ -167,17 +220,6 @@ void ARP_HMI_ARPSettings_UpdateDisplay() {
       // Print next item on line 3
       HMI_RenderLine(3, arpSettingsPageEntryTitles[arpHMISettings.lastArpSettingsPageIndex + 1], RENDER_LINE_CENTER);
    }
-}
-
-/////////////////////////////////////////////////////////////////////////////
-// Callback for select arp pattern page rotary encoder select
-/////////////////////////////////////////////////////////////////////////////
-void ARP_HMI_ARPPatternPage_RotaryEncoderSelected() {
-   ARP_PAT_SetCurrentPattern(lastARPPatternIndex);
-   // Go back to the previous page
-   pCurrentPage = pCurrentPage->pBackPage;
-   // And force an update to the current page display
-   pCurrentPage->pUpdateDisplayCallback();
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -196,21 +238,14 @@ void ARP_HMI_ARPPatternPage_RotaryEncoderChanged(s8 increment) {
       return;
    }
    lastARPPatternIndex = index;
-   // Activate the pattern, but don't set it as current until/unless user selects encoder.  
+
+   // Set and activate the pattern
+   ARP_PAT_SetCurrentPattern(lastARPPatternIndex);
+
    ARP_PAT_ActivatePattern(lastARPPatternIndex);
 
    // force an update to the current page display
    pCurrentPage->pUpdateDisplayCallback();
-}
-
-/////////////////////////////////////////////////////////////////////////////
-// Callback for back button pressed on arp pattern select page.
-/////////////////////////////////////////////////////////////////////////////
-void ARP_HMI_ARPPatternPage_BackButtonCallback() {
-   // On a back button press, user did not select a new pattern so restore the
-   // current one
-   lastARPPatternIndex = ARP_GetARPSettings()->arpPatternIndex;
-   ARP_PAT_ActivatePattern(lastARPPatternIndex);
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -221,8 +256,8 @@ void ARP_HMI_ARPSettingsPage_RotaryEncoderChanged(s8 increment) {
    if (index < 0) {
       index = 0;
    }
-   else if (index >= ARP_SETTINGS_PAGE_NUM_ENTRIES) {
-      index = ARP_SETTINGS_PAGE_NUM_ENTRIES - 1;
+   else if (index >= NUM_ARP_SETTINGS) {
+      index = NUM_ARP_SETTINGS - 1;
    }
    if (index == arpHMISettings.lastArpSettingsPageIndex)
       return;
@@ -234,11 +269,12 @@ void ARP_HMI_ARPSettingsPage_RotaryEncoderChanged(s8 increment) {
 // Callback for rotary encoder select on gen MIDI select page
 /////////////////////////////////////////////////////////////////////////////
 void ARP_HMI_ARPSettingsPage_RotaryEncoderSelected() {
+   snprintf(dialogPageTitle, DISPLAY_CHAR_WIDTH, arpSettingsPageEntryTitles[arpHMISettings.lastArpSettingsPageIndex]);
    switch (arpHMISettings.lastArpSettingsPageIndex) {
    case ARP_SETTINGS_CLOCK_MODE:
-      snprintf(dialogPageTitle, DISPLAY_CHAR_WIDTH, "SELECT CLOCK MODE");
-      snprintf(dialogPageMessage1, DISPLAY_CHAR_WIDTH, "Clock Mode: %s", ARP_HMI_GetClockModeText(ARP_GetClockMode()));
+      snprintf(dialogPageMessage1, DISPLAY_CHAR_WIDTH, "%s", ARP_HMI_GetClockModeText(ARP_GetClockMode()));
       dialogPageMessage2[0] = '\0';
+
       dialogPage.pRotaryEncoderChangedCallback = ARP_HMI_ARPSettingsValues_RotaryEncoderChanged;
       dialogPage.pBackPage = pCurrentPage;
       dialogPage.pBackButtonCallback = NULL;
@@ -264,7 +300,7 @@ void ARP_HMI_ARPSettingsValues_RotaryEncoderChanged(s8 increment) {
          mode = ARP_CLOCK_MODE_SLAVE;
       }
       ARP_SetClockMode(mode);
-      snprintf(dialogPageMessage1, DISPLAY_CHAR_WIDTH, "Clock Mode: %s", ARP_HMI_GetClockModeText(ARP_GetClockMode()));
+      snprintf(dialogPageMessage1, DISPLAY_CHAR_WIDTH, "%s", ARP_HMI_GetClockModeText(ARP_GetClockMode()));
       break;
    }
    pCurrentPage->pUpdateDisplayCallback();
@@ -289,7 +325,7 @@ void ARP_HMI_UpdateArpStompIndicator(indicator_id_t indicator) {
    indicator_color_t color = IND_COLOR_RED;
    // Set indicator to Green if running, Red if stopped, Yellow if not in Arp mode (this is an error)
    switch (ARP_GetArpMode()) {
-   case ARP_MODE_CHORD_ARP:
+   case ARP_MODE_ONEKEY_CHORD_ARP:
       // In chord arpeggiator mode, 
       if (ARP_GetEnabled()) {
          // Red for arpeggiator running
@@ -301,7 +337,7 @@ void ARP_HMI_UpdateArpStompIndicator(indicator_id_t indicator) {
          color = IND_COLOR_GREEN;
       }
       break;
-   case ARP_MODE_KEYS:
+   case ARP_MODE_MULTI_KEY:
       color = IND_COLOR_YELLOW;
       break;
    default:

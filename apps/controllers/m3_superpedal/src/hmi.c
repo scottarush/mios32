@@ -46,6 +46,7 @@
 struct page_s homePage;
 struct page_s arpSettingsPage;
 struct page_s arpPatternPage;
+struct page_s modeGroupPage;
 struct page_s dialogPage;
 struct page_s* pCurrentPage;
 
@@ -163,7 +164,6 @@ void HMI_Init(u8 resetDefaults) {
 // Initializes the HMI pages
 /////////////////////////////////////////////////////////////////////////////
 void HMI_InitPages() {
-   homePage.pageID = PAGE_HOME;
 
    char* pHomeTitle = { "---M3 SUPERPEDAL---" };
    homePage.pPageTitle = pHomeTitle;
@@ -174,28 +174,33 @@ void HMI_InitPages() {
    homePage.pBackButtonCallback = NULL;
    homePage.pBackPage = NULL;
 
-   arpSettingsPage.pageID = PAGE_ARP_SETTINGS;
    char* arpSettingsTitle = { "ARP SETTINGS" };
    arpSettingsPage.pPageTitle = arpSettingsTitle;
-   arpSettingsPage.pUpdateDisplayCallback = ARP_HMI_ARPSettings_UpdateDisplay;
+   arpSettingsPage.pUpdateDisplayCallback = ARP_HMI_ARPSettingsPage_UpdateDisplay;
    arpSettingsPage.pRotaryEncoderChangedCallback = ARP_HMI_ARPSettingsPage_RotaryEncoderChanged;
    arpSettingsPage.pRotaryEncoderSelectCallback = ARP_HMI_ARPSettingsPage_RotaryEncoderSelected;
    arpSettingsPage.pPedalSelectedCallback = NULL;
    arpSettingsPage.pBackButtonCallback = NULL;
    arpSettingsPage.pBackPage = &homePage;
 
+   char* modeGroupTitle = { "MODE GROUP" };
+   modeGroupPage.pPageTitle = modeGroupTitle;
+   modeGroupPage.pUpdateDisplayCallback = ARP_HMI_ModeGroupPage_UpdateDisplay;
+   modeGroupPage.pRotaryEncoderChangedCallback = ARP_HMI_ModeGroupPage_RotaryEncoderChanged;
+   modeGroupPage.pRotaryEncoderSelectCallback = NULL;
+   modeGroupPage.pPedalSelectedCallback = NULL;
+   modeGroupPage.pBackButtonCallback = NULL;
+   modeGroupPage.pBackPage = &homePage;
 
-   arpPatternPage.pageID = PAGE_ARP_PATTERN_SELECT;
    char* arpPatternTitle = { "ARP PATTERNS" };
    arpPatternPage.pPageTitle = arpPatternTitle;
    arpPatternPage.pUpdateDisplayCallback = ARP_HMI_ARPPatternPage_UpdateDisplay;
    arpPatternPage.pRotaryEncoderChangedCallback = ARP_HMI_ARPPatternPage_RotaryEncoderChanged;
-   arpPatternPage.pRotaryEncoderSelectCallback = ARP_HMI_ARPPatternPage_RotaryEncoderSelected;
+   arpPatternPage.pRotaryEncoderSelectCallback = NULL;
    arpPatternPage.pPedalSelectedCallback = NULL;
-   arpPatternPage.pBackButtonCallback = ARP_HMI_ARPPatternPage_BackButtonCallback;
+   arpPatternPage.pBackButtonCallback = NULL;
    arpPatternPage.pBackPage = &homePage;
 
-   dialogPage.pageID = PAGE_DIALOG;
    dialogPage.pPageTitle = dialogPageTitle;
    dialogPageTitle[0] = '\0';
    dialogPage.pBackButtonCallback = NULL;
@@ -342,10 +347,10 @@ void HMI_NotifyStompToggle(u8 stompNum, u8 pressed, s32 timestamp) {
    case STOMP_SWITCH_CHORD:
       if (hmiSettings.toeSwitchMode == TOE_SWITCH_CHORD) {
          // This is a second stomp so toggle Chord mode on/off
-         if (ARP_GetArpMode() == ARP_MODE_OFF){
+         if (ARP_GetArpMode() == ARP_MODE_OFF) {
             ARP_SetArpMode(ARP_MODE_CHORD_PAD);
          }
-         else{
+         else {
             ARP_SetArpMode(ARP_MODE_OFF);
          }
       }
@@ -369,7 +374,7 @@ void HMI_NotifyStompToggle(u8 stompNum, u8 pressed, s32 timestamp) {
          // Initial press
          hmiSettings.toeSwitchMode = TOE_SWITCH_ARP;
          // Set arp to arp mode
-         ARP_SetArpMode(ARP_MODE_CHORD_ARP);
+         ARP_SetArpMode(ARP_MODE_ONEKEY_CHORD_ARP);
          // TODO - Need a separate setting for Key vs Chord mode and use that setting here
 
          // Set enabled so arpeggiator running
@@ -544,7 +549,16 @@ void HMI_NotifyEncoderSwitchToggle(u8 pressed, s32 timestamp) {
    if (pCurrentPage->pRotaryEncoderSelectCallback != NULL) {
       pCurrentPage->pRotaryEncoderSelectCallback();
    }
-
+   else {
+      // Default behavior is back
+      if (pCurrentPage->pBackPage != NULL) {
+         pCurrentPage = pCurrentPage->pBackPage;
+      }
+      else {
+         pCurrentPage = &homePage;
+      }
+   }
+   pCurrentPage->pUpdateDisplayCallback();
 }
 ////////////////////////////////////////////////////////////////////////////
 // Called on a change in the Back switch
@@ -674,19 +688,20 @@ void HMI_HomePage_UpdateDisplay() {
       pToeSwitchModeTitles[hmiSettings.toeSwitchMode]);
    HMI_RenderLine(0, lineBuffer, RENDER_LINE_CENTER);
 
-   // Spacer on line 1
-   HMI_RenderLine(1, "--------------------", RENDER_LINE_LEFT);
    // Current octave, volume and midi channel always on line 3
    snprintf(lineBuffer, DISPLAY_CHAR_WIDTH + 1, "Oct:%d Vol:%d Chn:%d",
       PEDALS_GetOctave(), HMI_GetToeVolumeIndex(), PEDALS_GetMIDIChannel());
    HMI_RenderLine(3, lineBuffer, RENDER_LINE_LEFT);
 
    ///////////////////////////////////////
-   // Render line 2 based on the current toe switch mode
+   // Render lines 1 & 2 based on the current toe switch mode
    switch (hmiSettings.toeSwitchMode) {
    case TOE_SWITCH_OCTAVE:
    case TOE_SWITCH_VOLUME:
    case TOE_SWITCH_MIDI_CHANNEL:
+      // Spacer on line 1
+      HMI_RenderLine(1, "--------------------", RENDER_LINE_LEFT);
+
       HMI_ClearLine(2);
       break;
    case TOE_SWITCH_CHORD:
@@ -715,7 +730,7 @@ void HMI_HomePage_UpdateDisplay() {
          snprintf(lineBuffer, DISPLAY_CHAR_WIDTH + 1, "%s %d", scratchBuffer, bpm);
          HMI_RenderLine(2, lineBuffer, RENDER_LINE_CENTER);
       }
-      else{
+      else {
          // Just clear line 2 for chord mode 
          HMI_ClearLine(2);
       }
@@ -740,6 +755,11 @@ void HMI_HomePage_RotaryEncoderChanged(s8 increment) {
       // Go directly to the arp pattern select page
       arpPatternPage.pBackPage = pCurrentPage;
       pCurrentPage = &arpPatternPage;
+      break;
+   case TOE_SWITCH_CHORD:
+      // Go directly to the mode groups page
+      modeGroupPage.pBackPage = pCurrentPage;
+      pCurrentPage = &modeGroupPage;
       break;
    case TOE_SWITCH_OCTAVE:
       // Change the octave directly

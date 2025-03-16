@@ -26,15 +26,7 @@
 // Global Types
 /////////////////////////////////////////////////////////////////////////////
 
-typedef enum pageID_e {
-   PAGE_HOME = 0,
-   PAGE_ARP_SETTINGS = 1,
-   PAGE_ARP_PATTERN_SELECT = 2,
-   PAGE_DIALOG = 3,
-} pageID_t;
-
 struct page_s {
-   pageID_t pageID;
    char* pPageTitle;
    void (*pUpdateDisplayCallback)();
    void (*pRotaryEncoderChangedCallback)(s8 increment);
@@ -80,6 +72,7 @@ extern struct page_s dialogPage;
 extern struct page_s* pCurrentPage;
 extern struct page_s arpSettingsPage;
 extern struct page_s arpPatternPage;
+extern struct page_s modeGroupPage;
 
 // Buffer for dialog Page Title
 extern char dialogPageTitle[DISPLAY_CHAR_WIDTH + 1];
