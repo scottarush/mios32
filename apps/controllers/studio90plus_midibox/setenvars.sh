@@ -1,4 +1,4 @@
-export PATH=$PATH:/home/scott/tools/gnu-tools-for-stm32-12.3.rel1/install-native/bin
+export PATH=$PATH:/home/scott/gnutools/gnu-tools-for-stm32-12.3.rel1/install-native/bin
 export MIOS32_PATH=/home/scott/midibox/mios32
 export MIOS32_BIN_PATH=$MIOS32_PATH/bin
 export MIOS32_GCC_PREFIX=arm-none-eabi
