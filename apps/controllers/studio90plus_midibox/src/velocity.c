@@ -66,6 +66,9 @@ int VELOCITY_LookupVelocity(int velocity, velocity_curve_t curve) {
       case VELOCITY_CURVE_CONCAVE:
          pCurveArray = &concaveVelocityCurve;
          break;
+      case VELOCITY_CURVE_SATURATION:
+         pCurveArray = &saturationVelocityCurve;
+         break;
       default:
          DEBUG_MSG("VELOCITY_LookupVelocity: Invalid velocity curve index: %d", curve);
       }
