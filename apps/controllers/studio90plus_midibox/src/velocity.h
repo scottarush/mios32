@@ -12,9 +12,10 @@
 typedef enum velocity_curve_e {
    VELOCITY_CURVE_LINEAR = 0,
    VELOCITY_CURVE_SIGMOID = 1,
-   VELOCITY_CURVE_CONVEX = 2,
-   VELOCITY_CURVE_CONCAVE = 3,
-   VELOCITY_CURVE_SATURATION = 4
+   VELOCITY_CURVE_CONVEX_LOW = 2,
+   VELOCITY_CURVE_CONVEX_HIGH = 3,
+   VELOCITY_CURVE_CONCAVE = 4,
+   VELOCITY_CURVE_SATURATION = 5
 } velocity_curve_t;
 
 /////////////////////////////////////////////////////////////////////////////

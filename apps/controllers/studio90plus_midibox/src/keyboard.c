@@ -12,7 +12,7 @@
  * 1.  Simplified to a single keyboard.
  * 2.  Velocity DIN logic was replaced since Scott could not get the original
  *     code to work with the Studio 90.
- * 3.  Removed supported for multiple keyboards to reduce complex
+ * 3.  Removed support for multiple keyboards to reduce complexity
  * 4.  Removed all conditional compilations.
  *
  * ==========================================================================
@@ -193,7 +193,7 @@ s32 KEYBOARD_Init(u32 mode) {
       kc->current_zone_preset.zoneParams[0].midiChannel = 1;
       kc->current_zone_preset.zoneParams[0].startNoteNum = 21;
       kc->current_zone_preset.zoneParams[0].octaveOffset = 0;
-      kc->current_zone_preset.zoneParams[0].velocityCurve = VELOCITY_CURVE_CONVEX;
+      kc->current_zone_preset.zoneParams[0].velocityCurve = VELOCITY_CURVE_CONVEX_HIGH;
    }
 
    return 0; // no error
@@ -449,10 +449,10 @@ static void KEYBOARD_NotifyToggle(u8 kb, u8 row, u8 column, u8 depressed) {
    else if (note_number < 0)
       note_number = 0;
 
-#if DEBUG_VERBOSE_LEVEL >= 2
-   DEBUG_MSG("row=%d, column=%d, depressed=%d  -->  key=%d, break_contact:%d, note_number=%d\n",
-      row, column, depressed, key, break_contact, note_number);
-#endif
+   if (kc->verbose_level >= 2) {
+      DEBUG_MSG("row=%d, column=%d, depressed=%d  -->  key=%d, break_contact:%d, note_number=%d\n",
+         row, column, depressed, key, break_contact, note_number);
+   }
 
    //--------------------------------------------------------------------------
    // Scott Rush.  I hand copied and unwound the rest of this function from
