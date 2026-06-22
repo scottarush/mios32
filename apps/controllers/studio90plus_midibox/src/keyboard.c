@@ -193,7 +193,7 @@ s32 KEYBOARD_Init(u32 mode) {
       kc->current_zone_preset.zoneParams[0].midiChannel = 1;
       kc->current_zone_preset.zoneParams[0].startNoteNum = 21;
       kc->current_zone_preset.zoneParams[0].octaveOffset = 0;
-      kc->current_zone_preset.zoneParams[0].velocityCurve = VELOCITY_CURVE_CONVEX_HIGH;
+      kc->current_zone_preset.zoneParams[0].velocityCurve = VELOCITY_CURVE_SIGMOID_HIGH;
    }
 
    return 0; // no error

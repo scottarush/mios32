@@ -182,7 +182,7 @@ void HMI_InitPresetDefaults() {
    pZone->midiChannel = 1;
    pZone->startNoteNum = 21;  // A-1
    pZone->octaveOffset = 0;
-   pZone->velocityCurve = VELOCITY_CURVE_CONVEX_HIGH;
+   pZone->velocityCurve = VELOCITY_CURVE_SIGMOID_HIGH;
 
    //---------------------------------------
    // Dual_Zone split at middle C
@@ -195,14 +195,14 @@ void HMI_InitPresetDefaults() {
    pZone->midiChannel = 1;
    pZone->startNoteNum = 21;
    pZone->octaveOffset = 0;
-   pZone->velocityCurve = VELOCITY_CURVE_CONVEX_HIGH;
+   pZone->velocityCurve = VELOCITY_CURVE_SIGMOID_HIGH;
 
    pZone = &pPreset->zoneParams[1];
    pZone->midiPorts = defMidiPorts;
    pZone->midiChannel = 2;
    pZone->startNoteNum = 60;
    pZone->octaveOffset = -2;   // Two octave shift down
-   pZone->velocityCurve = VELOCITY_CURVE_CONVEX_HIGH;
+   pZone->velocityCurve = VELOCITY_CURVE_SIGMOID_HIGH;
 
    //---------------------------------------
    // Dual_Zone Bass with two left octaves
@@ -215,14 +215,14 @@ void HMI_InitPresetDefaults() {
    pZone->midiChannel = 1;
    pZone->startNoteNum = 21;
    pZone->octaveOffset = 0;
-   pZone->velocityCurve = VELOCITY_CURVE_CONVEX_HIGH;
+   pZone->velocityCurve = VELOCITY_CURVE_SIGMOID_HIGH;
 
    pZone = &pPreset->zoneParams[1];
    pZone->midiPorts = defMidiPorts;
    pZone->midiChannel = 2;
    pZone->startNoteNum = 45;
    pZone->octaveOffset = 0;    // no shift
-   pZone->velocityCurve = VELOCITY_CURVE_CONVEX_HIGH;
+   pZone->velocityCurve = VELOCITY_CURVE_SIGMOID_HIGH;
 
    //---------------------------------------
    // Triple zone split evenly
@@ -235,21 +235,22 @@ void HMI_InitPresetDefaults() {
    pZone->midiChannel = 1;
    pZone->startNoteNum = 21;
    pZone->octaveOffset = 0;
-   pZone->velocityCurve = VELOCITY_CURVE_CONVEX_HIGH;
+   pZone->velocityCurve = VELOCITY_CURVE_SIGMOID_HIGH;
+
 
    pZone = &pPreset->zoneParams[1];
    pZone->midiPorts = defMidiPorts;
    pZone->midiChannel = 2;
    pZone->startNoteNum = 50;
    pZone->octaveOffset = -1;   // Single octave down
-   pZone->velocityCurve = VELOCITY_CURVE_CONVEX_HIGH;
+   pZone->velocityCurve = VELOCITY_CURVE_SIGMOID_HIGH;
 
    pZone = &pPreset->zoneParams[2];
    pZone->midiPorts = defMidiPorts;
    pZone->midiChannel = 3;
    pZone->startNoteNum = 79;
    pZone->octaveOffset = -4;    // four octaves down
-   pZone->velocityCurve = VELOCITY_CURVE_CONVEX_HIGH;
+   pZone->velocityCurve = VELOCITY_CURVE_SIGMOID_HIGH;
 
    //---------------------------------------
     // Triple zone bass with two left octaves and two top octaves
@@ -262,21 +263,21 @@ void HMI_InitPresetDefaults() {
    pZone->midiChannel = 1;
    pZone->startNoteNum = 21;
    pZone->octaveOffset = 0;
-   pZone->velocityCurve = VELOCITY_CURVE_CONVEX_HIGH;
+   pZone->velocityCurve = VELOCITY_CURVE_SIGMOID_HIGH;
 
    pZone = &pPreset->zoneParams[1];
    pZone->midiPorts = defMidiPorts;
    pZone->midiChannel = 2;
    pZone->startNoteNum = 45;
    pZone->octaveOffset = 0;
-   pZone->velocityCurve = VELOCITY_CURVE_CONVEX_HIGH;
+   pZone->velocityCurve = VELOCITY_CURVE_SIGMOID_HIGH;
 
    pZone = &pPreset->zoneParams[2];
    pZone->midiPorts = defMidiPorts;
    pZone->midiChannel = 3;
    pZone->startNoteNum = 85;
    pZone->octaveOffset = 0;
-   pZone->velocityCurve = VELOCITY_CURVE_CONVEX_HIGH;
+   pZone->velocityCurve = VELOCITY_CURVE_SIGMOID_HIGH;
 
 }
 
@@ -646,13 +647,13 @@ int HMI_VelocityPageKeyCallbackHandler(u8 noteNumber) {
       curve = VELOCITY_CURVE_LINEAR;
       break;
    case 62:
-      curve = VELOCITY_CURVE_SIGMOID;
+      curve = VELOCITY_CURVE_SIGMOID_LOW;
       break;
    case 64:
-      curve = VELOCITY_CURVE_CONVEX_LOW;
+      curve = VELOCITY_CURVE_SIGMOID_HIGH;
       break;
    case 65:
-      curve = VELOCITY_CURVE_CONVEX_HIGH;
+      curve = VELOCITY_CURVE_CONVEX;
       break;
    case 67:
       curve = VELOCITY_CURVE_CONCAVE;
